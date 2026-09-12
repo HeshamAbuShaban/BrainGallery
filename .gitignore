@@ -1,0 +1,26 @@
+# Build outputs
+app/build/
+.gradle/
+build/
+*.apk
+*.aab
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# Local config
+local.properties
+gradle.properties
+
+# Generated files
+*.class
+*.dex
+*.jar
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

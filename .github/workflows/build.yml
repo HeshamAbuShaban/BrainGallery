@@ -1,0 +1,73 @@
+name: Build BrainGallery
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Accept licenses
+        run: yes | sdkmanager --licenses || true
+
+      - name: Install platform + build-tools
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+        working-directory: BrainGallery
+
+      - name: Build debug APK
+        run: ./gradlew assembleDebug --stacktrace
+        working-directory: BrainGallery
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: brain-gallery-debug
+          path: BrainGallery/app/build/outputs/apk/debug/app-debug.apk
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Accept licenses
+        run: yes | sdkmanager --licenses || true
+      - name: Install platform + build-tools
+        run: sdkmanager "platforms;android-36" "build-tools;36.0.0" "platform-tools"
+      - name: Build release APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --stacktrace
+        working-directory: BrainGallery
+      - name: GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: BrainGallery/app/build/outputs/apk/release/app-release-unsigned.apk
