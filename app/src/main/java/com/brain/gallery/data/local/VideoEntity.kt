@@ -22,6 +22,11 @@ data class VideoEntity(
     val confidence: Float = 0f,
     val brainLevel: Int = 0, // 0=L0, 1=L1, 2=L2 done
     val junkScore: Float = 0f, // 1.0 = meme/screenshot/junk
+    // Vision fields (L1, same keyframe pass)
+    val faceCount: Int = 0,
+    val smileCount: Int = 0,
+    val phash: Long = 0L, // 0 = unknown
+    val sharpness: Float = 0f,
     // Behavior fields with decay
     val lastWatchedMs: Long = 0,
     val watchCount: Int = 0,

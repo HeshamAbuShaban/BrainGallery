@@ -32,6 +32,9 @@ interface VideoDao {
     @Query("UPDATE videos SET isFavorite = :fav WHERE id = :id")
     suspend fun setFavorite(id: Long, fav: Boolean)
 
+    @Query("DELETE FROM videos WHERE id IN (:ids)")
+    suspend fun deleteByIds(ids: List<Long>)
+
     @Query("""SELECT * FROM videos WHERE displayName LIKE '%' || :q || '%' OR tags LIKE '%' || :q || '%'
         OR category LIKE '%' || :q || '%' OR folderName LIKE '%' || :q || '%'
         ORDER BY watchCount DESC, dateAddedSec DESC LIMIT 60""")

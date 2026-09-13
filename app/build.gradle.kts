@@ -80,6 +80,7 @@ dependencies {
     implementation(libs.androidx.media3.ui)
 
     implementation(libs.mlkit.imagelabeling)
+    implementation(libs.mlkit.facedetection)
 
     debugImplementation(libs.androidx.ui.tooling)
 }

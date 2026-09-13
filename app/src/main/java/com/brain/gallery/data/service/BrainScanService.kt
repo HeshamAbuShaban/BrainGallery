@@ -75,14 +75,18 @@ class BrainScanService : LifecycleService() {
                 val r1 = l1.analyze(v.uri, l0r)
                 budget--
                 val needL2 = r1.confidence < 0.75f && v.junkScore < 0.5f && v.durationMs > 8_000
-                if (!needL2) {
-                    dao.upsert(v.copy(category = r1.category, tags = r1.tags.joinToString(","),
-                        about = r1.about, confidence = r1.confidence, brainLevel = 1, junkScore = r1.junkScore))
-                } else {
-                    val r2 = l2.analyze(v.uri, v.durationMs, r1)
-                    dao.upsert(v.copy(category = r2.category, tags = r2.tags.joinToString(","),
-                        about = r2.about, confidence = r2.confidence, brainLevel = 2, junkScore = r2.junkScore))
-                }
+            if (!needL2) {
+                dao.upsert(v.copy(category = r1.category, tags = r1.tags.joinToString(","),
+                    about = r1.about, confidence = r1.confidence, brainLevel = 1, junkScore = r1.junkScore,
+                    faceCount = r1.faceCount, smileCount = r1.smileCount,
+                    phash = r1.phash, sharpness = r1.sharpness))
+            } else {
+                val r2 = l2.analyze(v.uri, v.durationMs, r1)
+                dao.upsert(v.copy(category = r2.category, tags = r2.tags.joinToString(","),
+                    about = r2.about, confidence = r2.confidence, brainLevel = 2, junkScore = r2.junkScore,
+                    faceCount = r1.faceCount, smileCount = r1.smileCount,
+                    phash = r1.phash, sharpness = r1.sharpness))
+            }
             }
             done++
             if (done % 5 == 0) notify("Understanding videos… $done/${fresh.size}", done, fresh.size, false)

@@ -11,13 +11,16 @@ data class SmartGroup(
     val subtitle: String,
     val kind: GroupKind,
     val videos: List<VideoEntity>,
-    val accent: Long // ARGB for card gradient
+    val accent: Long, // ARGB for card gradient
+    val keeperIds: Set<Long> = emptySet(),
+    val redundantIds: Set<Long> = emptySet(),
+    val savingsBytes: Long = 0L
 )
 
-enum class GroupKind { MEMORIES, JUNK, FAVORITES, CATEGORY, EVENT, GEMS, ON_THIS_DAY, UNREVIEWED }
+enum class GroupKind { MEMORIES, PEOPLE, DUPLICATES, JUNK, FAVORITES, CATEGORY, EVENT, GEMS, ON_THIS_DAY, UNREVIEWED }
 
 @Singleton
-class GroupBuilder @Inject constructor() {
+class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
 
     fun build(all: List<VideoEntity>): List<SmartGroup> {
         if (all.isEmpty()) return emptyList()
@@ -28,6 +31,30 @@ class GroupBuilder @Inject constructor() {
 
         out += SmartGroup("memories", "Memories", "${memories.size} videos worth keeping",
             GroupKind.MEMORIES, memories.sortedByDescending { it.dateAddedSec }.take(30), 0xFF8B5CF6)
+
+        // People first: faces detected on-device, smiles first.
+        val people = memories.filter { it.faceCount > 0 }
+        if (people.isNotEmpty()) {
+            val smiles = people.sumOf { it.smileCount }
+            out += SmartGroup("people", "People",
+                "${people.size} videos • $smiles smiles", GroupKind.PEOPLE,
+                people.sortedWith(compareByDescending<VideoEntity> { it.smileCount }
+                    .thenByDescending { it.faceCount }).take(30), 0xFFEC4899)
+        }
+
+        // Duplicates: keeper first per set, actionable savings.
+        val dupSets = dups.find(all)
+        if (dupSets.isNotEmpty()) {
+            val redundantCount = dupSets.sumOf { it.redundant.size }
+            val savings = dupSets.sumOf { it.savingsBytes }
+            out += SmartGroup("dups", "Duplicates",
+                "${dupSets.size} sets • free ${fmtSize(savings)}", GroupKind.DUPLICATES,
+                dupSets.flatMap { it.all }.take(30),
+                0xFFF59E0B,
+                keeperIds = dupSets.map { it.keeper.id }.toSet(),
+                redundantIds = dupSets.flatMap { it.redundant }.map { it.id }.toSet(),
+                savingsBytes = savings)
+        }
         val gems = memories.filter { it.watchCount == 0 && ageDays(it) > 180 }
         if (gems.isNotEmpty()) out += SmartGroup("gems", "Buried gems",
             "${gems.size} unseen for 6+ months", GroupKind.GEMS,
@@ -97,7 +124,6 @@ class GroupBuilder @Inject constructor() {
         return now.get(Calendar.DAY_OF_YEAR) == then.get(Calendar.DAY_OF_YEAR) &&
             now.get(Calendar.YEAR) != then.get(Calendar.YEAR)
     }
-
     private fun accentFor(cat: String): Long = when (cat) {
         "birthday", "wedding" -> 0xFFEC4899
         "trip", "beach", "travel" -> 0xFF06B6D4
@@ -106,4 +132,10 @@ class GroupBuilder @Inject constructor() {
         "music" -> 0xFF8B5CF6
         else -> 0xFF8B5CF6
     }
+}
+
+fun fmtSize(bytes: Long): String {
+    if (bytes < 1024 * 1024) return "${bytes / 1024} KB"
+    val mb = bytes / (1024.0 * 1024.0)
+    return if (mb < 1024) "%.0f MB".format(mb) else "%.1f GB".format(mb / 1024)
 }

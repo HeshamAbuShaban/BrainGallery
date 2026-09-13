@@ -19,8 +19,10 @@ Tag `v1.0` → automatic GitHub Release with release APK.
 
 ## How it works
 - **L0 instant:** filename + folder + duration → category/tags/confidence/junkScore (<5ms, on scan)
-- **L1 fast:** 1 mid-frame ML Kit label (~200ms, background worker)
-- **L2 deep:** 3 frames, only if `confidence<0.75` + not junk + >8s (battery cap 25 vids/run)
+- **L1 vision:** 1 mid-frame → ML Kit labels + faces/smiles + dHash + Brenner sharpness (one bitmap, one pass)
+- **L2 deep:** 3 frames, only if `confidence<0.75` + not junk + >8s (battery cap 40 vids/run)
+- **Duplicates (Xiaomi-style):** same folder + 7-day window + similar duration + dHash Hamming ≤ 6 → keeper = sharpest / highest-res / most-watched; one-tap "free X MB" with system consent
+- **People:** on-device face + smile detection → People group, smile-weighted feed
 - **Feed:** completion-weighted + nostalgia + on-this-day + 80/20 explore + palette cleanse (no repeat category)
 - **Player:** single ExoPlayer singleton, thumbnails via Coil VideoFrameDecoder offscreen
 

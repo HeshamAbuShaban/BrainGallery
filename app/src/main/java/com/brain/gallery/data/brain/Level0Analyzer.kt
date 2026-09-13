@@ -8,7 +8,11 @@ data class BrainResult(
     val about: String,
     val confidence: Float,
     val junkScore: Float,
-    val level: Int
+    val level: Int,
+    val faceCount: Int = 0,
+    val smileCount: Int = 0,
+    val phash: Long = 0L,
+    val sharpness: Float = 0f
 )
 
 object Level0Analyzer {

@@ -27,6 +27,9 @@ class FeedComposer @Inject constructor() {
                 s += 0.12f; why = "Unwatched"
             }
             if (v.isFavorite) { s += 0.2f; why = "One of your favorites" }
+            // People matter: faces, especially smiles, earn a lift.
+            if (v.faceCount > 0) { s += 0.08f; if (why == "Fresh pick" || why == "Unwatched") why = "People you film" }
+            if (v.smileCount > 0) { s += 0.05f; if (why == "People you film") why = "Happy moment" }
             // Nostalgia: buried gem
             val ageDays = (System.currentTimeMillis() / 1000 - v.dateAddedSec) / 86400
             if (ageDays > 180 && v.watchCount == 0 && v.junkScore < 0.4f) { s += 0.25f; why = "Buried gem • ${ageDays / 30}mo ago" }
