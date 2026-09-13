@@ -47,7 +47,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
-import coil.video.VideoFrameDecoder
+import coil.decode.VideoFrameDecoder
 import coil.ImageLoader
 import com.brain.gallery.domain.engine.FeedItem
 import com.brain.gallery.ui.player.PlayerManager
@@ -96,27 +96,28 @@ fun FeedScreen(player: PlayerManager, vm: FeedViewModel = hiltViewModel()) {
 
     VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize().background(Bg)) { page ->
         ReelPage(item = feed[page], isActive = pagerState.currentPage == page,
-            player = player, onFav = { vm.toggleFav(feed[page].video.id, !feed[page].video.isFavorite) })
+            manager = player, onFav = { vm.toggleFav(feed[page].video.id, !feed[page].video.isFavorite) })
     }
 }
 
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
-private fun ReelPage(item: FeedItem, isActive: Boolean, player: PlayerManager, onFav: () -> Unit) {
+private fun ReelPage(item: FeedItem, isActive: Boolean, manager: PlayerManager, onFav: () -> Unit) {
     val ctx = LocalContext.current
     var paused by remember { mutableStateOf(false) }
     val v = item.video
 
-    val exo = remember(item.video.uri) { player.playerFor(item.video.uri) }
+    val exo = remember(item.video.uri) { manager.playerFor(item.video.uri) }
     LaunchedEffect(isActive) { if (isActive && !paused) exo.play() else exo.pause() }
     DisposableEffect(isActive) { onDispose { if (!isActive) exo.pause() } }
 
     Box(Modifier.fillMaxSize()
         .pointerInput(Unit) {
-            detectTapGestures(onTap = { paused = !paused; player.toggle() })
+            detectTapGestures(onTap = { paused = !paused; manager.toggle() })
         }) {
         if (isActive) {
-            AndroidView(factory = { c -> PlayerView(c).apply { player = exo; useController = false } },
+            AndroidView(factory = { c ->
+                PlayerView(c).also { pv -> pv.player = exo; pv.useController = false } },
                 modifier = Modifier.fillMaxSize())
         } else {
             val loader = remember {
