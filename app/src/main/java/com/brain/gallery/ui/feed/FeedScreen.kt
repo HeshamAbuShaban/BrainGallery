@@ -2,6 +2,7 @@ package com.brain.gallery.ui.feed
 
 import android.app.Activity
 import android.view.WindowManager
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
@@ -52,6 +53,7 @@ import com.brain.gallery.domain.engine.FeedItem
 import com.brain.gallery.ui.player.PlayerManager
 import com.brain.gallery.ui.theme.Bg
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun FeedScreen(player: PlayerManager, vm: FeedViewModel = hiltViewModel()) {
     val feed by vm.feed.collectAsState()

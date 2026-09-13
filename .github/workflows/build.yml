@@ -30,17 +30,15 @@ jobs:
 
       - name: Make gradlew executable
         run: chmod +x gradlew
-        working-directory: BrainGallery
 
       - name: Build debug APK
         run: ./gradlew assembleDebug --stacktrace
-        working-directory: BrainGallery
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: brain-gallery-debug
-          path: BrainGallery/app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
 
   release:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -66,8 +64,7 @@ jobs:
         run: |
           chmod +x gradlew
           ./gradlew assembleRelease --stacktrace
-        working-directory: BrainGallery
       - name: GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          files: BrainGallery/app/build/outputs/apk/release/app-release-unsigned.apk
+          files: app/build/outputs/apk/release/app-release-unsigned.apk
