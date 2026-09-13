@@ -41,5 +41,13 @@ class PlayerManager @Inject constructor(@ApplicationContext private val ctx: Con
     fun pause() { player?.pause() }
     fun toggle() { player?.let { if (it.isPlaying) it.pause() else it.play() } }
 
+    /** Fraction 0..1 of current item watched (0 if unknown). */
+    fun completion(): Float {
+        val p = player ?: return 0f
+        val d = p.duration
+        if (d <= 0) return 0f
+        return (p.currentPosition.toFloat() / d).coerceIn(0f, 1f)
+    }
+
     fun release() { player?.release(); player = null; currentUri = null }
 }

@@ -1,6 +1,10 @@
 # BrainGallery — your local For You feed
 
-Offline-first TikTok-style gallery. Cascading brain (L0 filename → L1 thumbnail → L2 deep only if needed), single-ExoPlayer reels, explainable "why" cards.
+Offline-first smart gallery. The product is **organization**: a VLC-style foreground
+indexer (`BrainScanService`, progress notification, ContentObserver-triggered) feeds a
+cascading on-device brain (L0 filename → L1 thumbnail → L2 deep only if needed),
+which powers auto **Smart Groups** (Memories, Buried gems, On this day, Events,
+Categories, Clutter drawer), search, and a reels feed — all with explainable "why" cards.
 
 ## Build on Windows (your SSD with SDK + cached libs)
 ```bat

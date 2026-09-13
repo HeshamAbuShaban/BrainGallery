@@ -2,7 +2,6 @@ package com.brain.gallery.di
 
 import android.content.Context
 import androidx.room.Room
-import androidx.work.WorkManager
 import com.brain.gallery.data.local.BrainDatabase
 import dagger.Module
 import dagger.Provides
@@ -21,5 +20,4 @@ object AppModule {
 
     @Provides fun videoDao(db: BrainDatabase) = db.videoDao()
     @Provides fun watchDao(db: BrainDatabase) = db.watchDao()
-    @Provides @Singleton fun workManager(@ApplicationContext ctx: Context) = WorkManager.getInstance(ctx)
 }

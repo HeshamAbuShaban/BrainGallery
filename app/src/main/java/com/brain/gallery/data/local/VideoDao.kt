@@ -31,4 +31,15 @@ interface VideoDao {
 
     @Query("UPDATE videos SET isFavorite = :fav WHERE id = :id")
     suspend fun setFavorite(id: Long, fav: Boolean)
+
+    @Query("""SELECT * FROM videos WHERE displayName LIKE '%' || :q || '%' OR tags LIKE '%' || :q || '%'
+        OR category LIKE '%' || :q || '%' OR folderName LIKE '%' || :q || '%'
+        ORDER BY watchCount DESC, dateAddedSec DESC LIMIT 60""")
+    suspend fun search(q: String): List<VideoEntity>
+
+    @Query("SELECT * FROM videos WHERE category = :cat ORDER BY dateAddedSec DESC")
+    suspend fun byCategory(cat: String): List<VideoEntity>
+
+    @Query("SELECT DISTINCT category FROM videos WHERE category != 'unknown' ORDER BY category")
+    suspend fun categories(): List<String>
 }
