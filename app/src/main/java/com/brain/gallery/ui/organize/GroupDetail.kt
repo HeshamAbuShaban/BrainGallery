@@ -19,7 +19,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -52,7 +52,8 @@ fun GroupDetail(
     group: SmartGroup,
     onBack: () -> Unit,
     onFav: (VideoEntity) -> Unit,
-    onDeleteRedundant: (List<Long>) -> Unit = {}
+    onDeleteRedundant: (List<Long>) -> Unit = {},
+    onPlay: (VideoEntity) -> Unit = {}
 ) {
     val isDups = group.kind == GroupKind.DUPLICATES
     val redundant = group.videos.filter { it.id in group.redundantIds }
@@ -61,7 +62,7 @@ fun GroupDetail(
             verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack,
                 modifier = Modifier.background(Color(0xFF1D2534), CircleShape).size(38.dp)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Text1,
+                Icon(Icons.Default.ArrowBack, null, tint = Text1,
                     modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.width(12.dp))
@@ -89,7 +90,7 @@ fun GroupDetail(
                 val keeper = v.id in group.keeperIds
                 val redund = v.id in group.redundantIds
                 Box(Modifier.aspectRatio(0.7f).alpha(if (redund) 0.55f else 1f)) {
-                    VideoThumb(v, Modifier.fillMaxSize())
+                    VideoThumb(v, Modifier.fillMaxSize()) { onPlay(v) }
                     if (keeper) {
                         Text("KEEPER", color = Color.Black, fontSize = 9.sp,
                             fontWeight = FontWeight.ExtraBold,

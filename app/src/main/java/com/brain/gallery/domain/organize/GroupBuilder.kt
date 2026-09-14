@@ -1,6 +1,7 @@
 package com.brain.gallery.domain.organize
 
 import com.brain.gallery.data.local.VideoEntity
+import com.brain.gallery.engine.DuplicateFinder
 import java.util.Calendar
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -32,14 +33,28 @@ class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
         out += SmartGroup("memories", "Memories", "${memories.size} videos worth keeping",
             GroupKind.MEMORIES, memories.sortedByDescending { it.dateAddedSec }.take(30), 0xFF8B5CF6)
 
-        // People first: faces detected on-device, smiles first.
-        val people = memories.filter { it.faceCount > 0 }
-        if (people.isNotEmpty()) {
-            val smiles = people.sumOf { it.smileCount }
-            out += SmartGroup("people", "People",
-                "${people.size} videos • $smiles smiles", GroupKind.PEOPLE,
-                people.sortedWith(compareByDescending<VideoEntity> { it.smileCount }
-                    .thenByDescending { it.faceCount }).take(30), 0xFFEC4899)
+        // Identity: clustered dominant faces -> Person groups (the Google Photos key).
+        val persons = all.filter { it.personId >= 0 }.groupBy { it.personId }
+            .entries.sortedByDescending { it.value.size }
+        for ((pid, list) in persons) {
+            if (list.size < 2) continue
+            val label = com.brain.gallery.engine.MemoryDocBuilder.personLabel(pid)
+            val smiles = list.sumOf { it.smileCount }
+            out += SmartGroup("person_$pid", label,
+                "${list.size} videos${if (smiles > 0) " • $smiles smiles" else ""}",
+                GroupKind.PEOPLE,
+                list.sortedByDescending { it.dateAddedSec }.take(30), 0xFFEC4899)
+        }
+        // Fallback when identity hasn't clustered yet: face-count group.
+        if (persons.isEmpty()) {
+            val people = memories.filter { it.faceCount > 0 }
+            if (people.isNotEmpty()) {
+                val smiles = people.sumOf { it.smileCount }
+                out += SmartGroup("people", "People",
+                    "${people.size} videos • $smiles smiles", GroupKind.PEOPLE,
+                    people.sortedWith(compareByDescending<VideoEntity> { it.smileCount }
+                        .thenByDescending { it.faceCount }).take(30), 0xFFEC4899)
+            }
         }
 
         // Duplicates: keeper first per set, actionable savings.

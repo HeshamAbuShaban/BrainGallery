@@ -12,7 +12,8 @@ data class BrainResult(
     val faceCount: Int = 0,
     val smileCount: Int = 0,
     val phash: Long = 0L,
-    val sharpness: Float = 0f
+    val sharpness: Float = 0f,
+    val faceEmbedding: ByteArray? = null
 )
 
 object Level0Analyzer {

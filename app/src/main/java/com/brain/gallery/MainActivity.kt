@@ -96,8 +96,8 @@ private fun Root(player: PlayerManager) {
         Box(Modifier.fillMaxSize().background(Bg).then(if (tab == 0) Modifier else Modifier.padding(pad))) {
             when (tab) {
                 0 -> FeedScreen(player)
-                1 -> OrganizeScreen()
-                else -> SearchScreen()
+                1 -> OrganizeScreen(player)
+                else -> SearchScreen(player)
             }
         }
     }

@@ -1,7 +1,6 @@
-package com.brain.gallery.domain.organize
+package com.brain.gallery.engine
 
 import com.brain.gallery.data.local.VideoEntity
-import com.brain.gallery.data.vision.VisionUtils
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -34,7 +33,7 @@ class DuplicateFinder @Inject constructor() {
                     b.id != a.id && b.id !in used &&
                         kotlin.math.abs(b.dateAddedSec - a.dateAddedSec) < 7 * 86400 &&
                         durationSimilar(a.durationMs, b.durationMs) &&
-                        VisionUtils.hamming(a.phash, b.phash) <= 6
+                        ClusterMath.hamming(a.phash, b.phash) <= 6
                 }
                 if (mates.isEmpty()) continue
                 val set = listOf(a) + mates

@@ -15,6 +15,7 @@ import com.brain.gallery.data.brain.Level1Analyzer
 import com.brain.gallery.data.brain.Level2Analyzer
 import com.brain.gallery.data.local.BrainDatabase
 import com.brain.gallery.data.scan.MediaScanner
+import com.brain.gallery.data.vision.FaceEmbedder
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -79,20 +80,62 @@ class BrainScanService : LifecycleService() {
                 dao.upsert(v.copy(category = r1.category, tags = r1.tags.joinToString(","),
                     about = r1.about, confidence = r1.confidence, brainLevel = 1, junkScore = r1.junkScore,
                     faceCount = r1.faceCount, smileCount = r1.smileCount,
-                    phash = r1.phash, sharpness = r1.sharpness))
+                    phash = r1.phash, sharpness = r1.sharpness,
+                    faceEmbedding = r1.faceEmbedding ?: v.faceEmbedding))
             } else {
                 val r2 = l2.analyze(v.uri, v.durationMs, r1)
                 dao.upsert(v.copy(category = r2.category, tags = r2.tags.joinToString(","),
                     about = r2.about, confidence = r2.confidence, brainLevel = 2, junkScore = r2.junkScore,
                     faceCount = r1.faceCount, smileCount = r1.smileCount,
-                    phash = r1.phash, sharpness = r1.sharpness))
+                    phash = r1.phash, sharpness = r1.sharpness,
+                    faceEmbedding = r1.faceEmbedding ?: v.faceEmbedding))
             }
             }
             done++
             if (done % 5 == 0) notify("Understanding videos… $done/${fresh.size}", done, fresh.size, false)
         }
+        runIdentityPass()
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         nm.notify(NOTIF_ID, doneNotification(fresh.size))
+    }
+
+    /**
+     * Identity pass: cluster dominant-face embeddings, assign stable personIds.
+     * New clusters inherit old ids by majority overlap; singletons stay -1.
+     */
+    private suspend fun runIdentityPass() {
+        val dao = db.videoDao()
+        val all = dao.getAllSync()
+        val withEmb = all.mapNotNull { v ->
+            FaceEmbedder.fromBytes(v.faceEmbedding)?.let { v.id to it }
+        }
+        if (withEmb.size < 2) return
+        val ids = withEmb.map { it.first }
+        val vecs = withEmb.map { it.second }
+        val clusters = com.brain.gallery.engine.ClusterMath.clusterCosine(vecs, 0.55f, false)
+        // Map new cluster index -> old personId by majority overlap.
+        val byId = all.associateBy { it.id }
+        val newGroups = mutableMapOf<Int, MutableList<Long>>()
+        ids.forEachIndexed { i, id ->
+            val c = clusters[i]
+            if (c >= 0) newGroups.getOrPut(c) { mutableListOf() } += id
+        }
+        var nextPerson = (all.maxOfOrNull { it.personId } ?: -1).coerceAtLeast(-1) + 1
+        val oldOf: (Long) -> Int = { id -> byId[id]?.personId ?: -1 }
+        for ((_, members) in newGroups) {
+            val votes = members.map { oldOf(it) }.filter { it >= 0 }.groupingBy { it }.eachCount()
+            val keep = votes.maxByOrNull { it.value }?.key
+            val pid = if (keep != null) keep else { val p = nextPerson; nextPerson++; p }
+            members.forEach { dao.setPerson(it, pid) }
+        }
+        // Videos that lost their cluster (no embedding match) keep old ids; singletons -> -1.
+        val clustered = newGroups.values.flatten().toSet()
+        withEmb.forEach { (id, _) ->
+            if (id !in clustered && (byId[id]?.personId ?: -1) >= 0) {
+                // Re-check: still has embedding but unclustered -> singleton.
+                dao.setPerson(id, -1)
+            }
+        }
     }
 
     private fun ensureChannel() {

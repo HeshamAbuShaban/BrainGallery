@@ -27,16 +27,20 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.brain.gallery.ui.components.SpotlightPlayer
 import com.brain.gallery.ui.components.VideoThumb
+import com.brain.gallery.ui.player.PlayerManager
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.Surface
 import com.brain.gallery.ui.theme.Text1
 import com.brain.gallery.ui.theme.Text2
 
 @Composable
-fun SearchScreen(vm: SearchViewModel = hiltViewModel()) {
+fun SearchScreen(player: PlayerManager, vm: SearchViewModel = hiltViewModel()) {
     val q by vm.query.collectAsState()
     val results by vm.results.collectAsState()
+    val spotlight by vm.spotlight.collectAsState()
+    val similar by vm.similar.collectAsState()
     Column(Modifier.fillMaxSize().background(Bg).padding(top = 20.dp)) {
         Text("Search", color = Text1, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
             modifier = Modifier.padding(horizontal = 20.dp))
@@ -60,8 +64,13 @@ fun SearchScreen(vm: SearchViewModel = hiltViewModel()) {
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(results, key = { it.id }) { v ->
-                VideoThumb(v, Modifier.aspectRatio(0.7f))
+                VideoThumb(v, Modifier.aspectRatio(0.7f)) { vm.play(v) }
             }
         }
+    }
+    if (spotlight != null) {
+        SpotlightPlayer(video = spotlight!!, similar = similar, manager = player,
+            onClose = { vm.closeSpotlight() }, onPick = { vm.play(it) },
+            onFav = { vm.toggleFav(it) })
     }
 }

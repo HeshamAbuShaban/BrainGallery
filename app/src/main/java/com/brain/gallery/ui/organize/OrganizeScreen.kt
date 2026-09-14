@@ -48,8 +48,10 @@ import androidx.activity.result.IntentSenderRequest
 import android.app.Activity
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.brain.gallery.domain.organize.SmartGroup
+import com.brain.gallery.ui.components.SpotlightPlayer
 import com.brain.gallery.ui.components.ShimmerBar
 import com.brain.gallery.ui.components.VideoThumb
+import com.brain.gallery.ui.player.PlayerManager
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.CardShape
@@ -60,11 +62,13 @@ import com.brain.gallery.ui.theme.Text2
 import com.brain.gallery.ui.theme.Yellow
 
 @Composable
-fun OrganizeScreen(vm: OrganizeViewModel = hiltViewModel()) {
+fun OrganizeScreen(player: PlayerManager, vm: OrganizeViewModel = hiltViewModel()) {
     val groups by vm.groupList.collectAsState()
     val stats by vm.stats.collectAsState()
     val loading by vm.loading.collectAsState()
     val selected by vm.selected.collectAsState()
+    val spotlight by vm.spotlight.collectAsState()
+    val similar by vm.similar.collectAsState()
     val deleteAsk by vm.deleteAsk.collectAsState()
 
     val delLauncher = rememberLauncherForActivityResult(
@@ -80,10 +84,8 @@ fun OrganizeScreen(vm: OrganizeViewModel = hiltViewModel()) {
 
     if (selected != null) {
         GroupDetail(group = selected!!, onBack = { vm.close() }, onFav = { vm.toggleFav(it) },
-            onDeleteRedundant = { vm.requestDelete(it) })
-        return
-    }
-
+            onDeleteRedundant = { vm.requestDelete(it) }, onPlay = { vm.play(it) })
+    } else {
     Column(Modifier.fillMaxSize().background(Bg)) {
         // Header
         Row(Modifier.fillMaxWidth().padding(20.dp, 20.dp, 20.dp, 4.dp),
@@ -143,6 +145,12 @@ fun OrganizeScreen(vm: OrganizeViewModel = hiltViewModel()) {
                 }
             }
         }
+    }
+    }
+    if (spotlight != null) {
+        SpotlightPlayer(video = spotlight!!, similar = similar, manager = player,
+            onClose = { vm.closeSpotlight() }, onPick = { vm.play(it) },
+            onFav = { vm.toggleFav(it) })
     }
 }
 

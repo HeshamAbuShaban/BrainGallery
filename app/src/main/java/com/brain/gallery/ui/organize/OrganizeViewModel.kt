@@ -11,6 +11,8 @@ import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.data.service.BrainScanService
 import com.brain.gallery.domain.organize.GroupBuilder
 import com.brain.gallery.domain.organize.SmartGroup
+import com.brain.gallery.engine.MemoryDocBuilder
+import com.brain.gallery.engine.SimilarFinder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -41,10 +43,17 @@ class OrganizeViewModel @Inject constructor(
     val selected: StateFlow<SmartGroup?> = _selected
     private val _loading = MutableStateFlow(true)
     val loading: StateFlow<Boolean> = _loading
+    // Spotlight (watch from anywhere) + siblings.
+    private val _spotlight = MutableStateFlow<VideoEntity?>(null)
+    val spotlight: StateFlow<VideoEntity?> = _spotlight
+    private val _similar = MutableStateFlow<List<VideoEntity>>(emptyList())
+    val similar: StateFlow<List<VideoEntity>> = _similar
+    private var allVideos: List<VideoEntity> = emptyList()
 
     init {
         viewModelScope.launch {
             db.videoDao().observeAll().collect { all ->
+                allVideos = all
                 _groups.value = groups.build(all)
                 val understood = all.count { it.brainLevel >= 1 }
                 _stats.value = LibraryStats(
@@ -65,6 +74,11 @@ class OrganizeViewModel @Inject constructor(
 
     fun open(g: SmartGroup) { _selected.value = g }
     fun close() { _selected.value = null }
+    fun play(v: VideoEntity) {
+        _spotlight.value = v
+        _similar.value = SimilarFinder.find(v, allVideos)
+    }
+    fun closeSpotlight() { _spotlight.value = null; _similar.value = emptyList() }
     fun rescan() { BrainScanService.start(ctx) }
     fun toggleFav(v: VideoEntity) {
         viewModelScope.launch { db.videoDao().setFavorite(v.id, !v.isFavorite) }
@@ -117,14 +131,46 @@ class SearchViewModel @Inject constructor(private val db: BrainDatabase) : ViewM
     val query: StateFlow<String> = _q
     private val _results = MutableStateFlow<List<VideoEntity>>(emptyList())
     val results: StateFlow<List<VideoEntity>> = _results
+    private val _spotlight = MutableStateFlow<VideoEntity?>(null)
+    val spotlight: StateFlow<VideoEntity?> = _spotlight
+    private val _similar = MutableStateFlow<List<VideoEntity>>(emptyList())
+    val similar: StateFlow<List<VideoEntity>> = _similar
 
     init {
         viewModelScope.launch {
             _q.debounce(300).collect { q ->
-                _results.value = if (q.length < 2) emptyList() else db.videoDao().search(q)
+                if (q.length < 2) { _results.value = emptyList(); return@collect }
+                val lower = q.trim().lowercase()
+                // People-key routing: "who" questions bypass keywords.
+                if (lower in setOf("people", "person", "faces", "face", "smiles", "smiling",
+                        "selfie", "selfies", "person a", "person b", "person c")) {
+                    _results.value = db.videoDao().people()
+                    return@collect
+                }
+                val like = db.videoDao().search(q)
+                val likeIds = like.map { it.id }.toSet()
+                // Doc-aware ranking: LIKE candidates + full-library doc match for
+                // who/vibe/year tokens the filename never contains.
+                val pool = if (like.size < 20) db.videoDao().getAllSync() else like
+                _results.value = pool.map { v ->
+                    v to MemoryDocBuilder.matchScore(MemoryDocBuilder.build(v).text, q)
+                }
+                    .filter { it.second > 0f || it.first.id in likeIds }
+                    .sortedWith(compareByDescending<Pair<VideoEntity, Float>> { it.second }
+                        .thenByDescending { it.first.watchCount })
+                    .take(60)
+                    .map { it.first }
             }
         }
     }
 
     fun query(s: String) { _q.value = s }
+    fun toggleFav(v: VideoEntity) {
+        viewModelScope.launch { db.videoDao().setFavorite(v.id, !v.isFavorite) }
+    }
+    fun play(v: VideoEntity) {
+        _spotlight.value = v
+        _similar.value = SimilarFinder.find(v, _results.value)
+    }
+    fun closeSpotlight() { _spotlight.value = null; _similar.value = emptyList() }
 }

@@ -40,6 +40,10 @@ android {
     buildFeatures {
         compose = true
     }
+
+    aaptOptions {
+        noCompress += "tflite"
+    }
 }
 
 dependencies {
@@ -55,16 +59,13 @@ dependencies {
     implementation(libs.androidx.ui.graphics)
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
-    implementation(libs.androidx.material.icons.extended)
+    implementation(libs.androidx.material.icons.core)
 
-    implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.navigation.compose)
 
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
-
-    implementation(libs.androidx.datastore.preferences)
 
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
@@ -81,6 +82,7 @@ dependencies {
 
     implementation(libs.mlkit.imagelabeling)
     implementation(libs.mlkit.facedetection)
+    implementation(libs.tensorflow.lite)
 
     debugImplementation(libs.androidx.ui.tooling)
 }

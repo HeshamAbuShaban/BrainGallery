@@ -27,6 +27,11 @@ data class VideoEntity(
     val smileCount: Int = 0,
     val phash: Long = 0L, // 0 = unknown
     val sharpness: Float = 0f,
+    // Identity (dominant face MobileFaceNet embedding; null = unknown)
+    val faceEmbedding: ByteArray? = null,
+    val personId: Int = -1, // cluster index, -1 = unknown/singleton
+    // Reserved: semantic text embedding over the Memory Document (future)
+    val textEmbedding: ByteArray? = null,
     // Behavior fields with decay
     val lastWatchedMs: Long = 0,
     val watchCount: Int = 0,

@@ -35,6 +35,15 @@ interface VideoDao {
     @Query("DELETE FROM videos WHERE id IN (:ids)")
     suspend fun deleteByIds(ids: List<Long>)
 
+    @Query("SELECT * FROM videos WHERE faceCount > 0 ORDER BY smileCount DESC, faceCount DESC")
+    suspend fun people(): List<VideoEntity>
+
+    @Query("SELECT * FROM videos WHERE personId = :person ORDER BY dateAddedSec DESC")
+    suspend fun personGroup(person: Int): List<VideoEntity>
+
+    @Query("UPDATE videos SET personId = :person WHERE id = :id")
+    suspend fun setPerson(id: Long, person: Int)
+
     @Query("""SELECT * FROM videos WHERE displayName LIKE '%' || :q || '%' OR tags LIKE '%' || :q || '%'
         OR category LIKE '%' || :q || '%' OR folderName LIKE '%' || :q || '%'
         ORDER BY watchCount DESC, dateAddedSec DESC LIMIT 60""")

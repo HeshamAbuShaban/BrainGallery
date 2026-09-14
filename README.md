@@ -19,11 +19,16 @@ Tag `v1.0` → automatic GitHub Release with release APK.
 
 ## How it works
 - **L0 instant:** filename + folder + duration → category/tags/confidence/junkScore (<5ms, on scan)
-- **L1 vision:** 1 mid-frame → ML Kit labels + faces/smiles + dHash + Brenner sharpness (one bitmap, one pass)
+- **L1 vision:** 1 mid-frame → ML Kit labels + faces/smiles + dHash + Brenner sharpness + dominant-face MobileFaceNet embedding (one bitmap, one pass)
 - **L2 deep:** 3 frames, only if `confidence<0.75` + not junk + >8s (battery cap 40 vids/run)
+- **Identity:** face embeddings clustered on-device (cosine ≥ 0.55, stable ids) → Person A/B/C groups; singletons stay unknown
+- **Memory Document:** one doc per video (who/what/where/when/vibe); search filters hard keys + ranks doc meaning; embedding column reserved
 - **Duplicates (Xiaomi-style):** same folder + 7-day window + similar duration + dHash Hamming ≤ 6 → keeper = sharpest / highest-res / most-watched; one-tap "free X MB" with system consent
-- **People:** on-device face + smile detection → People group, smile-weighted feed
-- **Feed:** completion-weighted + nostalgia + on-this-day + 80/20 explore + palette cleanse (no repeat category)
+- **Watch anywhere:** any thumbnail opens a spotlight player (single ExoPlayer) with a More-like-this rail — clip pulls its siblings
+- **Feed:** completion-weighted + nostalgia + on-this-day + people lift + 80/20 explore + palette cleanse
+
+## Engine seams (portable core path)
+`engine/` (`ClusterMath`, `DuplicateFinder`, `SimilarFinder`, `MemoryDoc`) is pure ranking/clustering math with zero Android imports — shaped for a future Rust port (UniFFI). ML sensors (ML Kit, TFLite) stay platform-native permanently.
 - **Player:** single ExoPlayer singleton, thumbnails via Coil VideoFrameDecoder offscreen
 
 ## Project layout
