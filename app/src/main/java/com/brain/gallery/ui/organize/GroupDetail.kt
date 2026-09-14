@@ -19,7 +19,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
@@ -62,7 +62,7 @@ fun GroupDetail(
             verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack,
                 modifier = Modifier.background(Color(0xFF1D2534), CircleShape).size(38.dp)) {
-                Icon(Icons.Default.ArrowBack, null, tint = Text1,
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Text1,
                     modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.width(12.dp))
