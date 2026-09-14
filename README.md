@@ -1,46 +1,111 @@
-# BrainGallery — your local For You feed
+# BrainGallery — your device remembers for you
 
-Offline-first smart gallery. The product is **organization**: a VLC-style foreground
-indexer (`BrainScanService`, progress notification, ContentObserver-triggered) feeds a
-cascading on-device brain (L0 filename → L1 thumbnail → L2 deep only if needed),
-which powers auto **Smart Groups** (Memories, Buried gems, On this day, Events,
-Categories, Clutter drawer), search, and a reels feed — all with explainable "why" cards.
+> Every phone holds thousands of videos nobody ever rewatchs — buried memories,
+> duplicated clips, moments you half-remember but can never find. Cloud galleries
+> solve this by uploading your life to someone else's computer. **BrainGallery is
+> the opposite bet: a private, on-device brain that understands your library and
+> retrieves what you need before you finish wanting it.**
 
-## Build on Windows (your SSD with SDK + cached libs)
-```bat
-cd BrainGallery
-gradlew assembleDebug
-rem APK: app\build\outputs\apk\debug\app-debug.apk
+No account. No network calls. No tracking. Your videos never leave your pocket.
+
+---
+
+## The idea in one paragraph
+
+You don't remember videos the way filesystems store them. You remember ***who*
+was there, *what* was happening, *where* and *when* it was, *what was said*.**
+BrainGallery's indexer compiles exactly that — one **Memory Document** per video —
+then organizes, deduplicates, and surfaces your library around it: *People*,
+*Events*, *Buried gems*, *On this day*, *Duplicates worth deleting*, and a feed
+that learns what you actually finish watching. One found clip pulls its siblings.
+Hours of diving become one query.
+
+## What it does today
+
+| Capability | How |
+|---|---|
+| **People** | On-device face detection + MobileFaceNet identity embeddings, clustered into Person A/B/C groups. Smiles ranked first. |
+| **Duplicates** | dHash fingerprints + Brenner sharpness + keeper rules (sharpest → highest-res → most-watched). One tap frees the megabytes, with system consent. |
+| **Events** | Same-folder bursts within 3-day gaps auto-cluster into trips, parties, weekends. |
+| **Nostalgia** | Buried gems (unseen 6+ months) and On-this-day surfacing. |
+| **Search** | Who/what/where/when-aware: people-questions route to the identity index, everything else ranks against Memory Documents. |
+| **For You feed** | Completion-weighted, smile- and people-aware, 80/20 explore, never repeats a category twice. Every card explains *why*. |
+| **Watch anywhere** | Any thumbnail opens a spotlight player with a More-like-this rail. |
+
+## How the brain works (cascading, battery-first)
+
+```
+MediaStore scan ──▶ L0 instant (<5ms: filename, folder, duration)
+                        │ confident? ──▶ done
+                        ▼ uncertain
+                   L1 vision (1 keyframe, one pass):
+                     labels · faces/smiles · dHash · sharpness · identity vector
+                        │ confident? ──▶ done
+                        ▼ uncertain + worthy
+                   L2 deep (3 keyframes, charging-friendly budget)
+                        ▼
+               Identity pass (cosine clustering, stable personIds)
 ```
 
-## Build via GitHub Actions (no local SDK needed)
-Push to `main` → Actions tab → download `brain-gallery-debug` artifact.
-Tag `v1.0` → automatic GitHub Release with release APK.
+Rules that keep it cheap: junk skips ML entirely, 40-video budget per run,
+new videos trigger a small debounced pass — never a full rescan. A VLC-style
+foreground service (`BrainScanService`) does the work with a progress
+notification, like a media library should.
 
-## How it works
-- **L0 instant:** filename + folder + duration → category/tags/confidence/junkScore (<5ms, on scan)
-- **L1 vision:** 1 mid-frame → ML Kit labels + faces/smiles + dHash + Brenner sharpness + dominant-face MobileFaceNet embedding (one bitmap, one pass)
-- **L2 deep:** 3 frames, only if `confidence<0.75` + not junk + >8s (battery cap 40 vids/run)
-- **Identity:** face embeddings clustered on-device (cosine ≥ 0.55, stable ids) → Person A/B/C groups; singletons stay unknown
-- **Memory Document:** one doc per video (who/what/where/when/vibe); search filters hard keys + ranks doc meaning; embedding column reserved
-- **Duplicates (Xiaomi-style):** same folder + 7-day window + similar duration + dHash Hamming ≤ 6 → keeper = sharpest / highest-res / most-watched; one-tap "free X MB" with system consent
-- **Watch anywhere:** any thumbnail opens a spotlight player (single ExoPlayer) with a More-like-this rail — clip pulls its siblings
-- **Feed:** completion-weighted + nostalgia + on-this-day + people lift + 80/20 explore + palette cleanse
+## Storage philosophy
 
-## Engine seams (portable core path)
-`engine/` (`ClusterMath`, `DuplicateFinder`, `SimilarFinder`, `MemoryDoc`) is pure ranking/clustering math with zero Android imports — shaped for a future Rust port (UniFFI). ML sensors (ML Kit, TFLite) stay platform-native permanently.
-- **Player:** single ExoPlayer singleton, thumbnails via Coil VideoFrameDecoder offscreen
+The database grows by **~3 KB per video** (hashes, scores, one 768-byte identity
+vector). Models are the real megabytes, so a model ships **iff it fills a
+human-memory key** — nothing merely nice. Semantic text embeddings and speech
+transcription are designed into the schema but deferred until they earn it.
 
-## Project layout
+## Architecture
+
 ```
 app/src/main/java/com/brain/gallery/
-  BrainGalleryApp.kt, MainActivity.kt
-  data/local/   (Room: videos + watch_events)
-  data/scan/    (MediaStore scanner, scoped-storage safe)
-  data/brain/   (CategoryOntology, Level0/1/2 analyzers)
-  data/work/    (IndexWorker — Hilt + WorkManager cascade)
-  domain/engine/(FeedComposer — local reels algorithm)
-  ui/feed/      (FeedScreen + FeedViewModel, VerticalPager)
-  ui/player/    (PlayerManager singleton)
-  di/           (Hilt module)
+├── data/
+│   ├── scan/      MediaStore scanner (scoped-storage safe)
+│   ├── brain/     L0/L1/L2 analyzers (sensors)
+│   ├── vision/    dHash, Brenner sharpness, faces, identity embeddings
+│   ├── service/   Foreground indexer (VLC-style)
+│   └── local/     Room: videos + watch events (Memory Document storage)
+├── engine/        Portable core: ClusterMath, DuplicateFinder,
+│                  SimilarFinder, MemoryDoc — pure logic, zero Android
+│                  imports, shaped for a future Rust port (UniFFI).
+│                  ML sensors stay platform-native. Permanently.
+├── domain/
+│   ├── organize/  Smart-group builder (People, Events, Gems, …)
+│   └── engine/    Feed composer (local reels algorithm)
+└── ui/
+    ├── organize/  Library, groups, search, spotlight player
+    ├── feed/      Vertical reels (single shared ExoPlayer)
+    └── components/Thumbnails, shimmer, why-chips
 ```
+
+## Roadmap (gated — each phase funds the next)
+
+- **Gate 0 · now:** video memory retrieval on Android. Nothing else exists.
+- **Gate 1:** Rust core spike — translate `engine/` via UniFFI, Android consumes its own core.
+- **Gate 2:** desktop scanner + any-file support (images, documents share the same machinery).
+- **Gate 3:** on-device taste profile — big-corps' recommendation mechanic, private by construction.
+
+## Build
+
+On any machine with the Android SDK (versions match `gradle/libs.versions.toml`):
+
+```bash
+git clone https://github.com/HeshamAbuShaban/BrainGallery.git
+cd BrainGallery
+./gradlew assembleDebug
+# APK: app/build/outputs/apk/debug/app-debug.apk
+```
+
+No SDK handy? Every push to `main` builds on GitHub Actions — grab
+`brain-gallery-debug` from the run's Artifacts. Tags matching `v*` cut a release.
+
+## Principles
+
+1. **Offline is a feature**, not a limitation — the brain works on a plane.
+2. **Explain every surface** — no black-box "recommended"; every card says why.
+3. **Battery is a budget** — cascade from cheap to deep, never brute-force.
+4. **Your data is the moat** — big tech feeds you the world's content; this feeds you *yours*.
