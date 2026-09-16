@@ -74,6 +74,10 @@ class OrganizeViewModel @Inject constructor(
 
     fun open(g: SmartGroup) { _selected.value = g }
     fun close() { _selected.value = null }
+    fun mergePersons(fromId: Int, toId: Int) {
+        if (fromId == toId) return
+        viewModelScope.launch(Dispatchers.IO) { db.videoDao().mergePersons(fromId, toId) }
+    }
     fun play(v: VideoEntity) {
         _spotlight.value = v
         _similar.value = SimilarFinder.find(v, allVideos)
@@ -126,7 +130,10 @@ class OrganizeViewModel @Inject constructor(
 
 @OptIn(FlowPreview::class)
 @HiltViewModel
-class SearchViewModel @Inject constructor(private val db: BrainDatabase) : ViewModel() {
+class SearchViewModel @Inject constructor(
+    private val db: BrainDatabase,
+    @ApplicationContext private val ctx: android.content.Context
+) : ViewModel() {
     private val _q = MutableStateFlow("")
     val query: StateFlow<String> = _q
     private val _results = MutableStateFlow<List<VideoEntity>>(emptyList())
@@ -173,4 +180,38 @@ class SearchViewModel @Inject constructor(private val db: BrainDatabase) : ViewM
         _similar.value = SimilarFinder.find(v, _results.value)
     }
     fun closeSpotlight() { _spotlight.value = null; _similar.value = emptyList() }
+
+    private val _deleteAsk = MutableStateFlow<android.content.IntentSender?>(null)
+    val deleteAsk: StateFlow<android.content.IntentSender?> = _deleteAsk
+    private var pendingIds: List<Long> = emptyList()
+
+    fun requestDelete(ids: List<Long>) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            pendingIds = ids
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                val uris = ids.mapNotNull { id ->
+                    db.videoDao().getById(id)?.uri?.let { runCatching { android.net.Uri.parse(it) }.getOrNull() }
+                }
+                if (uris.isEmpty()) return@launch
+                _deleteAsk.value = android.provider.MediaStore.createDeleteRequest(
+                    ctx.contentResolver, uris).intentSender
+            } else {
+                ids.forEach { id ->
+                    db.videoDao().getById(id)?.let { v ->
+                        runCatching { ctx.contentResolver.delete(android.net.Uri.parse(v.uri), null, null) }
+                    }
+                }
+                db.videoDao().deleteByIds(ids)
+            }
+        }
+    }
+
+    fun consumeDeleteAsk() { _deleteAsk.value = null }
+
+    fun confirmDelete() {
+        val ids = pendingIds
+        pendingIds = emptyList()
+        viewModelScope.launch(Dispatchers.IO) { db.videoDao().deleteByIds(ids) }
+    }
 }

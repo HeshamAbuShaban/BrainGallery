@@ -44,6 +44,12 @@ interface VideoDao {
     @Query("UPDATE videos SET personId = :person WHERE id = :id")
     suspend fun setPerson(id: Long, person: Int)
 
+    @Query("UPDATE videos SET personId = :to WHERE personId = :from")
+    suspend fun mergePersons(from: Int, to: Int)
+
+    @Query("UPDATE videos SET personId = -1 WHERE id = :id")
+    suspend fun unperson(id: Long)
+
     @Query("""SELECT * FROM videos WHERE displayName LIKE '%' || :q || '%' OR tags LIKE '%' || :q || '%'
         OR category LIKE '%' || :q || '%' OR folderName LIKE '%' || :q || '%'
         ORDER BY watchCount DESC, dateAddedSec DESC LIMIT 60""")

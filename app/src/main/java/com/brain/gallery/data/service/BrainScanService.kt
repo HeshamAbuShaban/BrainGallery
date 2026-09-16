@@ -112,7 +112,7 @@ class BrainScanService : LifecycleService() {
         if (withEmb.size < 2) return
         val ids = withEmb.map { it.first }
         val vecs = withEmb.map { it.second }
-        val clusters = com.brain.gallery.engine.ClusterMath.clusterCosine(vecs, 0.55f, false)
+        val clusters = com.brain.gallery.engine.ClusterMath.clusterCosine(vecs, 0.50f, false)
         // Map new cluster index -> old personId by majority overlap.
         val byId = all.associateBy { it.id }
         val newGroups = mutableMapOf<Int, MutableList<Long>>()

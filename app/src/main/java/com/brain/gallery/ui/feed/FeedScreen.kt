@@ -2,6 +2,9 @@ package com.brain.gallery.ui.feed
 
 import android.app.Activity
 import android.view.WindowManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -63,7 +66,10 @@ import coil.request.ImageRequest
 import coil.decode.VideoFrameDecoder
 import coil.ImageLoader
 import coil.request.videoFrameMillis
+import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.domain.engine.FeedItem
+import com.brain.gallery.ui.components.VideoActionsSheet
+import com.brain.gallery.ui.components.VideoDetailsDialog
 import com.brain.gallery.ui.player.PlayerManager
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.Cyan
@@ -103,16 +109,46 @@ fun FeedScreen(player: PlayerManager, vm: FeedViewModel = hiltViewModel()) {
     }
 
     val pagerState = rememberPagerState(pageCount = { feed.size })
-    VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize().background(Bg)) { page ->
-        val item = feed[page]
-        ReelPage(
-            item = item,
-            isActive = pagerState.currentPage == page,
-            position = "${page + 1}/${feed.size}",
-            manager = player,
-            onFav = { vm.toggleFav(item.video.id, !item.video.isFavorite) },
-            onReport = { completion -> vm.onWatched(item.video.id, completion, completion < 0.15f) }
-        )
+    val deleteAsk by vm.deleteAsk.collectAsState()
+    var menuFor by remember { mutableStateOf<VideoEntity?>(null) }
+    var detailsFor by remember { mutableStateOf<VideoEntity?>(null) }
+
+    val delLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()) { res ->
+        if (res.resultCode == Activity.RESULT_OK) vm.confirmDelete()
+    }
+    LaunchedEffect(deleteAsk) {
+        deleteAsk?.let {
+            delLauncher.launch(IntentSenderRequest.Builder(it).build())
+            vm.consumeDeleteAsk()
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize().background(Bg)) { page ->
+            val item = feed[page]
+            ReelPage(
+                item = item,
+                isActive = pagerState.currentPage == page,
+                position = "${page + 1}/${feed.size}",
+                manager = player,
+                onFav = { vm.toggleFav(item.video.id, !item.video.isFavorite) },
+                onReport = { completion -> vm.onWatched(item.video.id, completion, completion < 0.15f) },
+                onMenu = { menuFor = item.video }
+            )
+        }
+        menuFor?.let { mv ->
+            val live = feed.firstOrNull { it.video.id == mv.id }?.video ?: mv
+            VideoActionsSheet(video = live,
+                onDismiss = { menuFor = null },
+                onPlay = { menuFor = null },
+                onFav = { menuFor = null; vm.toggleFav(live.id, !live.isFavorite) },
+                onSimilar = { menuFor = null },
+                onDetails = { detailsFor = live; menuFor = null },
+                onDelete = { menuFor = null; vm.requestDelete(listOf(live.id)) },
+                onNotInterested = { menuFor = null; vm.onWatched(live.id, 0.05f, true) })
+        }
+        detailsFor?.let { VideoDetailsDialog(video = it, onDismiss = { detailsFor = null }) }
     }
 }
 
@@ -120,7 +156,8 @@ fun FeedScreen(player: PlayerManager, vm: FeedViewModel = hiltViewModel()) {
 @Composable
 private fun ReelPage(
     item: FeedItem, isActive: Boolean, position: String,
-    manager: PlayerManager, onFav: () -> Unit, onReport: (Float) -> Unit
+    manager: PlayerManager, onFav: () -> Unit, onReport: (Float) -> Unit,
+    onMenu: () -> Unit
 ) {
     val ctx = LocalContext.current
     val v = item.video
@@ -179,7 +216,8 @@ private fun ReelPage(
     Box(Modifier.fillMaxSize().pointerInput(v.uri) {
         detectTapGestures(
             onTap = { paused = !paused; manager.toggle() },
-            onDoubleTap = { onFav(); heart = true }
+            onDoubleTap = { onFav(); heart = true },
+            onLongPress = { onMenu() }
         )
     }) {
         // Thumbnail underneath until first frame renders.

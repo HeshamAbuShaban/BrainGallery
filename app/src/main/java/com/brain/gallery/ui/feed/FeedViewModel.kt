@@ -9,6 +9,7 @@ import com.brain.gallery.domain.engine.FeedComposer
 import com.brain.gallery.domain.engine.FeedItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -54,5 +55,40 @@ class FeedViewModel @Inject constructor(
 
     fun toggleFav(id: Long, fav: Boolean) {
         viewModelScope.launch { db.videoDao().setFavorite(id, fav) }
+    }
+
+    // Delete-with-consent (same pattern as Organize).
+    private val _deleteAsk = MutableStateFlow<android.content.IntentSender?>(null)
+    val deleteAsk: StateFlow<android.content.IntentSender?> = _deleteAsk
+    private var pendingIds: List<Long> = emptyList()
+
+    fun requestDelete(ids: List<Long>) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            pendingIds = ids
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                val uris = ids.mapNotNull { id ->
+                    db.videoDao().getById(id)?.uri?.let { runCatching { android.net.Uri.parse(it) }.getOrNull() }
+                }
+                if (uris.isEmpty()) return@launch
+                _deleteAsk.value = android.provider.MediaStore.createDeleteRequest(
+                    ctx.contentResolver, uris).intentSender
+            } else {
+                ids.forEach { id ->
+                    db.videoDao().getById(id)?.let { v ->
+                        runCatching { ctx.contentResolver.delete(android.net.Uri.parse(v.uri), null, null) }
+                    }
+                }
+                db.videoDao().deleteByIds(ids)
+            }
+        }
+    }
+
+    fun consumeDeleteAsk() { _deleteAsk.value = null }
+
+    fun confirmDelete() {
+        val ids = pendingIds
+        pendingIds = emptyList()
+        viewModelScope.launch(Dispatchers.IO) { db.videoDao().deleteByIds(ids) }
     }
 }

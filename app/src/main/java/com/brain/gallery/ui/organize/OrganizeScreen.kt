@@ -5,8 +5,10 @@ import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.slideInVertically
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,13 +29,17 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -47,6 +53,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.IntentSenderRequest
 import android.app.Activity
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.brain.gallery.domain.organize.GroupKind
 import com.brain.gallery.domain.organize.SmartGroup
 import com.brain.gallery.ui.components.SpotlightPlayer
 import com.brain.gallery.ui.components.ShimmerBar
@@ -84,7 +91,9 @@ fun OrganizeScreen(player: PlayerManager, vm: OrganizeViewModel = hiltViewModel(
 
     if (selected != null) {
         GroupDetail(group = selected!!, onBack = { vm.close() }, onFav = { vm.toggleFav(it) },
-            onDeleteRedundant = { vm.requestDelete(it) }, onPlay = { vm.play(it) })
+            onDeleteRedundant = { vm.requestDelete(it) }, onPlay = { vm.play(it) },
+            onDeleteOne = { vm.requestDelete(listOf(it.id)) },
+            onSimilar = { vm.play(it) })
     } else {
     Column(Modifier.fillMaxSize().background(Bg)) {
         // Header
@@ -140,7 +149,15 @@ fun OrganizeScreen(player: PlayerManager, vm: OrganizeViewModel = hiltViewModel(
                     AnimatedVisibility(vis,
                         enter = fadeIn(tween(350, i * 60)) +
                             slideInVertically(tween(350, i * 60)) { it / 3 }) {
-                        GroupCard(g) { vm.open(g) }
+                        GroupCardFull(group = g,
+                            persons = groups.filter { it.kind == GroupKind.PEOPLE },
+                            onOpen = { vm.open(g) },
+                            onPlayFirst = { g.videos.firstOrNull()?.let { vm.play(it) } },
+                            onMerge = { from, to ->
+                                val f = from.id.removePrefix("person_").toIntOrNull()
+                                val t = to.id.removePrefix("person_").toIntOrNull()
+                                if (f != null && t != null) vm.mergePersons(f, t)
+                            })
                     }
                 }
             }
@@ -164,13 +181,29 @@ private fun StatCard(value: String, label: String, color: Color, modifier: Modif
 
 @Composable
 fun GroupCard(g: SmartGroup, onClick: () -> Unit) {
+    GroupCardFull(group = g, persons = emptyList(), onOpen = onClick,
+        onPlayFirst = {}, onMerge = { _, _ -> })
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun GroupCardFull(
+    group: SmartGroup,
+    persons: List<SmartGroup>,
+    onOpen: () -> Unit,
+    onPlayFirst: () -> Unit,
+    onMerge: (SmartGroup, SmartGroup) -> Unit
+) {
+    val g = group
     val accent = Color(g.accent)
+    var menu by remember { mutableStateOf(false) }
+    var merge by remember { mutableStateOf(false) }
     Box(Modifier
         .fillMaxWidth()
         .aspectRatio(0.86f)
         .clip(CardShape)
         .background(Color(0xFF151B26))
-        .clickable { onClick() }) {
+        .combinedClickable(onClick = onOpen, onLongClick = { menu = true })) {
         val cover = g.videos.firstOrNull()
         if (cover != null) VideoThumb(cover, Modifier.fillMaxSize())
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
@@ -184,6 +217,50 @@ fun GroupCard(g: SmartGroup, onClick: () -> Unit) {
             Text(g.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(2.dp))
             Text(g.subtitle, color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp, maxLines = 2)
+        }
+        DropdownMenu(expanded = menu, onDismissRequest = { menu = false },
+            modifier = Modifier.background(Color(0xFF1D2534))) {
+            DropdownMenuItem(text = { Text("Open", color = Text1) },
+                onClick = { menu = false; onOpen() })
+            DropdownMenuItem(text = { Text("Play first video", color = Text1) },
+                onClick = { menu = false; onPlayFirst() })
+            if (g.kind == GroupKind.PEOPLE && persons.size > 1) {
+                DropdownMenuItem(text = { Text("Merge with another person…", color = Text1) },
+                    onClick = { menu = false; merge = true })
+            }
+        }
+    }
+    if (merge) {
+        MergePersonDialog(group = g, others = persons.filter { it.id != g.id },
+            onDismiss = { merge = false },
+            onPick = { other -> merge = false; onMerge(g, other) })
+    }
+}
+
+@Composable
+private fun MergePersonDialog(
+    group: SmartGroup, others: List<SmartGroup>,
+    onDismiss: () -> Unit, onPick: (SmartGroup) -> Unit
+) {
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Column(Modifier.clip(CardShape).background(Color(0xFF151B26)).padding(20.dp)) {
+            Text("Merge \"${group.title}\" into…", color = Text1, fontSize = 15.sp,
+                fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(4.dp))
+            Text("Same person split in two? Pick the keeper.", color = Text2, fontSize = 12.sp)
+            Spacer(Modifier.height(12.dp))
+            others.forEach { o ->
+                Row(Modifier.fillMaxWidth().clickable { onPick(o) }.padding(vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    val cover = o.videos.firstOrNull()
+                    if (cover != null) VideoThumb(cover, Modifier.size(44.dp, 60.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column {
+                        Text(o.title, color = Text1, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                        Text(o.subtitle, color = Text2, fontSize = 11.5.sp)
+                    }
+                }
+            }
         }
     }
 }

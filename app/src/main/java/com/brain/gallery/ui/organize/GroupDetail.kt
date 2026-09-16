@@ -29,6 +29,10 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -40,6 +44,8 @@ import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.domain.organize.GroupKind
 import com.brain.gallery.domain.organize.SmartGroup
 import com.brain.gallery.domain.organize.fmtSize
+import com.brain.gallery.ui.components.VideoActionsSheet
+import com.brain.gallery.ui.components.VideoDetailsDialog
 import com.brain.gallery.ui.components.VideoThumb
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.Green
@@ -53,10 +59,14 @@ fun GroupDetail(
     onBack: () -> Unit,
     onFav: (VideoEntity) -> Unit,
     onDeleteRedundant: (List<Long>) -> Unit = {},
-    onPlay: (VideoEntity) -> Unit = {}
+    onPlay: (VideoEntity) -> Unit = {},
+    onDeleteOne: (VideoEntity) -> Unit = {},
+    onSimilar: (VideoEntity) -> Unit = {}
 ) {
     val isDups = group.kind == GroupKind.DUPLICATES
     val redundant = group.videos.filter { it.id in group.redundantIds }
+    var menuFor by remember { mutableStateOf<VideoEntity?>(null) }
+    var detailsFor by remember { mutableStateOf<VideoEntity?>(null) }
     Column(Modifier.fillMaxSize().background(Bg)) {
         Row(Modifier.fillMaxWidth().padding(8.dp, 16.dp, 16.dp, 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
@@ -90,7 +100,8 @@ fun GroupDetail(
                 val keeper = v.id in group.keeperIds
                 val redund = v.id in group.redundantIds
                 Box(Modifier.aspectRatio(0.7f).alpha(if (redund) 0.55f else 1f)) {
-                    VideoThumb(v, Modifier.fillMaxSize()) { onPlay(v) }
+                    VideoThumb(v, Modifier.fillMaxSize(),
+                        onClick = { onPlay(v) }, onLongClick = { menuFor = v })
                     if (keeper) {
                         Text("KEEPER", color = Color.Black, fontSize = 9.sp,
                             fontWeight = FontWeight.ExtraBold,
@@ -115,4 +126,14 @@ fun GroupDetail(
         }
         Spacer(Modifier.height(4.dp))
     }
+    menuFor?.let { mv ->
+        VideoActionsSheet(video = mv,
+            onDismiss = { menuFor = null },
+            onPlay = { menuFor = null; onPlay(mv) },
+            onFav = { menuFor = null; onFav(mv) },
+            onSimilar = { menuFor = null; onSimilar(mv) },
+            onDetails = { detailsFor = mv; menuFor = null },
+            onDelete = { menuFor = null; onDeleteOne(mv) })
+    }
+    detailsFor?.let { VideoDetailsDialog(video = it, onDismiss = { detailsFor = null }) }
 }
