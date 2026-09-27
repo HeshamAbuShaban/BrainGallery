@@ -7,6 +7,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Mid-range OEM "cleaners" kill long indexing runs; the user can whitelist us. -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
     <application
         android:name=".BrainGalleryApp"
@@ -28,6 +30,10 @@
         <service
             android:name=".data.service.BrainScanService"
             android:foregroundServiceType="dataSync"
+            android:exported="false" />
+
+        <receiver
+            android:name=".data.service.RescheduleReceiver"
             android:exported="false" />
     </application>
 </manifest>

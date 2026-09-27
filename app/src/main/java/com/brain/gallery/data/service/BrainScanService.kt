@@ -22,6 +22,7 @@ import com.brain.gallery.engine.NameSuggester
 import com.brain.gallery.engine.PersonConsolidator
 import com.brain.gallery.engine.PersonMatcher
 import com.brain.gallery.engine.SplitDetector
+import androidx.room.withTransaction
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withTimeoutOrNull
@@ -76,9 +77,22 @@ class BrainScanService : LifecycleService() {
         val fresh = scanned.filter { it.id !in existingIds }
         val known = scanned.filter { it.id in existingIds }
 
-        for (s in known) {
-            dao.touchMetadata(s.id, s.uri, s.displayName, s.durationMs, s.sizeBytes,
-                s.folderName, s.width, s.height, scanId)
+        // One transaction, and only rows whose metadata actually changed: rewriting
+        // 1300 identical rows every run was pure waste.
+        val byId = dao.getAllSync().associateBy { it.id }
+        val changed = known.filter { s ->
+            val o = byId[s.id] ?: return@filter true
+            o.displayName != s.displayName || o.durationMs != s.durationMs ||
+                o.sizeBytes != s.sizeBytes || o.folderName != s.folderName ||
+                o.width != s.width || o.height != s.height || o.uri != s.uri
+        }
+        if (changed.isNotEmpty()) {
+            db.withTransaction {
+                for (s in changed) {
+                    dao.touchMetadata(s.id, s.uri, s.displayName, s.durationMs, s.sizeBytes,
+                        s.folderName, s.width, s.height, scanId)
+                }
+            }
         }
         if (fresh.isNotEmpty()) {
             dao.insertNew(fresh.map { s ->
@@ -133,7 +147,7 @@ class BrainScanService : LifecycleService() {
                 )
                 for (cand in r.vectors) matcher.assignOrCreate(v.id, cand.vec, cand.quality)
                 totalL1a++
-                if (i % 10 == 0) {
+                if (i % 25 == 0) {
                     val remaining = dao.perceptualPendingCount()
                     notify("Understanding videos… ${totalL1a + unreadable}", totalL1a + unreadable,
                         totalL1a + unreadable + remaining, false)
@@ -177,8 +191,16 @@ class BrainScanService : LifecycleService() {
         frameCache.prune()
         db.supportDao().pruneEvents(20000)
 
+        val remaining = dao.perceptualPendingCount() + dao.semanticPendingCount()
+        if (remaining > 0) {
+            // Something is still queued: vendor cleaners kill long runs, so come back.
+            RescheduleReceiver.schedule(this)
+        } else {
+            RescheduleReceiver.cancel(this)
+        }
+
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.notify(NOTIF_ID, doneNotification(totalL1a, totalL1b, merged))
+        nm.notify(NOTIF_ID, doneNotification(totalL1a, totalL1b, merged, remaining))
     }
 
     /** Keep videos.personId aligned with the best vector per video. */
@@ -215,14 +237,20 @@ class BrainScanService : LifecycleService() {
         return n
     }
 
-    private fun doneNotification(perceptual: Int, semantic: Int, merged: Int): Notification =
+    private fun doneNotification(
+        perceptual: Int, semantic: Int, merged: Int, remaining: Int
+    ): Notification =
         NotificationCompat.Builder(this, CHANNEL)
             .setContentTitle("BrainGallery")
             .setContentText(
-                if (perceptual == 0 && semantic == 0) "Library up to date"
-                else "Indexed $perceptual · $semantic enriched${if (merged > 0) " · $merged merged" else ""}")
+                if (remaining == 0) {
+                    if (perceptual == 0 && semantic == 0) "Library up to date"
+                    else "Indexed $perceptual · $semantic enriched${if (merged > 0) " · $merged merged" else ""}"
+                } else "Indexed $perceptual · $semantic enriched · $remaining left"
+            )
             .setSmallIcon(android.R.drawable.stat_sys_download_done)
             .setAutoCancel(true)
+            .setOngoing(remaining > 0)
             .build()
 
     private fun startForegroundCompat(n: Notification) {

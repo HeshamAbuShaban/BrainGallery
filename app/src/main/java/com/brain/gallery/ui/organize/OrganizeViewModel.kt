@@ -11,6 +11,7 @@ import com.brain.gallery.data.local.PersonEntity
 import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.data.portability.MemoryBundle
 import com.brain.gallery.data.service.BrainScanService
+import com.brain.gallery.domain.BatteryOptims
 import com.brain.gallery.domain.organize.GroupBuilder
 import com.brain.gallery.domain.organize.SmartGroup
 import com.brain.gallery.engine.MemoryDocBuilder
@@ -47,6 +48,7 @@ class OrganizeViewModel @Inject constructor(
     private val db: BrainDatabase,
     private val groups: GroupBuilder,
     private val bundle: MemoryBundle,
+    private val battery: BatteryOptims,
     @ApplicationContext private val ctx: android.content.Context
 ) : ViewModel() {
     private val _groups = MutableStateFlow<List<SmartGroup>>(emptyList())
@@ -65,6 +67,8 @@ class OrganizeViewModel @Inject constructor(
     val similar: StateFlow<List<VideoEntity>> = _similar
     private val _diag = MutableStateFlow(Diagnostics())
     val diagnostics: StateFlow<Diagnostics> = _diag
+    private val _batteryExempt = MutableStateFlow(false)
+    val batteryExempt: StateFlow<Boolean> = _batteryExempt
     private var allVideos: List<VideoEntity> = emptyList()
 
     init {
@@ -143,6 +147,10 @@ class OrganizeViewModel @Inject constructor(
     }
 
     fun rescan() { BrainScanService.start(ctx) }
+
+    fun refreshBattery() { _batteryExempt.value = battery.isIgnoringOptimizations() }
+    fun batteryRequestIntent() = battery.requestIntent()
+    fun batterySettingsIntent() = battery.settingsIntent()
 
     suspend fun refreshDiagnostics() {
         val d = withContext(Dispatchers.IO) {
@@ -232,6 +240,7 @@ class OrganizeViewModel @Inject constructor(
 class SearchViewModel @Inject constructor(
     private val db: BrainDatabase,
     private val bundle: MemoryBundle,
+    private val battery: BatteryOptims,
     @ApplicationContext private val ctx: android.content.Context
 ) : ViewModel() {
     private val _q = MutableStateFlow("")

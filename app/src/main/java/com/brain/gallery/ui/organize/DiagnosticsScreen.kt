@@ -1,6 +1,7 @@
 package com.brain.gallery.ui.organize
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -41,7 +43,9 @@ import com.brain.gallery.ui.theme.Yellow
 fun DiagnosticsScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
     val d by vm.diagnostics.collectAsState()
     val stats by vm.stats.collectAsState()
-    LaunchedEffect(Unit) { vm.refreshDiagnostics() }
+    val exempt by vm.batteryExempt.collectAsState()
+    val ctx = LocalContext.current
+    LaunchedEffect(Unit) { vm.refreshDiagnostics(); vm.refreshBattery() }
 
     Column(Modifier.fillMaxSize().background(Bg)) {
         Row(Modifier.fillMaxWidth().padding(8.dp, 16.dp, 16.dp, 4.dp),
@@ -78,6 +82,26 @@ fun DiagnosticsScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
             Stat("Ambiguous adopted", "${d.adopted}")
             Stat("Unreadable files", "${d.unreadable}",
                 if (d.unreadable > 0) Yellow else Green)
+            Spacer(Modifier.height(16.dp))
+            Section("Background reliability")
+            if (exempt) {
+                Stat("Battery optimisation", "exempt", Green)
+            } else {
+                Row(Modifier.fillMaxWidth().padding(vertical = 6.dp)
+                    .background(Color(0x33243B1B), CardShape)
+                    .clickable {
+                        runCatching { ctx.startActivity(vm.batteryRequestIntent()) }
+                    }
+                    .padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Allow background indexing", color = Text1, fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold)
+                        Text("Your phone's clean-up app kills the indexer mid-run. " +
+                            "Exempting it lets the library finish.", color = Text2, fontSize = 11.5.sp)
+                    }
+                    Text("FIX", color = Yellow, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                }
+            }
             Spacer(Modifier.height(16.dp))
             Text(
                 "Perceptual runs unbudgeted so duplicates and identity are complete on the " +
