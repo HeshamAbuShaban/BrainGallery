@@ -11,11 +11,18 @@ data class FeedItem(val video: VideoEntity, val score: Float, val why: String)
 @Singleton
 class FeedComposer @Inject constructor() {
 
-    fun compose(videos: List<VideoEntity>, events: List<WatchEventEntity>, limit: Int = 60): List<FeedItem> {
+    fun compose(
+        videos: List<VideoEntity>,
+        events: List<WatchEventEntity>,
+        suppressed: Set<Long> = emptySet(),
+        limit: Int = 60
+    ): List<FeedItem> {
         if (videos.isEmpty()) return emptyList()
+        val pool = if (suppressed.isEmpty()) videos else videos.filter { it.id !in suppressed }
+        if (pool.isEmpty()) return emptyList()
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         val recentIds = events.take(40).map { it.videoId }.toSet()
-        val scored = videos.filter { it.junkScore < 0.85f }.map { v ->
+        val scored = pool.filter { it.junkScore < 0.85f }.map { v ->
             var s = 0.3f // base exploration
             var why = "Fresh pick"
             // Behavior: completion is king

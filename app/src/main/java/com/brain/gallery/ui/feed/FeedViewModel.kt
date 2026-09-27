@@ -3,15 +3,19 @@ package com.brain.gallery.ui.feed
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.brain.gallery.data.local.BrainDatabase
+import com.brain.gallery.data.local.NotInterestedEntity
 import com.brain.gallery.data.local.WatchEventEntity
 import com.brain.gallery.data.service.BrainScanService
 import com.brain.gallery.domain.engine.FeedComposer
 import com.brain.gallery.domain.engine.FeedItem
+import com.brain.gallery.engine.ClusterMath
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.launch
 import java.util.Calendar
 import javax.inject.Inject
@@ -26,17 +30,50 @@ class FeedViewModel @Inject constructor(
     val feed: StateFlow<List<FeedItem>> = _feed
     private val _loading = MutableStateFlow(true)
     val loading: StateFlow<Boolean> = _loading
+    /** Bumped when the feed runs dry so the composer can reshuffle a fresh batch. */
+    private val _nonce = MutableStateFlow(0)
+    val nonce: StateFlow<Int> = _nonce
 
     init {
         BrainScanService.start(ctx)
         viewModelScope.launch {
-            db.videoDao().observeAll().collect { videos ->
-                val events = db.watchDao().recent()
-                _feed.value = composer.compose(videos, events)
-                _loading.value = false
-            }
+            combine(
+                db.videoDao().observeAll().conflate(),
+                db.supportDao().observeNotInterested().conflate(),
+                _nonce
+            ) { videos, notInterested, _ -> videos to notInterested }
+                .collect { (videos, notInterested) ->
+                    val suppressed = suppressionSet(videos, notInterested)
+                    val events = db.watchDao().recent()
+                    _feed.value = composer.compose(videos, events, suppressed)
+                    _loading.value = false
+                }
         }
     }
+
+    /**
+     * "Not interested" is sticky and contagious: suppressing one clip also
+     * suppresses its near-duplicates, so the same footage stops resurfacing.
+     */
+    private suspend fun suppressionSet(
+        videos: List<com.brain.gallery.data.local.VideoEntity>,
+        notInterested: List<Long>
+    ): Set<Long> {
+        if (notInterested.isEmpty()) return emptySet()
+        val seeds = videos.filter { it.id in notInterested }
+        if (seeds.isEmpty()) return notInterested.toSet()
+        val seedHashes = seeds.mapNotNull { if (it.phash != 0L) it.phash else null }
+        val out = HashSet(notInterested)
+        if (seedHashes.isNotEmpty()) {
+            for (v in videos) {
+                if (v.id in out || v.phash == 0L) continue
+                if (seedHashes.any { ClusterMath.hamming(it, v.phash) <= 6 }) out += v.id
+            }
+        }
+        return out
+    }
+
+    fun reshuffle() { _nonce.value += 1 }
 
     fun refresh() { BrainScanService.start(ctx) }
 
@@ -54,6 +91,13 @@ class FeedViewModel @Inject constructor(
 
     fun toggleFav(id: Long, fav: Boolean) {
         viewModelScope.launch { db.videoDao().setFavorite(id, fav) }
+    }
+
+    /** Real, persistent dismissal: hides this clip and its duplicates for good. */
+    fun markNotInterested(id: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            db.supportDao().addNotInterested(NotInterestedEntity(id, System.currentTimeMillis()))
+        }
     }
 
     // Delete-with-consent (same pattern as Organize).

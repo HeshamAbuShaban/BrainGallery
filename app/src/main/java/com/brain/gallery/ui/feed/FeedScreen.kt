@@ -5,35 +5,45 @@ import android.view.WindowManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -41,20 +51,26 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -69,10 +85,16 @@ import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.domain.engine.FeedItem
 import com.brain.gallery.ui.components.VideoActionsSheet
 import com.brain.gallery.ui.components.VideoDetailsDialog
+import com.brain.gallery.ui.components.fmtDur
 import com.brain.gallery.ui.player.PlayerManager
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.Cyan
+import com.brain.gallery.ui.theme.Motion
+import com.brain.gallery.ui.theme.Pink
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+private const val CHROME_IDLE_MS = 2500L
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -80,6 +102,7 @@ fun FeedScreen(player: PlayerManager, vm: FeedViewModel = hiltViewModel()) {
     val feed by vm.feed.collectAsState()
     val loading by vm.loading.collectAsState()
     val ctx = LocalContext.current
+    val haptics = LocalHapticFeedback.current
 
     DisposableEffect(Unit) {
         (ctx as? Activity)?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -95,8 +118,11 @@ fun FeedScreen(player: PlayerManager, vm: FeedViewModel = hiltViewModel()) {
     if (feed.isEmpty()) {
         Box(Modifier.fillMaxSize().background(Bg), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("No videos yet", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                Text("Grant access, then rescan", color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
+                Text("Nothing to show", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                Text(
+                    if (vm.feed.value.isEmpty()) "Everything got filtered out — tap refresh"
+                    else "Grant access, then rescan",
+                    color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
                 Spacer(Modifier.height(12.dp))
                 IconButton(onClick = { vm.refresh() },
                     modifier = Modifier.background(Color(0xFF1D2534), CircleShape)) {
@@ -108,6 +134,7 @@ fun FeedScreen(player: PlayerManager, vm: FeedViewModel = hiltViewModel()) {
     }
 
     val pagerState = rememberPagerState(pageCount = { feed.size })
+    val scope = rememberCoroutineScope()
     val deleteAsk by vm.deleteAsk.collectAsState()
     var menuFor by remember { mutableStateOf<VideoEntity?>(null) }
     var detailsFor by remember { mutableStateOf<VideoEntity?>(null) }
@@ -123,29 +150,50 @@ fun FeedScreen(player: PlayerManager, vm: FeedViewModel = hiltViewModel()) {
         }
     }
 
+    fun advance() {
+        val next = pagerState.currentPage + 1
+        scope.launch {
+            if (next < feed.size) pagerState.animateScrollToPage(next)
+            else {
+                // Feed exhausted: reshuffle a fresh batch rather than stopping dead.
+                vm.reshuffle()
+                pagerState.scrollToPage(0)
+            }
+        }
+    }
+
     Box(Modifier.fillMaxSize()) {
         VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize().background(Bg)) { page ->
             val item = feed[page]
             ReelPage(
                 item = item,
                 isActive = pagerState.currentPage == page,
-                position = "${page + 1}/${feed.size}",
                 manager = player,
                 onFav = { vm.toggleFav(item.video.id, !item.video.isFavorite) },
-                onReport = { completion -> vm.onWatched(item.video.id, completion, completion < 0.15f) },
-                onMenu = { menuFor = item.video }
+                onReport = { c -> vm.onWatched(item.video.id, c, c < 0.15f) },
+                onMenu = { menuFor = item.video },
+                onEnded = { advance() }
             )
         }
+
         menuFor?.let { mv ->
             val live = feed.firstOrNull { it.video.id == mv.id }?.video ?: mv
             VideoActionsSheet(video = live,
                 onDismiss = { menuFor = null },
                 onPlay = { menuFor = null },
-                onFav = { menuFor = null; vm.toggleFav(live.id, !live.isFavorite) },
+                onFav = {
+                    menuFor = null
+                    vm.toggleFav(live.id, !live.isFavorite)
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                },
                 onSimilar = { menuFor = null },
                 onDetails = { detailsFor = live; menuFor = null },
                 onDelete = { menuFor = null; vm.requestDelete(listOf(live.id)) },
-                onNotInterested = { menuFor = null; vm.onWatched(live.id, 0.05f, true) })
+                onNotInterested = {
+                    menuFor = null
+                    vm.markNotInterested(live.id)
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                })
         }
         detailsFor?.let { VideoDetailsDialog(video = it, onDismiss = { detailsFor = null }) }
     }
@@ -154,139 +202,256 @@ fun FeedScreen(player: PlayerManager, vm: FeedViewModel = hiltViewModel()) {
 @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
 @Composable
 private fun ReelPage(
-    item: FeedItem, isActive: Boolean, position: String,
-    manager: PlayerManager, onFav: () -> Unit, onReport: (Float) -> Unit,
-    onMenu: () -> Unit
+    item: FeedItem,
+    isActive: Boolean,
+    manager: PlayerManager,
+    onFav: () -> Unit,
+    onReport: (Float) -> Unit,
+    onMenu: () -> Unit,
+    onEnded: () -> Unit
 ) {
     val ctx = LocalContext.current
+    val haptics = LocalHapticFeedback.current
     val v = item.video
+
     var paused by remember { mutableStateOf(false) }
     var ready by remember { mutableStateOf(false) }
+    var chrome by remember { mutableStateOf(true) }
+    var tick by remember { mutableIntStateOf(0) }        // restarts the chrome timer
     var progress by remember { mutableFloatStateOf(0f) }
     var maxSeen by remember { mutableFloatStateOf(0f) }
-    var heart by remember { mutableStateOf(false) }
-    val heartScale = remember { Animatable(0.6f) }
+    var heartAt by remember { mutableStateOf<Offset?>(null) }
+    var scrubbing by remember { mutableFloatStateOf(-1f) }
+    var seekMs by remember { mutableStateOf(0L) }
+    val heartScale = remember { Animatable(0.4f) }
 
-    val exo = remember(v.uri) { manager.playerFor(v.uri) }
+    // ONLY the active page acquires the shared player. An adjacent page asking
+    // for it would swap the media item out from under the current video.
+    val exo = remember(v.uri, isActive) { if (isActive) manager.playerFor(v.uri) else null }
 
-    // First frame -> hide thumbnail.
-    DisposableEffect(exo, v.uri) {
+    // First frame gate + end-of-item advance.
+    DisposableEffect(exo) {
+        if (exo == null) return@DisposableEffect onDispose { }
         ready = false
         val l = object : Player.Listener {
             override fun onRenderedFirstFrame() { ready = true }
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_ENDED) onEnded()
+            }
         }
         exo.addListener(l)
         onDispose { exo.removeListener(l) }
     }
 
-    // Active: play + track progress. Inactive: report real completion once.
+    // Playback state + honest progress measurement.
+    LaunchedEffect(exo, paused) {
+        val p = exo ?: return@LaunchedEffect
+        if (paused) p.pause() else p.play()
+        while (true) {
+            delay(300)
+            val c = manager.completion()
+            progress = c
+            if (c > maxSeen) maxSeen = c
+        }
+    }
     LaunchedEffect(isActive) {
-        if (isActive) {
-            if (!paused) exo.play() else exo.pause()
-            while (true) {
-                delay(500)
-                val c = manager.completion()
-                progress = c
-                if (c > maxSeen) maxSeen = c
-            }
-        } else {
-            exo.pause()
+        if (!isActive) {
+            exo?.pause()
             if (maxSeen > 0.02f) { onReport(maxSeen); maxSeen = 0f }
         }
     }
     DisposableEffect(Unit) {
-        onDispose { if (maxSeen > 0.02f) { onReport(maxSeen) } }
+        onDispose { if (maxSeen > 0.02f) onReport(maxSeen) }
     }
 
-    LaunchedEffect(heart) {
-        if (heart) {
-            heartScale.snapTo(0.6f)
+    // Chrome auto-hides while playing, like the real thing.
+    LaunchedEffect(paused, isActive, tick) {
+        if (paused || !isActive) return@LaunchedEffect
+        delay(CHROME_IDLE_MS)
+        chrome = false
+    }
+
+    LaunchedEffect(heartAt) {
+        if (heartAt != null) {
+            heartScale.snapTo(0.4f)
             heartScale.animateTo(1.15f, spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMedium))
             heartScale.animateTo(1f, spring(Spring.DampingRatioHighBouncy))
-            delay(500)
-            heart = false
+            delay(420)
+            heartAt = null
         }
     }
 
-    val loader = ctx.imageLoader // shared app-level thumbnail cache
+    val railAlpha by animateFloatAsState(
+        targetValue = if (chrome) 1f else 0f,
+        animationSpec = tween(Motion.mediumMs), label = "rail")
 
     Box(Modifier.fillMaxSize().pointerInput(v.uri) {
         detectTapGestures(
-            onTap = { paused = !paused; manager.toggle() },
-            onDoubleTap = { onFav(); heart = true },
-            onLongPress = { onMenu() }
+            onTap = {
+                paused = !paused
+                tick++
+                manager.toggle()
+            },
+            onDoubleTap = {
+                heartAt = Offset(size.width / 2f, size.height / 2f)
+                onFav()
+                tick++
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            },
+            onLongPress = {
+                paused = true
+                tick++
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                onMenu()
+            }
         )
     }) {
-        // Thumbnail underneath until first frame renders.
+        // ---- stage ----
         if (!ready) {
             AsyncImage(
-                model = ImageRequest.Builder(ctx).data(v.uri).videoFrameMillis(500).build(),
-                imageLoader = loader, contentDescription = null,
+                model = ImageRequest.Builder(ctx).data(v.uri).videoFrameMillis(400).build(),
+                imageLoader = ctx.imageLoader, contentDescription = null,
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }
-        if (isActive || ready) {
+        if (exo != null) {
             AndroidView(factory = { c ->
-                PlayerView(c).also { pv -> pv.player = exo; pv.useController = false } },
-                modifier = Modifier.fillMaxSize().alpha(if (ready) 1f else 0f))
+                PlayerView(c).also { pv -> pv.player = exo; pv.useController = false }
+            }, modifier = Modifier.fillMaxSize().alpha(if (ready) 1f else 0f))
         }
-        // Top gradient + position + brain chip.
-        Box(Modifier.fillMaxWidth().height(110.dp).background(Brush.verticalGradient(
-            listOf(Color.Black.copy(alpha = 0.55f), Color.Transparent))))
-        Row(Modifier.align(Alignment.TopStart).fillMaxWidth().padding(16.dp, 14.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            Text(position, color = Color.White.copy(alpha = 0.75f), fontSize = 11.sp,
-                fontWeight = FontWeight.SemiBold)
-            Spacer(Modifier.weight(1f))
-            if (v.brainLevel >= 1) {
-                Text("✦ ${v.category}", color = Color.Black, fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.background(Color.White.copy(alpha = 0.9f), CircleShape)
-                        .padding(9.dp, 4.dp))
+
+        // ---- double-tap heart, at the touch point ----
+        heartAt?.let { pos ->
+            Box(Modifier.fillMaxSize()) {
+                Icon(Icons.Default.Favorite, null, tint = Pink,
+                    modifier = Modifier
+                        .offset(x = pos.x - 55.dp, y = pos.y - 55.dp)
+                        .size(110.dp)
+                        .scale(heartScale.value))
             }
         }
+
+        // ---- centred play/pause (translucent, no chip) ----
         if (paused && isActive) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                val icon = if (exo.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow
-                Box(Modifier.background(Color.Black.copy(alpha = 0.55f), CircleShape).padding(14.dp)) {
-                    Icon(icon, null, tint = Color.White, modifier = Modifier.size(34.dp))
+            Icon(
+                if (exo?.isPlaying == true) Icons.Default.Pause else Icons.Default.PlayArrow,
+                null, tint = Color.White.copy(alpha = 0.82f),
+                modifier = Modifier.align(Alignment.Center).size(76.dp))
+        }
+
+        // ---- chrome ----
+        AnimatedVisibility(visible = chrome, enter = fadeIn(tween(160)), exit = fadeOut(tween(220)),
+            modifier = Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize().alpha(railAlpha)) {
+                // top: single-feed label, centred like TikTok's tab strip
+                Row(Modifier.align(Alignment.TopCenter).padding(top = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Box(Modifier.size(5.dp).clip(CircleShape).background(Color.White))
+                    Spacer(Modifier.width(6.dp))
+                    Text("For You", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                }
+
+                // right action rail
+                Column(
+                    Modifier.align(Alignment.BottomEnd)
+                        .padding(end = 10.dp, bottom = 96.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                ) {
+                    RailButton(
+                        icon = if (v.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                        tint = if (v.isFavorite) Pink else Color.White,
+                        count = if (v.watchCount > 0) "${v.watchCount}" else null
+                    ) { onFav(); tick++ }
+                    RailButton(Icons.Default.AutoAwesome, Color.White, null) { onMenu() }
+                    RailButton(Icons.Default.MoreHoriz, Color.White, null) { onMenu() }
+                }
+
+                // bottom caption block
+                Column(Modifier.align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .background(Brush.verticalGradient(
+                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)),
+                        startY = 240f))
+                    .padding(start = 14.dp, end = 86.dp, bottom = 26.dp)) {
+                    Text(item.why, color = Cyan, fontSize = 11.5.sp, fontWeight = FontWeight.Bold,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Spacer(Modifier.height(4.dp))
+                    Text(v.about.ifEmpty { v.displayName }, color = Color.White,
+                        fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    if (v.tagList.isNotEmpty()) {
+                        Spacer(Modifier.height(3.dp))
+                        Text(v.tagList.take(4).joinToString("  •  "), color = Color.White.copy(alpha = 0.62f),
+                            fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    Spacer(Modifier.height(3.dp))
+                    Text("${v.folderName} • ${fmtDur(v.durationMs)}", color = Color.White.copy(alpha = 0.45f),
+                        fontSize = 10.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
-        if (heart) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Icon(Icons.Default.Favorite, null, tint = Color(0xFFEC4899),
-                    modifier = Modifier.size(96.dp).scale(heartScale.value))
+
+        // ---- scrub bar: 2px visual, full-width, drag to seek ----
+        val shown = if (scrubbing >= 0f) scrubbing else progress
+        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(26.dp)
+            .pointerInput(v.uri) {
+                detectTapGestures(
+                    onTap = { off ->
+                        val frac = (off.x / size.width).coerceIn(0f, 1f)
+                        manager.seekTo((manager.durationMs() * frac).toLong())
+                        tick++
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    }
+                )
+            }
+            .pointerInput(v.uri) {
+                detectHorizontalDragGestures(
+                    onDragStart = { off ->
+                        val frac = (off.x / size.width).coerceIn(0f, 1f)
+                        scrubbing = frac
+                        seekMs = (manager.durationMs() * frac).toLong()
+                    },
+                    onDragEnd = {
+                        if (scrubbing >= 0f) { manager.seekTo(seekMs); scrubbing = -1f; tick++ }
+                    },
+                    onDragCancel = { scrubbing = -1f },
+                    onHorizontalDrag = { change, amount ->
+                        change.consume()
+                        val base = if (scrubbing >= 0f) scrubbing else progress
+                        scrubbing = ((base * size.width + amount) / size.width).coerceIn(0f, 1f)
+                        seekMs = (manager.durationMs() * scrubbing).toLong()
+                    }
+                )
+            },
+            contentAlignment = Alignment.BottomCenter) {
+            Box(Modifier.fillMaxWidth().height(2.dp).background(Color.White.copy(alpha = 0.25f)))
+            Box(Modifier.fillMaxWidth(shown.coerceIn(0f, 1f)).height(2.dp).background(Color.White))
+            if (scrubbing >= 0f) {
+                Text(fmtDur(seekMs), color = Color.White, fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .offset(y = (-34).dp)
+                        .background(Color.Black.copy(alpha = 0.6f), CircleShape)
+                        .padding(horizontal = 8.dp, vertical = 3.dp))
             }
         }
-        // Bottom info.
-        Column(Modifier.align(Alignment.BottomStart).fillMaxWidth()
-            .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))))
-            .padding(16.dp, 26.dp, 16.dp, 12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(item.why, color = Cyan, fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.background(Color.Black.copy(alpha = 0.5f), CircleShape)
-                        .padding(9.dp, 4.dp))
-                Spacer(Modifier.width(8.dp))
-                Text(v.folderName, color = Color.White.copy(alpha = 0.65f), fontSize = 11.sp)
-            }
-            Spacer(Modifier.height(6.dp))
-            Text(v.about.ifEmpty { v.displayName }, color = Color.White,
-                fontSize = 15.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
-            Spacer(Modifier.height(3.dp))
-            Text(v.tagList.take(4).joinToString("  •  "),
-                color = Color.White.copy(alpha = 0.6f), fontSize = 11.sp, maxLines = 1)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = { onFav(); if (!v.isFavorite) heart = true },
-                    modifier = Modifier.size(44.dp)) {
-                    Icon(if (v.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, null,
-                        tint = if (v.isFavorite) Color(0xFFEC4899) else Color.White,
-                        modifier = Modifier.size(26.dp))
-                }
-            }
+    }
+}
+
+@Composable
+private fun RailButton(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    tint: Color,
+    count: String?,
+    onClick: () -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        IconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
+            Icon(icon, null, tint = tint, modifier = Modifier.size(31.dp))
         }
-        LinearProgressIndicator(progress = { progress },
-            modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(2.5.dp),
-            color = Color.White, trackColor = Color.White.copy(alpha = 0.25f))
+        if (count != null) {
+            Text(count, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+        }
     }
 }

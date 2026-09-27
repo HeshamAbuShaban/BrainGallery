@@ -39,6 +39,12 @@ interface SupportDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun addNotInterested(e: NotInterestedEntity)
 
+    @Query("SELECT videoId FROM not_interested")
+    fun observeNotInterested(): Flow<List<Long>>
+
+    @Query("SELECT videoId FROM not_interested")
+    suspend fun notInterestedIds(): List<Long>
+
     @Query("DELETE FROM watch_events WHERE rowId NOT IN (SELECT rowId FROM watch_events ORDER BY atMs DESC LIMIT :keep)")
     suspend fun pruneEvents(keep: Int)
 
