@@ -23,7 +23,9 @@ data class PerceptualResult(
     val confidence: Float,
     val vectors: List<VectorCandidate>,
     val priority: Float,
-    val pendingSemantic: Boolean
+    val pendingSemantic: Boolean,
+    /** False only when no frame could be decoded at all (dead/corrupt file). */
+    val frameRead: Boolean = true
 )
 
 data class VectorCandidate(val vec: FloatArray, val quality: Float) {
@@ -50,7 +52,8 @@ class L1aAnalyzer @Inject constructor(
             return PerceptualResult(0L, 0f, 0, 0, l0.about, l0.category, l0.tags,
                 l0.confidence, emptyList(),
                 PriorityScorer.score(l0.junkScore, durationMs, 0, l0.category),
-                l0.category == "unknown" || l0.confidence < 0.6f)
+                l0.category == "unknown" || l0.confidence < 0.6f,
+                frameRead = false)
         }
         val bmp: Bitmap = raw
 

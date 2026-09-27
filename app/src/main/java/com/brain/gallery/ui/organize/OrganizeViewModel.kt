@@ -39,7 +39,7 @@ data class Diagnostics(
     val unassigned: Int = 0, val splitsFlagged: Int = 0,
     val lastL1a: Int = 0, val lastL1b: Int = 0, val lastMs: Long = 0,
     val tScan: Long = 0, val tL1a: Long = 0, val tL1b: Long = 0,
-    val merged: Int = 0, val adopted: Int = 0
+    val merged: Int = 0, val adopted: Int = 0, val unreadable: Int = 0
 )
 
 @HiltViewModel
@@ -163,7 +163,8 @@ class OrganizeViewModel @Inject constructor(
                 tL1a = kv.get("diag.tL1a")?.toLongOrNull() ?: 0,
                 tL1b = kv.get("diag.tL1b")?.toLongOrNull() ?: 0,
                 merged = kv.get("diag.lastRun")?.split("|")?.getOrNull(4)?.toIntOrNull() ?: 0,
-                adopted = kv.get("diag.lastRun")?.split("|")?.getOrNull(5)?.toIntOrNull() ?: 0
+                adopted = kv.get("diag.lastRun")?.split("|")?.getOrNull(5)?.toIntOrNull() ?: 0,
+                unreadable = kv.get("diag.lastRun")?.split("|")?.getOrNull(6)?.toIntOrNull() ?: 0
             )
         }
         _diag.value = d

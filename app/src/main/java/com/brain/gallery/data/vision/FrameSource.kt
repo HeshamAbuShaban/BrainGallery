@@ -9,28 +9,59 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** Frame decoding is the real cost of indexing. Centralize it. */
+/**
+ * Frame decoding is the real cost of indexing, and the one place that can wedge
+ * the whole pipeline: MediaMetadataRetriever.getFrameAtTime can block for a very
+ * long time on long-GOP or damaged files. Three defences:
+ *
+ *  1. OPTION_CLOSEST_SYNC — seek to the nearest sync frame instead of decoding
+ *     forward from the start. Turns a multi-second stall into milliseconds.
+ *  2. A hard timeout, so the caller always moves on.
+ *  3. A small pool, so one pathological file cannot block every other frame.
+ */
 @Singleton
 class FrameSource @Inject constructor(@ApplicationContext private val ctx: Context) {
 
+    private val pool = Executors.newFixedThreadPool(4) { r ->
+        Thread(r, "brain-frame").apply { isDaemon = true }
+    }
+
     suspend fun at(uri: String, atUs: Long): Bitmap? = withContext(Dispatchers.IO) {
-        var retriever: MediaMetadataRetriever? = null
+        val job = pool.submit<Bitmap?> { extract(uri, atUs) }
         try {
-            retriever = MediaMetadataRetriever()
-            retriever.setDataSource(ctx, Uri.parse(uri))
-            retriever.getFrameAtTime(atUs)
+            job.get(EXTRACT_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         } catch (_: Exception) {
             null
         } finally {
-            try { retriever?.release() } catch (_: Exception) {}
+            job.cancel(true)
         }
     }
 
     suspend fun mid(uri: String, durationMs: Long): Bitmap? =
-        at(uri, (durationMs * 1000L / 2).coerceAtLeast(500_000L))
+        at(uri, (durationMs * 1000L / 2).coerceAtLeast(400_000L))
+
+    private fun extract(uri: String, atUs: Long): Bitmap? {
+        var retriever: MediaMetadataRetriever? = null
+        return try {
+            retriever = MediaMetadataRetriever()
+            retriever.setDataSource(ctx, Uri.parse(uri))
+            retriever.getFrameAtTime(
+                atUs,
+                MediaMetadataRetriever.OPTION_CLOSEST_SYNC
+            ) ?: retriever.frameAtTime
+        } catch (_: Throwable) {
+            null
+        } finally {
+            try { retriever?.release() } catch (_: Throwable) {}
+        }
+    }
+
+    companion object { const val EXTRACT_TIMEOUT_MS = 8_000L }
 }
 
 /**

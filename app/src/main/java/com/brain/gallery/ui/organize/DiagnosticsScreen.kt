@@ -76,6 +76,8 @@ fun DiagnosticsScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
                 if (d.splitsFlagged > 0) Yellow else Green)
             Stat("Clusters merged (last run)", "${d.merged}")
             Stat("Ambiguous adopted", "${d.adopted}")
+            Stat("Unreadable files", "${d.unreadable}",
+                if (d.unreadable > 0) Yellow else Green)
             Spacer(Modifier.height(16.dp))
             Text(
                 "Perceptual runs unbudgeted so duplicates and identity are complete on the " +

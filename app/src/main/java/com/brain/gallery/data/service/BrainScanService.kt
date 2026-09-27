@@ -24,6 +24,7 @@ import com.brain.gallery.engine.PersonMatcher
 import com.brain.gallery.engine.SplitDetector
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
@@ -103,13 +104,27 @@ class BrainScanService : LifecycleService() {
         val deadline = t0 + RUN_BUDGET_MS
         var totalL1a = 0
         var totalL1b = 0
+        var unreadable = 0
         while (System.currentTimeMillis() < deadline) {
             val pending = dao.pendingPerceptual(PERCEPTUAL_BATCH)
             if (pending.isEmpty()) break
             for ((i, v) in pending.withIndex()) {
-                val r = runCatching {
-                    l1a.analyze(v.uri, v.durationMs, v.displayName, v.folderName)
-                }.getOrNull() ?: continue
+                // One pathological file must never cost more than a couple of seconds.
+                val r = withTimeoutOrNull(PER_VIDEO_TIMEOUT_MS) {
+                    runCatching { l1a.analyze(v.uri, v.durationMs, v.displayName, v.folderName) }
+                        .getOrNull()
+                }
+                if (r == null || !r.frameRead) {
+                    // Unreadable frame: park it so we stop retrying it forever.
+                    unreadable++
+                    dao.applyPerceptual(
+                        id = v.id, category = v.category, tags = (v.tagList + "unreadable").joinToString(","),
+                        about = "Could not read a frame", confidence = 0f, level = 1,
+                        junk = maxOf(v.junkScore, 0.5f), faces = 0, smiles = 0, phash = 0L,
+                        sharpness = 0f, priority = 0f, pending = false
+                    )
+                    continue
+                }
                 dao.applyPerceptual(
                     id = v.id, category = r.category, tags = r.tags.joinToString(","),
                     about = r.about, confidence = r.confidence, level = 1, junk = v.junkScore,
@@ -119,8 +134,9 @@ class BrainScanService : LifecycleService() {
                 for (cand in r.vectors) matcher.assignOrCreate(v.id, cand.vec, cand.quality)
                 totalL1a++
                 if (i % 10 == 0) {
-                    val done = totalL1a + dao.perceptualPendingCount()
-                    notify("Understanding videos… $done", totalL1a, totalL1a + done, false)
+                    val remaining = dao.perceptualPendingCount()
+                    notify("Understanding videos… ${totalL1a + unreadable}", totalL1a + unreadable,
+                        totalL1a + unreadable + remaining, false)
                 }
             }
         }
@@ -154,7 +170,7 @@ class BrainScanService : LifecycleService() {
         val flagged = splitter.scanAll()
         namer.applyAllSuggestions()
         db.supportDao().put("diag.lastRun",
-            "$totalL1a|$totalL1b|${System.currentTimeMillis() - t0}|$flagged|$merged|$adopted")
+            "$totalL1a|$totalL1b|${System.currentTimeMillis() - t0}|$flagged|$merged|$adopted|$unreadable")
         db.supportDao().put("diag.tScan", "${tScan - t0}")
         db.supportDao().put("diag.tL1a", "${tL1a - tScan}")
         db.supportDao().put("diag.tL1b", "${tL1b - tL1a}")
@@ -229,6 +245,8 @@ class BrainScanService : LifecycleService() {
         const val SEMANTIC_BATCH = 25
         const val SEMANTIC_MIN = 25
         const val SEMANTIC_MAX = 250
+        /** Per-video ceiling so one bad file cannot stall the run. */
+        const val PER_VIDEO_TIMEOUT_MS = 12_000L
         fun start(ctx: Context, deltaIds: List<Long>? = null) {
             val i = Intent(ctx, BrainScanService::class.java)
             deltaIds?.let { i.putExtra(EXTRA_IDS, it.toLongArray()) }
