@@ -31,7 +31,11 @@ interface VideoDao {
         folder: String, w: Int, h: Int, scan: Long
     )
 
-    /** Mark-and-sweep: anything not seen in this scan is gone from the device. */
+    /** Stamp every id we actually saw this run, in one statement per chunk. */
+    @Query("UPDATE videos SET lastSeenScan = :scan WHERE id IN (:ids)")
+    suspend fun stampSeen(ids: List<Long>, scan: Long)
+
+    /** Mark-and-sweep: anything not stamped this run is gone from the device. */
     @Query("DELETE FROM videos WHERE lastSeenScan < :scanId")
     suspend fun sweepMissing(scanId: Long)
 

@@ -100,13 +100,24 @@ class BrainScanService : LifecycleService() {
         phase("scan")
 
         val scanned = if (deltaIds != null) scanner.scanIds(deltaIds) else scanner.scan()
-        val existingIds = dao.getAllSync().map { it.id }.toSet()
-        val fresh = scanned.filter { it.id !in existingIds }
-        val known = scanned.filter { it.id in existingIds }
-
-        // One transaction, and only rows whose metadata actually changed: rewriting
-        // 1300 identical rows every run was pure waste.
         val byId = dao.getAllSync().associateBy { it.id }
+        val fresh = scanned.filter { it.id !in byId }
+        val known = scanned.filter { it.id in byId }
+
+        // Order matters: stamp everything we actually saw, THEN sweep, then update
+        // only rows whose metadata really changed. Skipping the stamp step here
+        // once wiped the whole library, so it is never optional.
+        val seenIds = scanned.map { it.id }
+        seenIds.chunked(400).forEach { chunk -> dao.stampSeen(chunk, scanId) }
+
+        // Safety: a truncated scan must never be allowed to delete anything.
+        val existingCount = byId.size
+        if (deltaIds == null && existingCount > 0 && seenIds.size < existingCount / 2) {
+            Log.w(TAG, "scan returned ${seenIds.size} of $existingCount known videos; skipping sweep")
+        } else if (deltaIds == null) {
+            dao.sweepMissing(scanId)
+        }
+
         val changed = known.filter { s ->
             val o = byId[s.id] ?: return@filter true
             o.displayName != s.displayName || o.durationMs != s.durationMs ||
@@ -121,24 +132,6 @@ class BrainScanService : LifecycleService() {
                 }
             }
         }
-        if (fresh.isNotEmpty()) {
-            dao.insertNew(fresh.map { s ->
-                val l0 = Level0Analyzer.analyze(s.displayName, s.folderName, s.durationMs)
-                VideoEntity(
-                    id = s.id, uri = s.uri, displayName = s.displayName,
-                    durationMs = s.durationMs, sizeBytes = s.sizeBytes,
-                    dateAddedSec = s.dateAddedSec, folderName = s.folderName,
-                    width = s.width, height = s.height,
-                    category = l0.category, tags = l0.tags.joinToString(","),
-                    about = l0.about, confidence = l0.confidence,
-                    brainLevel = 0, junkScore = l0.junkScore,
-                    lastSeenScan = scanId
-                )
-            })
-        }
-        // Mark-and-sweep only on full scans; a delta scan must not delete unseen rows.
-        if (deltaIds == null) dao.sweepMissing(scanId)
-
         phase("metadata-merge")
         val tScan = System.currentTimeMillis()
 
