@@ -100,7 +100,7 @@ interface PersonDao {
     suspend fun vectorCount(): Int
 
     @Insert
-    suspend fun insertVectors(items: List<FaceVectorEntity>): List<Long>
+    suspend fun insertVectors(items: List<FaceVectorEntity>)
 
     @Query("UPDATE face_vectors SET personId = :personId WHERE id = :id")
     suspend fun assignVector(id: Long, personId: Int)
