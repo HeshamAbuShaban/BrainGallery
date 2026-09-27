@@ -4,6 +4,7 @@ import android.content.ContentUris
 import android.content.Context
 import android.os.Build
 import android.provider.MediaStore
+import android.util.Log
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -69,7 +70,12 @@ class MediaScanner @Inject constructor(@ApplicationContext private val ctx: Cont
                     )
                 }
             }
-        } catch (_: Exception) { }
+        } catch (t: Throwable) {
+            Log.e(TAG, "MediaStore query failed on ${collection()}", t)
+        }
+        Log.i(TAG, "scan returned ${out.size} rows")
         return out
     }
 }
+
+    companion object { private const val TAG = "MediaScanner" }

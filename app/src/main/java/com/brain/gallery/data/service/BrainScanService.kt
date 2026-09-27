@@ -100,6 +100,7 @@ class BrainScanService : LifecycleService() {
         phase("scan")
 
         val scanned = if (deltaIds != null) scanner.scanIds(deltaIds) else scanner.scan()
+        Log.i(TAG, "scanned=${scanned.size} delta=${deltaIds?.size}")
         val byId = dao.getAllSync().associateBy { it.id }
         val fresh = scanned.filter { it.id !in byId }
         val known = scanned.filter { it.id in byId }
