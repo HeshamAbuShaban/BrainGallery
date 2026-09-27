@@ -17,7 +17,6 @@ import com.brain.gallery.domain.SettingsStore
 import com.brain.gallery.domain.organize.GroupBuilder
 import com.brain.gallery.domain.organize.SmartGroup
 import com.brain.gallery.engine.MemoryDocBuilder
-import com.brain.gallery.engine.SimilarFinder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -64,10 +63,6 @@ class OrganizeViewModel @Inject constructor(
     val selected: StateFlow<SmartGroup?> = _selected
     private val _loading = MutableStateFlow(true)
     val loading: StateFlow<Boolean> = _loading
-    private val _spotlight = MutableStateFlow<VideoEntity?>(null)
-    val spotlight: StateFlow<VideoEntity?> = _spotlight
-    private val _similar = MutableStateFlow<List<VideoEntity>>(emptyList())
-    val similar: StateFlow<List<VideoEntity>> = _similar
     private val _diag = MutableStateFlow(Diagnostics())
     val diagnostics: StateFlow<Diagnostics> = _diag
     private val _batteryExempt = MutableStateFlow(false)
@@ -129,11 +124,6 @@ class OrganizeViewModel @Inject constructor(
 
     fun open(g: SmartGroup) { _selected.value = g }
     fun close() { _selected.value = null }
-    fun play(v: VideoEntity) {
-        _spotlight.value = v
-        _similar.value = SimilarFinder.find(v, allVideos)
-    }
-    fun closeSpotlight() { _spotlight.value = null; _similar.value = emptyList() }
 
     // ---- Identity corrections ----
     fun renamePerson(personId: Int, name: String) {
@@ -325,10 +315,6 @@ class SearchViewModel @Inject constructor(
     val query: StateFlow<String> = _q
     private val _results = MutableStateFlow<List<VideoEntity>>(emptyList())
     val results: StateFlow<List<VideoEntity>> = _results
-    private val _spotlight = MutableStateFlow<VideoEntity?>(null)
-    val spotlight: StateFlow<VideoEntity?> = _spotlight
-    private val _similar = MutableStateFlow<List<VideoEntity>>(emptyList())
-    val similar: StateFlow<List<VideoEntity>> = _similar
 
     init {
         viewModelScope.launch {
@@ -365,11 +351,6 @@ class SearchViewModel @Inject constructor(
     fun toggleFav(v: VideoEntity) {
         viewModelScope.launch { db.videoDao().setFavorite(v.id, !v.isFavorite) }
     }
-    fun play(v: VideoEntity) {
-        _spotlight.value = v
-        _similar.value = SimilarFinder.find(v, _results.value)
-    }
-    fun closeSpotlight() { _spotlight.value = null; _similar.value = emptyList() }
 
     private val _deleteAsk = MutableStateFlow<IntentSender?>(null)
     val deleteAsk: StateFlow<IntentSender?> = _deleteAsk

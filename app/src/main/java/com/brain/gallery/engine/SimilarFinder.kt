@@ -1,12 +1,15 @@
 package com.brain.gallery.engine
 
 import com.brain.gallery.data.local.VideoEntity
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Portable engine seam: "clip pulls its siblings" ranking.
  * Order of affinity: same person -> same event -> same category -> visual neighbor -> shared tag.
  */
-object SimilarFinder {
+@Singleton
+class SimilarFinder @Inject constructor() {
 
     fun find(target: VideoEntity, all: List<VideoEntity>, limit: Int = 12): List<VideoEntity> {
         val targetTags = target.tagList.toSet()
