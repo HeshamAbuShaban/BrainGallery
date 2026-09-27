@@ -112,6 +112,7 @@ fun FeedScreen(
     player: PlayerManager,
     spotlight: SpotlightController,
     onLeaveFeed: () -> Unit,
+    bottomOverlay: androidx.compose.ui.unit.Dp = 0.dp,
     vm: FeedViewModel = hiltViewModel()
 ) {
     val feed by vm.feed.collectAsState()
@@ -191,7 +192,8 @@ fun FeedScreen(
                 onSimilar = {
                     spotlight.openPlaylist(feed.map { it.video }, page)
                 },
-                onDismiss = onLeaveFeed
+                onDismiss = onLeaveFeed,
+                bottomOverlay = bottomOverlay
             )
         }
 
@@ -229,7 +231,8 @@ private fun ReelPage(
     onMenu: () -> Unit,
     onEnded: () -> Unit,
     onSimilar: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    bottomOverlay: androidx.compose.ui.unit.Dp = 0.dp
 ) {
     val ctx = LocalContext.current
     val haptics = LocalHapticFeedback.current
@@ -394,7 +397,7 @@ private fun ReelPage(
                 // right action rail
                 Column(
                     Modifier.align(Alignment.BottomEnd)
-                        .padding(end = 10.dp, bottom = 96.dp),
+                        .padding(end = 10.dp, bottom = 96.dp + bottomOverlay),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(18.dp)
                 ) {
@@ -420,7 +423,7 @@ private fun ReelPage(
                     .background(Brush.verticalGradient(
                         listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)),
                         startY = 240f))
-                    .padding(start = 14.dp, end = 86.dp, bottom = 26.dp)) {
+                    .padding(start = 14.dp, end = 86.dp, bottom = 26.dp + bottomOverlay)) {
                     Text(item.why, color = Cyan, fontSize = 11.5.sp, fontWeight = FontWeight.Bold,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Spacer(Modifier.height(4.dp))
@@ -441,7 +444,8 @@ private fun ReelPage(
 
         // ---- scrub bar: 2px visual, full-width, drag to seek ----
         val shown = if (scrubbing >= 0f) scrubbing else progress
-        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(26.dp)
+        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+            .padding(bottom = bottomOverlay).height(26.dp)
             .pointerInput(v.uri) {
                 detectTapGestures(
                     onTap = { off ->

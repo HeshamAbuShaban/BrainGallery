@@ -128,7 +128,9 @@ private fun Root(spotlight: SpotlightController) {
         containerColor = Bg,
         bottomBar = {
             Box(Modifier.graphicsLayer { alpha = chromeVisible; translationY = navHeight * (1f - chromeVisible) }) {
-                NavigationBar(containerColor = Color(0xFF10151F), tonalElevation = 0.dp) {
+                NavigationBar(
+                    containerColor = if (tab == 0) Color(0xB310151F) else Color(0xFF10151F),
+                    tonalElevation = 0.dp) {
                     tabs.forEachIndexed { i, t ->
                         NavigationBarItem(
                             selected = tab == i,
@@ -172,7 +174,8 @@ private fun Root(spotlight: SpotlightController) {
                         FeedScreen(
                             player = spotlight.player,
                             spotlight = spotlight,
-                            onLeaveFeed = { go(1) }
+                            onLeaveFeed = { go(1) },
+                            bottomOverlay = 80.dp
                         )
                     }
                     1 -> Box(Modifier.fillMaxSize()) { OrganizeScreen(spotlight) }
