@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Neural-node mark: a small memory graph. Four nodes, linked, with one node
+  accented as the "found" spark. Sized inside the adaptive-icon safe zone
+  (centre 66dp of the 108dp canvas).
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- links -->
+    <path
+        android:pathData="M40,46 L68,42"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3.4"
+        android:strokeAlpha="0.55"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M40,46 L47,70"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3.4"
+        android:strokeAlpha="0.55"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M68,42 L47,70"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3.4"
+        android:strokeAlpha="0.55"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M47,70 L70,70"
+        android:strokeColor="#FF06B6D4"
+        android:strokeWidth="3.4"
+        android:strokeAlpha="0.85"
+        android:strokeLineCap="round" />
+
+    <!-- nodes -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M40,36.5 a9.5,9.5 0 1,0 0.01,0 z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillAlpha="0.9"
+        android:pathData="M68,34.5 a7.5,7.5 0 1,0 0.01,0 z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M47,62 a8,8 0 1,0 0.01,0 z" />
+    <path
+        android:fillColor="#FF06B6D4"
+        android:pathData="M70,59 a11,11 0 1,0 0.01,0 z" />
+</vector>

@@ -11,6 +11,8 @@
     <application
         android:name=".BrainGalleryApp"
         android:label="BrainGallery"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@style/Theme.BrainGallery"
         android:allowBackup="true">
         <activity
