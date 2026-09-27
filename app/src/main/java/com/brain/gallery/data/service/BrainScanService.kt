@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
@@ -47,6 +48,7 @@ class BrainScanService : LifecycleService() {
     @Inject lateinit var matcher: PersonMatcher
     @Inject lateinit var consolidator: PersonConsolidator
     @Inject lateinit var settings: SettingsStore
+    private val running = java.util.concurrent.atomic.AtomicBoolean(false)
     @Inject lateinit var splitter: SplitDetector
     @Inject lateinit var namer: NameSuggester
     @Inject lateinit var frameCache: FrameCache
@@ -58,23 +60,37 @@ class BrainScanService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
+        // Overlapping runs would fight over the same database writes.
+        if (!running.compareAndSet(false, true)) {
+            Log.i(TAG, "run already in progress; ignoring start id=$startId")
+            return START_NOT_STICKY
+        }
         startForegroundCompat(notify("Scanning gallery…", 0, 0, true))
         val deltaIds = intent?.getLongArrayExtra(EXTRA_IDS)?.toList()
         lifecycleScope.launch(Dispatchers.IO) {
             try {
                 runIndex(deltaIds)
+            } catch (t: Throwable) {
+                // Never die silently: a swallowed failure looks like a hang.
+                Log.e(TAG, "index run failed", t)
+                notify(getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
             } finally {
+                running.set(false)
                 stopSelf(startId)
             }
         }
         return START_NOT_STICKY
     }
 
+    private fun phase(name: String) { Log.i(TAG, "phase: $name") }
+
     private suspend fun runIndex(deltaIds: List<Long>?) {
         val dao = db.videoDao()
         val t0 = System.currentTimeMillis()
         val scanId = t0
+        phase("settings")
         val cfg = settings.load()
+        phase("scan")
 
         val scanned = if (deltaIds != null) scanner.scanIds(deltaIds) else scanner.scan()
         val existingIds = dao.getAllSync().map { it.id }.toSet()
@@ -116,9 +132,11 @@ class BrainScanService : LifecycleService() {
         // Mark-and-sweep only on full scans; a delta scan must not delete unseen rows.
         if (deltaIds == null) dao.sweepMissing(scanId)
 
+        phase("metadata-merge")
         val tScan = System.currentTimeMillis()
 
         // ---- L1a: unbudgeted, looped until drained or the time budget runs out ----
+        phase("perceptual")
         val deadline = t0 + cfg.runBudgetSeconds * 1000L
         var totalL1a = 0
         var totalL1b = 0
@@ -126,6 +144,8 @@ class BrainScanService : LifecycleService() {
         while (System.currentTimeMillis() < deadline) {
             val pending = dao.pendingPerceptual(PERCEPTUAL_BATCH)
             if (pending.isEmpty()) break
+            Log.i(TAG, "perceptual batch of ${pending.size}, first id=${pending.first().id} " +
+                "\"${pending.first().displayName}\"")
             for ((i, v) in pending.withIndex()) {
                 // One pathological file must never cost more than a couple of seconds.
                 val r = withTimeoutOrNull(PER_VIDEO_TIMEOUT_MS) {
@@ -163,6 +183,7 @@ class BrainScanService : LifecycleService() {
         val tL1a = System.currentTimeMillis()
 
         // ---- L1b: budget scales with how much of the library is still unknown ----
+        phase("semantic")
         val semPending = dao.semanticPendingCount()
         val semBudget = if (cfg.semanticEnabled)
             semPending.coerceIn(SEMANTIC_MIN, cfg.semanticBudget.coerceIn(SEMANTIC_MIN, 600)) else 0
@@ -185,6 +206,7 @@ class BrainScanService : LifecycleService() {
         val tL1b = System.currentTimeMillis()
 
         // ---- Identity maintenance: repair fragmentation, then look for over-merges ----
+        phase("identity")
         val merged = consolidator.consolidate(cfg.mergeSim)
         val adopted = consolidator.adoptUnassigned()
         syncDenormalisedPersons()
@@ -199,6 +221,7 @@ class BrainScanService : LifecycleService() {
         frameCache.prune()
         db.supportDao().pruneEvents(20000)
 
+        phase("done")
         val remaining = dao.perceptualPendingCount() + dao.semanticPendingCount()
         if (remaining > 0) {
             // Something is still queued: vendor cleaners kill long runs, so come back.
@@ -270,6 +293,7 @@ class BrainScanService : LifecycleService() {
     }
 
     companion object {
+        private const val TAG = "BrainScan"
         const val CHANNEL = "brain_index"
         const val NOTIF_ID = 41
         const val EXTRA_IDS = "delta_ids"
