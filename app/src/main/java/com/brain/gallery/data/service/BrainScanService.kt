@@ -105,6 +105,23 @@ class BrainScanService : LifecycleService() {
         val fresh = scanned.filter { it.id !in byId }
         val known = scanned.filter { it.id in byId }
 
+        // Brand new videos first, so they exist before stamping/sweeping.
+        if (fresh.isNotEmpty()) {
+            dao.insertNew(fresh.map { s ->
+                val l0 = Level0Analyzer.analyze(s.displayName, s.folderName, s.durationMs)
+                VideoEntity(
+                    id = s.id, uri = s.uri, displayName = s.displayName,
+                    durationMs = s.durationMs, sizeBytes = s.sizeBytes,
+                    dateAddedSec = s.dateAddedSec, folderName = s.folderName,
+                    width = s.width, height = s.height,
+                    category = l0.category, tags = l0.tags.joinToString(","),
+                    about = l0.about, confidence = l0.confidence,
+                    brainLevel = 0, junkScore = l0.junkScore,
+                    lastSeenScan = scanId
+                )
+            })
+        }
+
         // Order matters: stamp everything we actually saw, THEN sweep, then update
         // only rows whose metadata really changed. Skipping the stamp step here
         // once wiped the whole library, so it is never optional.
