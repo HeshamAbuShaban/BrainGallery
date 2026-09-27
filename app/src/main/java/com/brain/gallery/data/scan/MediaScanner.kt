@@ -76,6 +76,6 @@ class MediaScanner @Inject constructor(@ApplicationContext private val ctx: Cont
         Log.i(TAG, "scan returned ${out.size} rows")
         return out
     }
-}
 
     companion object { private const val TAG = "MediaScanner" }
+}
