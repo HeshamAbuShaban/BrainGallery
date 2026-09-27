@@ -144,11 +144,13 @@ class BrainScanService : LifecycleService() {
 
         // ---- L1a: unbudgeted, looped until drained or the time budget runs out ----
         phase("perceptual")
+        // Hard outer ceiling: whatever happens, we must reach the bookkeeping below.
+        val hardDeadline = t0 + cfg.runBudgetSeconds * 1000L + HARD_GRACE_MS
         val deadline = t0 + cfg.runBudgetSeconds * 1000L
         var totalL1a = 0
         var totalL1b = 0
         var unreadable = 0
-        while (System.currentTimeMillis() < deadline) {
+        while (System.currentTimeMillis() < hardDeadline) {
             val pending = dao.pendingPerceptual(PERCEPTUAL_BATCH)
             if (pending.isEmpty()) break
             Log.i(TAG, "perceptual batch of ${pending.size}, first id=${pending.first().id} " +
@@ -182,6 +184,7 @@ class BrainScanService : LifecycleService() {
                 totalL1a++
                 if (i % 25 == 0) {
                     val remaining = dao.perceptualPendingCount()
+                    Log.i(TAG, "perceptual ${totalL1a + unreadable}/${pending.size} remaining=$remaining")
                     notify("Understanding videos… ${totalL1a + unreadable}", totalL1a + unreadable,
                         totalL1a + unreadable + remaining, false)
                 }
@@ -195,16 +198,21 @@ class BrainScanService : LifecycleService() {
         val semBudget = if (cfg.semanticEnabled)
             semPending.coerceIn(SEMANTIC_MIN, cfg.semanticBudget.coerceIn(SEMANTIC_MIN, 600)) else 0
         var semIndex = 0
-        while (semIndex < semBudget && System.currentTimeMillis() < deadline + SEMANTIC_GRACE_MS) {
+        var semStalled = 0
+        while (semIndex < semBudget && System.currentTimeMillis() < hardDeadline) {
             val batch = dao.pendingSemantic(SEMANTIC_BATCH)
             if (batch.isEmpty()) break
-            for (v in batch) {
+            for ((i, v) in batch.withIndex()) {
                 val prev = PerceptualResult(
                     v.phash, v.sharpness, v.faceCount, v.smileCount, v.about, v.category,
                     v.tagList, v.confidence, emptyList(), v.priority, true
                 )
-                val s = runCatching { l1b.analyze(v.id, v.uri, v.durationMs, prev) }.getOrNull()
-                    ?: continue
+                // ML Kit's Task can hang on a damaged file; never wait forever for it.
+                val s = withTimeoutOrNull(PER_VIDEO_TIMEOUT_MS) {
+                    runCatching { l1b.analyze(v.id, v.uri, v.durationMs, prev) }.getOrNull()
+                }
+                if (i % 5 == 0) Log.i(TAG, "semantic $semIndex/$semBudget id=${v.id}")
+                if (s == null) { semStalled++; continue }
                 dao.applySemantic(v.id, s.category, s.tags.joinToString(","), s.about, s.confidence, 2)
                 semIndex++
             }
@@ -220,7 +228,7 @@ class BrainScanService : LifecycleService() {
         val flagged = splitter.scanAll(cfg.splitSensitivity)
         namer.applyAllSuggestions()
         db.supportDao().put("diag.lastRun",
-            "$totalL1a|$totalL1b|${System.currentTimeMillis() - t0}|$flagged|$merged|$adopted|$unreadable")
+            "$totalL1a|$totalL1b|${System.currentTimeMillis() - t0}|$flagged|$merged|$adopted|$unreadable|$semStalled")
         db.supportDao().put("diag.tScan", "${tScan - t0}")
         db.supportDao().put("diag.tL1a", "${tL1a - tScan}")
         db.supportDao().put("diag.tL1b", "${tL1b - tL1a}")
@@ -314,6 +322,8 @@ class BrainScanService : LifecycleService() {
         const val SEMANTIC_MAX = 250
         /** Per-video ceiling so one bad file cannot stall the run. */
         const val PER_VIDEO_TIMEOUT_MS = 12_000L
+        /** Slack on top of the run budget so bookkeeping is always reached. */
+        const val HARD_GRACE_MS = 60_000L
         fun start(ctx: Context, deltaIds: List<Long>? = null) {
             val i = Intent(ctx, BrainScanService::class.java)
             deltaIds?.let { i.putExtra(EXTRA_IDS, it.toLongArray()) }

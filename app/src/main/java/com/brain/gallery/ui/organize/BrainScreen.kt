@@ -127,6 +127,7 @@ fun BrainScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
             Stat("Last run", "${d.lastL1a} perceptual · ${d.lastL1b} enriched · ${d.lastMs} ms")
             Stat("Clusters merged / adopted", "${d.merged} / ${d.adopted}")
             Stat("Unreadable files", "${d.unreadable}")
+            Stat("Model timeouts", "${d.stalled}", if (d.stalled > 0) Yellow else Green)
             ActionRow("Re-index now", Accent) { vm.rescan() }
 
             // ---------------- Identity ----------------
