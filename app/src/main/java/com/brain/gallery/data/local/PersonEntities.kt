@@ -86,4 +86,8 @@ interface PersonDao {
 
     @Query("DELETE FROM persons")
     suspend fun deleteAllPersons()
+
+    /** Merged-away people leave empty rows behind; drop them so counts stay honest. */
+    @Query("DELETE FROM persons WHERE id NOT IN (SELECT DISTINCT personId FROM face_vectors WHERE personId >= 0)")
+    suspend fun deleteEmptyPersons()
 }

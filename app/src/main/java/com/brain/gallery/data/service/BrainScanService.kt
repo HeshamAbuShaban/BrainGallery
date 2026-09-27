@@ -234,6 +234,7 @@ class BrainScanService : LifecycleService() {
         // ---- Identity maintenance: repair fragmentation, then look for over-merges ----
         phase("identity")
         val merged = consolidator.consolidate(cfg.mergeSim)
+        db.personDao().deleteEmptyPersons()
         val adopted = consolidator.adoptUnassigned()
         syncDenormalisedPersons()
         val flagged = splitter.scanAll(cfg.splitSensitivity)

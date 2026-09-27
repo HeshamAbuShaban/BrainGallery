@@ -134,6 +134,7 @@ class OrganizeViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             db.personDao().mergePersons(fromId, toId)
             db.videoDao().mergePersons(fromId, toId)
+            db.personDao().deleteEmptyPersons()
         }
     }
     /** Split: detach one video's vectors from a person so it can re-match elsewhere. */
@@ -200,6 +201,7 @@ class OrganizeViewModel @Inject constructor(
                 db.videoDao().mergePersons(p.id, keep)
             }
             db.personDao().rename(keep, name)
+            db.personDao().deleteEmptyPersons()
         }
     }
 
