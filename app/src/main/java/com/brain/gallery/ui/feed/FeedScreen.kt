@@ -67,10 +67,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -92,6 +95,7 @@ import com.brain.gallery.ui.theme.Cyan
 import com.brain.gallery.ui.theme.Motion
 import com.brain.gallery.ui.theme.Pink
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 private const val CHROME_IDLE_MS = 2500L
@@ -223,6 +227,7 @@ private fun ReelPage(
     var heartAt by remember { mutableStateOf<Offset?>(null) }
     var scrubbing by remember { mutableFloatStateOf(-1f) }
     var seekMs by remember { mutableStateOf(0L) }
+    var stageSize by remember { mutableStateOf(IntSize.Zero) }
     val heartScale = remember { Animatable(0.4f) }
 
     // ONLY the active page acquires the shared player. An adjacent page asking
@@ -285,7 +290,9 @@ private fun ReelPage(
         targetValue = if (chrome) 1f else 0f,
         animationSpec = tween(Motion.mediumMs), label = "rail")
 
-    Box(Modifier.fillMaxSize().pointerInput(v.uri) {
+    Box(Modifier.fillMaxSize()
+        .onSizeChanged { stageSize = it }
+        .pointerInput(v.uri) {
         detectTapGestures(
             onTap = {
                 paused = !paused
@@ -321,12 +328,18 @@ private fun ReelPage(
 
         // ---- double-tap heart, at the touch point ----
         heartAt?.let { pos ->
-            Box(Modifier.fillMaxSize()) {
+            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Icon(Icons.Default.Favorite, null, tint = Pink,
                     modifier = Modifier
-                        .offset(x = pos.x - 55.dp, y = pos.y - 55.dp)
                         .size(110.dp)
-                        .scale(heartScale.value))
+                        .scale(heartScale.value)
+                        // pos is in pixels; the icon is centred, so shift by the delta.
+                        .offset {
+                            IntOffset(
+                                (pos.x - stageSize.width / 2f).roundToInt(),
+                                (pos.y - stageSize.height / 2f).roundToInt()
+                            )
+                        })
             }
         }
 
