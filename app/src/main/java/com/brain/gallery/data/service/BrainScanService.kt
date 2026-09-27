@@ -73,7 +73,11 @@ class BrainScanService : LifecycleService() {
             } catch (t: Throwable) {
                 // Never die silently: a swallowed failure looks like a hang.
                 Log.e(TAG, "index run failed", t)
-                notify(getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
+                nm.notify(NOTIF_ID, NotificationCompat.Builder(this@BrainScanService, CHANNEL)
+                    .setContentTitle("BrainGallery")
+                    .setContentText("Indexing paused — open the app to retry")
+                    .setSmallIcon(android.R.drawable.stat_notify_error)
+                    .setAutoCancel(true).build())
             } finally {
                 running.set(false)
                 stopSelf(startId)
@@ -83,6 +87,9 @@ class BrainScanService : LifecycleService() {
     }
 
     private fun phase(name: String) { Log.i(TAG, "phase: $name") }
+
+    private val nm: NotificationManager
+        get() = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
     private suspend fun runIndex(deltaIds: List<Long>?) {
         val dao = db.videoDao()
