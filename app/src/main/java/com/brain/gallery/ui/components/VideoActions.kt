@@ -41,6 +41,7 @@ import androidx.compose.ui.window.Dialog
 import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.engine.MemoryDocBuilder
 import com.brain.gallery.ui.theme.CardShape
+import com.brain.gallery.ui.theme.Cyan
 import com.brain.gallery.ui.theme.Pink
 import com.brain.gallery.ui.theme.Surface
 import com.brain.gallery.ui.theme.Text1

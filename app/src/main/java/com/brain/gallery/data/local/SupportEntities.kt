@@ -48,6 +48,9 @@ interface SupportDao {
     @Query("DELETE FROM watch_events WHERE rowId NOT IN (SELECT rowId FROM watch_events ORDER BY atMs DESC LIMIT :keep)")
     suspend fun pruneEvents(keep: Int)
 
+    @Query("DELETE FROM watch_events")
+    suspend fun clearEvents()
+
     @Query("SELECT v FROM app_kv WHERE k = :k")
     suspend fun get(k: String): String?
 

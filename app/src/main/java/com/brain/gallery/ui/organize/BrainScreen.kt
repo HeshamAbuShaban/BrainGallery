@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -102,17 +103,17 @@ fun BrainScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
                 "Find and rank redundant near-identical clips", cfg.duplicatesEnabled) {
                 vm.updateSettings(cfg.copy(duplicatesEnabled = it))
             }
-            SliderRow("Semantic budget per run", cfg.semanticBudget.toString(), 25f, 600f, 25f,
+            SliderRow("Semantic budget per run", cfg.semanticBudget.toString(), 25f, 600f, 24,
                 cfg.semanticBudget.toFloat()) { vm.updateSettings(cfg.copy(semanticBudget = it.toInt())) }
-            SliderRow("Run time budget", "${cfg.runBudgetSeconds}s", 30f, 420f, 30f,
+            SliderRow("Run time budget", "${cfg.runBudgetSeconds}s", 30f, 420f, 14,
                 cfg.runBudgetSeconds.toFloat()) { vm.updateSettings(cfg.copy(runBudgetSeconds = it.toInt())) }
-            SliderRow("Match strictness (similarity)", "%.2f".format(cfg.matchSim), 0.30f, 0.70f, 0.01f,
+            SliderRow("Match strictness (similarity)", "%.2f".format(cfg.matchSim), 0.30f, 0.70f, 40,
                 cfg.matchSim) { vm.updateSettings(cfg.copy(matchSim = it)) }
-            SliderRow("Cluster merge threshold", "%.2f".format(cfg.mergeSim), 0.35f, 0.75f, 0.01f,
+            SliderRow("Cluster merge threshold", "%.2f".format(cfg.mergeSim), 0.35f, 0.75f, 40,
                 cfg.mergeSim) { vm.updateSettings(cfg.copy(mergeSim = it)) }
-            SliderRow("Split sensitivity", "%.2f".format(cfg.splitSensitivity), 0.10f, 0.50f, 0.01f,
+            SliderRow("Split sensitivity", "%.2f".format(cfg.splitSensitivity), 0.10f, 0.50f, 40,
                 cfg.splitSensitivity) { vm.updateSettings(cfg.copy(splitSensitivity = it)) }
-            SliderRow("Clutter threshold", "%.2f".format(cfg.junkSensitivity), 0.20f, 0.90f, 0.05f,
+            SliderRow("Clutter threshold", "%.2f".format(cfg.junkSensitivity), 0.20f, 0.90f, 14,
                 cfg.junkSensitivity) { vm.updateSettings(cfg.copy(junkSensitivity = it)) }
             Text("Lower match strictness pulls more clips into a person; a lower merge " +
                 "threshold repairs fragmentation. Clutter threshold decides what counts as junk.",

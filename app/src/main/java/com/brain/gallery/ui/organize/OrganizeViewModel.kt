@@ -182,8 +182,9 @@ class OrganizeViewModel @Inject constructor(
             val matches = db.personDao().allPersons()
                 .filter { it.name.equals(name, true) || it.suggestedName.equals(name, true) }
             if (matches.size < 2) return@launch
-            val counts = matches.associate { it.id to db.personDao().vectorsForPerson(it.id).size }
-            val keep = counts.maxByOrNull { it.second }!!.first
+            val counts: Map<Int, Int> =
+                matches.associate { it.id to db.personDao().vectorsForPerson(it.id).size }
+            val keep: Int = counts.maxByOrNull { it.value }?.key ?: return@launch
             for (p in matches) {
                 if (p.id == keep) continue
                 db.personDao().mergePersons(p.id, keep)

@@ -102,7 +102,7 @@ fun SpotlightPlayer(
         delay(3200)
         controls = false
     }
-    LaunchedEffect(exo) {
+    DisposableEffect(exo) {
         val l = object : Player.Listener {
             override fun onRenderedFirstFrame() { ready = true }
         }
