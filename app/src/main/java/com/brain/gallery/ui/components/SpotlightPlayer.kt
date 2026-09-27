@@ -64,6 +64,7 @@ import androidx.media3.ui.PlayerView
 import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.ui.player.PlayerManager
 import com.brain.gallery.ui.theme.Accent
+import com.brain.gallery.ui.theme.Cyan
 import com.brain.gallery.ui.theme.Motion
 import com.brain.gallery.ui.theme.Numeral
 import com.brain.gallery.ui.theme.Pink
