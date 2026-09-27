@@ -19,6 +19,7 @@ import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.data.scan.MediaScanner
 import com.brain.gallery.data.vision.FrameCache
 import com.brain.gallery.engine.NameSuggester
+import com.brain.gallery.engine.PersonConsolidator
 import com.brain.gallery.engine.PersonMatcher
 import com.brain.gallery.engine.SplitDetector
 import dagger.hilt.android.AndroidEntryPoint
@@ -40,6 +41,7 @@ class BrainScanService : LifecycleService() {
     @Inject lateinit var l1a: L1aAnalyzer
     @Inject lateinit var l1b: L1bAnalyzer
     @Inject lateinit var matcher: PersonMatcher
+    @Inject lateinit var consolidator: PersonConsolidator
     @Inject lateinit var splitter: SplitDetector
     @Inject lateinit var namer: NameSuggester
     @Inject lateinit var frameCache: FrameCache
@@ -97,48 +99,62 @@ class BrainScanService : LifecycleService() {
 
         val tScan = System.currentTimeMillis()
 
-        // ---- L1a: unbudgeted, every pending video ----
-        val pending = dao.pendingPerceptual(200)
-        var l1aDone = 0
-        for (v in pending) {
-            val r = runCatching {
-                l1a.analyze(v.uri, v.durationMs, v.displayName, v.folderName)
-            }.getOrNull() ?: continue
-            dao.applyPerceptual(
-                id = v.id, category = r.category, tags = r.tags.joinToString(","),
-                about = r.about, confidence = r.confidence, level = 1, junk = v.junkScore,
-                faces = r.faceCount, smiles = r.smileCount, phash = r.phash,
-                sharpness = r.sharpness, priority = r.priority, pending = r.pendingSemantic
-            )
-            for (cand in r.vectors) {
-                matcher.assignOrCreate(v.id, cand.vec, cand.quality)
-            }
-            l1aDone++
-            if (l1aDone % 10 == 0) {
-                notify("Understanding videos… $l1aDone/${pending.size}", l1aDone, pending.size, false)
+        // ---- L1a: unbudgeted, looped until drained or the time budget runs out ----
+        val deadline = t0 + RUN_BUDGET_MS
+        var totalL1a = 0
+        var totalL1b = 0
+        while (System.currentTimeMillis() < deadline) {
+            val pending = dao.pendingPerceptual(PERCEPTUAL_BATCH)
+            if (pending.isEmpty()) break
+            for ((i, v) in pending.withIndex()) {
+                val r = runCatching {
+                    l1a.analyze(v.uri, v.durationMs, v.displayName, v.folderName)
+                }.getOrNull() ?: continue
+                dao.applyPerceptual(
+                    id = v.id, category = r.category, tags = r.tags.joinToString(","),
+                    about = r.about, confidence = r.confidence, level = 1, junk = v.junkScore,
+                    faces = r.faceCount, smiles = r.smileCount, phash = r.phash,
+                    sharpness = r.sharpness, priority = r.priority, pending = r.pendingSemantic
+                )
+                for (cand in r.vectors) matcher.assignOrCreate(v.id, cand.vec, cand.quality)
+                totalL1a++
+                if (i % 10 == 0) {
+                    val done = totalL1a + dao.perceptualPendingCount()
+                    notify("Understanding videos… $done", totalL1a, totalL1a + done, false)
+                }
             }
         }
         val tL1a = System.currentTimeMillis()
 
-        // ---- L1b: budgeted, expected-value ordered ----
-        val semanticPending = dao.pendingSemantic(25)
-        var l1bDone = 0
-        for (v in semanticPending) {
-            val prev = PerceptualResult(
-                v.phash, v.sharpness, v.faceCount, v.smileCount, v.about, v.category,
-                v.tagList, v.confidence, emptyList(), v.priority, true
-            )
-            val s = runCatching { l1b.analyze(v.id, v.uri, v.durationMs, prev) }.getOrNull() ?: continue
-            dao.applySemantic(v.id, s.category, s.tags.joinToString(","), s.about, s.confidence, 2)
-            l1bDone++
+        // ---- L1b: budget scales with how much of the library is still unknown ----
+        val semPending = dao.semanticPendingCount()
+        val semBudget = semPending.coerceIn(SEMANTIC_MIN, SEMANTIC_MAX)
+        var semIndex = 0
+        while (semIndex < semBudget && System.currentTimeMillis() < deadline + SEMANTIC_GRACE_MS) {
+            val batch = dao.pendingSemantic(SEMANTIC_BATCH)
+            if (batch.isEmpty()) break
+            for (v in batch) {
+                val prev = PerceptualResult(
+                    v.phash, v.sharpness, v.faceCount, v.smileCount, v.about, v.category,
+                    v.tagList, v.confidence, emptyList(), v.priority, true
+                )
+                val s = runCatching { l1b.analyze(v.id, v.uri, v.durationMs, prev) }.getOrNull()
+                    ?: continue
+                dao.applySemantic(v.id, s.category, s.tags.joinToString(","), s.about, s.confidence, 2)
+                semIndex++
+            }
         }
+        totalL1b = semIndex
         val tL1b = System.currentTimeMillis()
 
-        // ---- Identity maintenance ----
+        // ---- Identity maintenance: repair fragmentation, then look for over-merges ----
+        val merged = consolidator.consolidate()
+        val adopted = consolidator.adoptUnassigned()
         syncDenormalisedPersons()
         val flagged = splitter.scanAll()
         namer.applyAllSuggestions()
-        db.supportDao().put("diag.lastRun", "$l1aDone|$l1bDone|${System.currentTimeMillis() - t0}|$flagged")
+        db.supportDao().put("diag.lastRun",
+            "$totalL1a|$totalL1b|${System.currentTimeMillis() - t0}|$flagged|$merged|$adopted")
         db.supportDao().put("diag.tScan", "${tScan - t0}")
         db.supportDao().put("diag.tL1a", "${tL1a - tScan}")
         db.supportDao().put("diag.tL1b", "${tL1b - tL1a}")
@@ -146,7 +162,7 @@ class BrainScanService : LifecycleService() {
         db.supportDao().pruneEvents(20000)
 
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.notify(NOTIF_ID, doneNotification(l1aDone, l1bDone))
+        nm.notify(NOTIF_ID, doneNotification(totalL1a, totalL1b, merged))
     }
 
     /** Keep videos.personId aligned with the best vector per video. */
@@ -183,12 +199,12 @@ class BrainScanService : LifecycleService() {
         return n
     }
 
-    private fun doneNotification(perceptual: Int, semantic: Int): Notification =
+    private fun doneNotification(perceptual: Int, semantic: Int, merged: Int): Notification =
         NotificationCompat.Builder(this, CHANNEL)
             .setContentTitle("BrainGallery")
             .setContentText(
                 if (perceptual == 0 && semantic == 0) "Library up to date"
-                else "Indexed $perceptual · $semantic enriched")
+                else "Indexed $perceptual · $semantic enriched${if (merged > 0) " · $merged merged" else ""}")
             .setSmallIcon(android.R.drawable.stat_sys_download_done)
             .setAutoCancel(true)
             .build()
@@ -205,6 +221,14 @@ class BrainScanService : LifecycleService() {
         const val CHANNEL = "brain_index"
         const val NOTIF_ID = 41
         const val EXTRA_IDS = "delta_ids"
+        /** Wall-clock budget for one foreground indexing session. */
+        const val RUN_BUDGET_MS = 150_000L
+        /** Extra grace for the semantic stage once perceptual work is done. */
+        const val SEMANTIC_GRACE_MS = 90_000L
+        const val PERCEPTUAL_BATCH = 200
+        const val SEMANTIC_BATCH = 25
+        const val SEMANTIC_MIN = 25
+        const val SEMANTIC_MAX = 250
         fun start(ctx: Context, deltaIds: List<Long>? = null) {
             val i = Intent(ctx, BrainScanService::class.java)
             deltaIds?.let { i.putExtra(EXTRA_IDS, it.toLongArray()) }

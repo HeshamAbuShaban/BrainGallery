@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,12 +54,23 @@ fun VideoThumb(
                 Modifier.combinedClickable(onClick = { onClick?.invoke() },
                     onLongClick = { onLongClick?.invoke() })
             else Modifier
-        )) {
-        AsyncImage(
-            model = ImageRequest.Builder(ctx).data(video.uri).videoFrameMillis(500).build(),
-            imageLoader = loader, contentDescription = null,
-            contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()
-        )
+        )        ) {
+        // Dead files (0 bytes / 0 duration) have no frame to show; a placeholder
+        // reads better than a black rectangle.
+        val unplayable = video.durationMs <= 0L || video.sizeBytes <= 0L
+        if (unplayable) {
+            Box(Modifier.fillMaxSize().background(Color(0xFF1A2130)),
+                contentAlignment = Alignment.Center) {
+                Icon(Icons.Default.VideocamOff, null, tint = Color.White.copy(alpha = 0.28f),
+                    modifier = Modifier.size(22.dp))
+            }
+        } else {
+            AsyncImage(
+                model = ImageRequest.Builder(ctx).data(video.uri).videoFrameMillis(500).build(),
+                imageLoader = loader, contentDescription = null,
+                contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()
+            )
+        }
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
             listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)),
             startY = 300f)))

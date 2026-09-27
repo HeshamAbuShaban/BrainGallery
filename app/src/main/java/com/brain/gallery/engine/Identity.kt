@@ -17,7 +17,7 @@ data class MatchDecision(val personId: Int, val ambiguous: Boolean, val best: Fl
 @Singleton
 class PersonMatcher @Inject constructor(private val db: BrainDatabase) {
 
-    suspend fun match(vec: FloatArray, minSim: Float = 0.45f, minMargin: Float = 0.05f): MatchDecision {
+    suspend fun match(vec: FloatArray, minSim: Float = 0.42f, minMargin: Float = 0.05f): MatchDecision {
         val persons = db.personDao().allPersons()
         if (persons.isEmpty()) return MatchDecision(-1, false, 0f, 0f)
         val scores = persons.mapNotNull { p ->
@@ -53,6 +53,73 @@ class PersonMatcher @Inject constructor(private val db: BrainDatabase) {
             )
         ))
         return personId
+    }
+}
+
+/**
+ * Fragmentation repair.
+ *
+ * Greedy insertion matching is order-dependent: whoever arrives first seeds a
+ * person, and a face photographed under different lighting never quite clears
+ * the bar, so one person ends up as five. This pass repeatedly merges the two
+ * closest persons (highest max cross-similarity) until nothing is close enough,
+ * which makes identity independent of insertion order.
+ */
+@Singleton
+class PersonConsolidator @Inject constructor(private val db: BrainDatabase) {
+
+    suspend fun consolidate(mergeSim: Float = 0.45f, maxMerges: Int = 40): Int {
+        var merges = 0
+        while (merges < maxMerges) {
+            val persons = db.personDao().allPersons()
+            if (persons.size < 2) return merges
+            val vecs = HashMap<Int, List<FloatArray>>()
+            for (p in persons) {
+                vecs[p.id] = db.personDao().vectorsForPerson(p.id).mapNotNull { FaceEmbedder.fromBytes(it.vec) }
+            }
+            var bestA = -1
+            var bestB = -1
+            var bestSim = mergeSim
+            for (i in persons.indices) {
+                val a = vecs[persons[i].id].orEmpty()
+                if (a.isEmpty()) continue
+                for (j in i + 1 until persons.size) {
+                    val b = vecs[persons[j].id].orEmpty()
+                    if (b.isEmpty()) continue
+                    var s = -2f
+                    for (va in a) for (vb in b) {
+                        val c = Spherical.cosine(va, vb)
+                        if (c > s) s = c
+                    }
+                    if (s > bestSim) { bestSim = s; bestA = persons[i].id; bestB = persons[j].id }
+                }
+            }
+            if (bestA < 0 || bestB < 0) return merges
+            val na = vecs[bestA]?.size ?: 0
+            val nb = vecs[bestB]?.size ?: 0
+            val keep = if (na >= nb) bestA else bestB
+            val drop = if (na >= nb) bestB else bestA
+            db.personDao().mergePersons(drop, keep)
+            db.videoDao().mergePersons(drop, keep)
+            merges++
+        }
+        return merges
+    }
+
+    /** Second chance for vectors the ambiguity gate parked: adopt the clear winners. */
+    suspend fun adoptUnassigned(minSim: Float = 0.50f, minMargin: Float = 0.08f): Int {
+        val pending = db.personDao().unassignedVectors()
+        if (pending.isEmpty()) return 0
+        var adopted = 0
+        for (row in pending) {
+            val vec = FaceEmbedder.fromBytes(row.vec) ?: continue
+            val d = match(vec, minSim, minMargin)
+            if (d.personId >= 0 && !d.ambiguous) {
+                db.personDao().assignVector(row.id, d.personId)
+                adopted++
+            }
+        }
+        return adopted
     }
 }
 

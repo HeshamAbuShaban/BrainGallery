@@ -44,6 +44,12 @@ interface VideoDao {
     @Query("SELECT COUNT(*) FROM videos WHERE brainLevel < 1")
     fun observePerceptualPending(): Flow<Int>
 
+    @Query("SELECT COUNT(*) FROM videos WHERE brainLevel < 1")
+    suspend fun perceptualPendingCount(): Int
+
+    @Query("SELECT COUNT(*) FROM videos WHERE pendingSemantic = 1")
+    suspend fun semanticPendingCount(): Int
+
     @Query("SELECT COUNT(*) FROM videos WHERE pendingSemantic = 1")
     fun observeSemanticPending(): Flow<Int>
 
