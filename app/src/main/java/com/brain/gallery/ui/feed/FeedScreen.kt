@@ -62,9 +62,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.media3.common.Player
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
+import coil.imageLoader
 import coil.request.ImageRequest
-import coil.decode.VideoFrameDecoder
-import coil.ImageLoader
 import coil.request.videoFrameMillis
 import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.domain.engine.FeedItem
@@ -209,9 +208,7 @@ private fun ReelPage(
         }
     }
 
-    val loader = remember {
-        ImageLoader.Builder(ctx).components { add(VideoFrameDecoder.Factory()) }.build()
-    }
+    val loader = ctx.imageLoader // shared app-level thumbnail cache
 
     Box(Modifier.fillMaxSize().pointerInput(v.uri) {
         detectTapGestures(

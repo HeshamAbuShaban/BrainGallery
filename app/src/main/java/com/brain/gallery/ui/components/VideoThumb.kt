@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import coil.ImageLoader
 import coil.compose.AsyncImage
 import coil.decode.VideoFrameDecoder
+import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.videoFrameMillis
 import com.brain.gallery.data.local.VideoEntity
@@ -43,9 +44,7 @@ fun VideoThumb(
     onLongClick: (() -> Unit)? = null
 ) {
     val ctx = LocalContext.current
-    val loader = remember {
-        ImageLoader.Builder(ctx).components { add(VideoFrameDecoder.Factory()) }.build()
-    }
+    val loader = ctx.imageLoader // single app-level cache, not one per cell
     Box(modifier
         .clip(CardShape)
         .background(Color(0xFF151B26))

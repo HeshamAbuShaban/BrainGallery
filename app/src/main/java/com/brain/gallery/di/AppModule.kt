@@ -20,4 +20,6 @@ object AppModule {
 
     @Provides fun videoDao(db: BrainDatabase) = db.videoDao()
     @Provides fun watchDao(db: BrainDatabase) = db.watchDao()
+    @Provides fun personDao(db: BrainDatabase) = db.personDao()
+    @Provides fun supportDao(db: BrainDatabase) = db.supportDao()
 }

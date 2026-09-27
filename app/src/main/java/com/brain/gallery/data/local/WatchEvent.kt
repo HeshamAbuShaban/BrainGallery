@@ -21,4 +21,6 @@ interface WatchEventDao {
     @Insert suspend fun insert(e: WatchEventEntity)
     @Query("SELECT * FROM watch_events ORDER BY atMs DESC LIMIT 300")
     suspend fun recent(): List<WatchEventEntity>
+    @Query("SELECT * FROM watch_events ORDER BY atMs DESC")
+    suspend fun all(): List<WatchEventEntity>
 }

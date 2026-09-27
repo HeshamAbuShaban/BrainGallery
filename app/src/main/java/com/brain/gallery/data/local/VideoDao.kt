@@ -17,17 +17,35 @@ interface VideoDao {
     @Query("SELECT * FROM videos WHERE id = :id")
     suspend fun getById(id: Long): VideoEntity?
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsertAll(items: List<VideoEntity>)
+    @Query("SELECT * FROM videos WHERE id IN (:ids)")
+    suspend fun getByIds(ids: List<Long>): List<VideoEntity>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun upsert(item: VideoEntity)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertNew(items: List<VideoEntity>)
 
-    @Query("DELETE FROM videos WHERE id NOT IN (:keepIds)")
-    suspend fun deleteRemoved(keepIds: List<Long>)
+    @Query("""UPDATE videos SET uri = :uri, displayName = :name, durationMs = :duration,
+        sizeBytes = :size, folderName = :folder, width = :w, height = :h, lastSeenScan = :scan
+        WHERE id = :id""")
+    suspend fun touchMetadata(
+        id: Long, uri: String, name: String, duration: Long, size: Long,
+        folder: String, w: Int, h: Int, scan: Long
+    )
 
-    @Query("SELECT * FROM videos WHERE brainLevel < :maxLevel ORDER BY junkScore ASC, dateAddedSec DESC LIMIT :limit")
-    suspend fun pendingBrain(maxLevel: Int = 1, limit: Int = 50): List<VideoEntity>
+    /** Mark-and-sweep: anything not seen in this scan is gone from the device. */
+    @Query("DELETE FROM videos WHERE lastSeenScan < :scanId")
+    suspend fun sweepMissing(scanId: Long)
+
+    @Query("SELECT * FROM videos WHERE brainLevel < 1 ORDER BY dateAddedSec DESC LIMIT :limit")
+    suspend fun pendingPerceptual(limit: Int): List<VideoEntity>
+
+    @Query("SELECT * FROM videos WHERE pendingSemantic = 1 ORDER BY priority DESC, dateAddedSec DESC LIMIT :limit")
+    suspend fun pendingSemantic(limit: Int): List<VideoEntity>
+
+    @Query("SELECT COUNT(*) FROM videos WHERE brainLevel < 1")
+    fun observePerceptualPending(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM videos WHERE pendingSemantic = 1")
+    fun observeSemanticPending(): Flow<Int>
 
     @Query("UPDATE videos SET isFavorite = :fav WHERE id = :id")
     suspend fun setFavorite(id: Long, fav: Boolean)
@@ -35,11 +53,11 @@ interface VideoDao {
     @Query("DELETE FROM videos WHERE id IN (:ids)")
     suspend fun deleteByIds(ids: List<Long>)
 
-    @Query("SELECT * FROM videos WHERE faceCount > 0 ORDER BY smileCount DESC, faceCount DESC")
-    suspend fun people(): List<VideoEntity>
-
     @Query("SELECT * FROM videos WHERE personId = :person ORDER BY dateAddedSec DESC")
     suspend fun personGroup(person: Int): List<VideoEntity>
+
+    @Query("SELECT * FROM videos WHERE faceCount > 0 ORDER BY smileCount DESC, faceCount DESC")
+    suspend fun people(): List<VideoEntity>
 
     @Query("UPDATE videos SET personId = :person WHERE id = :id")
     suspend fun setPerson(id: Long, person: Int)
@@ -47,17 +65,27 @@ interface VideoDao {
     @Query("UPDATE videos SET personId = :to WHERE personId = :from")
     suspend fun mergePersons(from: Int, to: Int)
 
-    @Query("UPDATE videos SET personId = -1 WHERE id = :id")
-    suspend fun unperson(id: Long)
+    @Query("""UPDATE videos SET
+        category = :category, tags = :tags, about = :about, confidence = :confidence,
+        brainLevel = :level, junkScore = :junk, faceCount = :faces, smileCount = :smiles,
+        phash = :phash, sharpness = :sharpness, priority = :priority, pendingSemantic = :pending
+        WHERE id = :id""")
+    suspend fun applyPerceptual(
+        id: Long, category: String, tags: String, about: String, confidence: Float,
+        level: Int, junk: Float, faces: Int, smiles: Int, phash: Long,
+        sharpness: Float, priority: Float, pending: Boolean
+    )
+
+    @Query("""UPDATE videos SET category = :category, tags = :tags, about = :about,
+        confidence = :confidence, brainLevel = :level, pendingSemantic = 0
+        WHERE id = :id""")
+    suspend fun applySemantic(
+        id: Long, category: String, tags: String, about: String,
+        confidence: Float, level: Int
+    )
 
     @Query("""SELECT * FROM videos WHERE displayName LIKE '%' || :q || '%' OR tags LIKE '%' || :q || '%'
         OR category LIKE '%' || :q || '%' OR folderName LIKE '%' || :q || '%'
         ORDER BY watchCount DESC, dateAddedSec DESC LIMIT 60""")
     suspend fun search(q: String): List<VideoEntity>
-
-    @Query("SELECT * FROM videos WHERE category = :cat ORDER BY dateAddedSec DESC")
-    suspend fun byCategory(cat: String): List<VideoEntity>
-
-    @Query("SELECT DISTINCT category FROM videos WHERE category != 'unknown' ORDER BY category")
-    suspend fun categories(): List<String>
 }

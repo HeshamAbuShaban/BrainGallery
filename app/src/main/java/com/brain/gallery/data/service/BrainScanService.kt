@@ -10,24 +10,37 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
+import com.brain.gallery.data.brain.L1aAnalyzer
+import com.brain.gallery.data.brain.L1bAnalyzer
 import com.brain.gallery.data.brain.Level0Analyzer
-import com.brain.gallery.data.brain.Level1Analyzer
-import com.brain.gallery.data.brain.Level2Analyzer
 import com.brain.gallery.data.local.BrainDatabase
+import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.data.scan.MediaScanner
-import com.brain.gallery.data.vision.FaceEmbedder
+import com.brain.gallery.data.vision.FrameCache
+import com.brain.gallery.engine.NameSuggester
+import com.brain.gallery.engine.PersonMatcher
+import com.brain.gallery.engine.SplitDetector
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import javax.inject.Inject
+import kotlinx.coroutines.withContext
 
+/**
+ * Foreground indexer. Cascade order is by COST, not importance:
+ *   sweep -> L0 -> L1a perceptual (unbudgeted, all) -> L1b semantic (budgeted, EV queue)
+ * then incremental identity + split detection + name suggestions.
+ */
 @AndroidEntryPoint
 class BrainScanService : LifecycleService() {
 
     @Inject lateinit var db: BrainDatabase
     @Inject lateinit var scanner: MediaScanner
-    @Inject lateinit var l1: Level1Analyzer
-    @Inject lateinit var l2: Level2Analyzer
+    @Inject lateinit var l1a: L1aAnalyzer
+    @Inject lateinit var l1b: L1bAnalyzer
+    @Inject lateinit var matcher: PersonMatcher
+    @Inject lateinit var splitter: SplitDetector
+    @Inject lateinit var namer: NameSuggester
+    @Inject lateinit var frameCache: FrameCache
 
     override fun onCreate() {
         super.onCreate()
@@ -36,10 +49,11 @@ class BrainScanService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
-        startForegroundCompat(notify("Scanning gallery…", 0, 0, indeterminate = true))
+        startForegroundCompat(notify("Scanning gallery…", 0, 0, true))
+        val deltaIds = intent?.getLongArrayExtra(EXTRA_IDS)?.toList()
         lifecycleScope.launch(Dispatchers.IO) {
             try {
-                runIndex()
+                runIndex(deltaIds)
             } finally {
                 stopSelf(startId)
             }
@@ -47,94 +61,101 @@ class BrainScanService : LifecycleService() {
         return START_NOT_STICKY
     }
 
-    private suspend fun runIndex() {
+    private suspend fun runIndex(deltaIds: List<Long>?) {
         val dao = db.videoDao()
-        val scanned = scanner.scan()
-        val existing = dao.getAllSync().associateBy { it.id }
-        val merged = scanned.map { s ->
-            val old = existing[s.id]
-            if (old == null) s
-            else old.copy(uri = s.uri, displayName = s.displayName, durationMs = s.durationMs,
-                sizeBytes = s.sizeBytes, folderName = s.folderName, width = s.width, height = s.height)
-        }
-        dao.upsertAll(merged)
-        if (existing.isNotEmpty()) {
-            val ids = scanned.map { it.id }
-            if (ids.isNotEmpty()) dao.deleteRemoved(ids)
-        }
+        val t0 = System.currentTimeMillis()
+        val scanId = t0
 
-        // Cascade: L0 instant already done in scan. L1/L2 only for uncertain, budget-capped.
-        val fresh = dao.getAllSync().filter { it.brainLevel < 1 }
-        var budget = 40
-        var done = 0
-        for (v in fresh) {
-            if (budget <= 0) break
-            val l0r = Level0Analyzer.analyze(v.displayName, v.folderName, v.durationMs)
-            if (!Level0Analyzer.needsDeeper(l0r, v)) {
-                dao.upsert(v.copy(brainLevel = 1, confidence = maxOf(v.confidence, l0r.confidence)))
-            } else {
-                val r1 = l1.analyze(v.uri, l0r)
-                budget--
-                val needL2 = r1.confidence < 0.75f && v.junkScore < 0.5f && v.durationMs > 8_000
-            if (!needL2) {
-                dao.upsert(v.copy(category = r1.category, tags = r1.tags.joinToString(","),
-                    about = r1.about, confidence = r1.confidence, brainLevel = 1, junkScore = r1.junkScore,
-                    faceCount = r1.faceCount, smileCount = r1.smileCount,
-                    phash = r1.phash, sharpness = r1.sharpness,
-                    faceEmbedding = r1.faceEmbedding ?: v.faceEmbedding))
-            } else {
-                val r2 = l2.analyze(v.uri, v.durationMs, r1)
-                dao.upsert(v.copy(category = r2.category, tags = r2.tags.joinToString(","),
-                    about = r2.about, confidence = r2.confidence, brainLevel = 2, junkScore = r2.junkScore,
-                    faceCount = r1.faceCount, smileCount = r1.smileCount,
-                    phash = r1.phash, sharpness = r1.sharpness,
-                    faceEmbedding = r1.faceEmbedding ?: v.faceEmbedding))
-            }
-            }
-            done++
-            if (done % 5 == 0) notify("Understanding videos… $done/${fresh.size}", done, fresh.size, false)
+        val scanned = if (deltaIds != null) scanner.scanIds(deltaIds) else scanner.scan()
+        val existingIds = dao.getAllSync().map { it.id }.toSet()
+        val fresh = scanned.filter { it.id !in existingIds }
+        val known = scanned.filter { it.id in existingIds }
+
+        for (s in known) {
+            dao.touchMetadata(s.id, s.uri, s.displayName, s.durationMs, s.sizeBytes,
+                s.folderName, s.width, s.height, scanId)
         }
-        runIdentityPass()
+        if (fresh.isNotEmpty()) {
+            dao.insertNew(fresh.map { s ->
+                val l0 = Level0Analyzer.analyze(s.displayName, s.folderName, s.durationMs)
+                VideoEntity(
+                    id = s.id, uri = s.uri, displayName = s.displayName,
+                    durationMs = s.durationMs, sizeBytes = s.sizeBytes,
+                    dateAddedSec = s.dateAddedSec, folderName = s.folderName,
+                    width = s.width, height = s.height,
+                    category = l0.category, tags = l0.tags.joinToString(","),
+                    about = l0.about, confidence = l0.confidence,
+                    brainLevel = 0, junkScore = l0.junkScore,
+                    lastSeenScan = scanId
+                )
+            })
+        }
+        // Mark-and-sweep only on full scans; a delta scan must not delete unseen rows.
+        if (deltaIds == null) dao.sweepMissing(scanId)
+
+        val tScan = System.currentTimeMillis()
+
+        // ---- L1a: unbudgeted, every pending video ----
+        val pending = dao.pendingPerceptual(200)
+        var l1aDone = 0
+        for (v in pending) {
+            val r = runCatching {
+                l1a.analyze(v.uri, v.durationMs, v.displayName, v.folderName)
+            }.getOrNull() ?: continue
+            dao.applyPerceptual(
+                id = v.id, category = r.category, tags = r.tags.joinToString(","),
+                about = r.about, confidence = r.confidence, level = 1, junk = v.junkScore,
+                faces = r.faceCount, smiles = r.smileCount, phash = r.phash,
+                sharpness = r.sharpness, priority = r.priority, pending = r.pendingSemantic
+            )
+            for (cand in r.vectors) {
+                matcher.assignOrCreate(v.id, cand.vec, cand.quality)
+            }
+            l1aDone++
+            if (l1aDone % 10 == 0) {
+                notify("Understanding videos… $l1aDone/${pending.size}", l1aDone, pending.size, false)
+            }
+        }
+        val tL1a = System.currentTimeMillis()
+
+        // ---- L1b: budgeted, expected-value ordered ----
+        val semanticPending = dao.pendingSemantic(25)
+        var l1bDone = 0
+        for (v in semanticPending) {
+            val prev = com.brain.gallery.data.brain.PerceptualResult(
+                v.phash, v.sharpness, v.faceCount, v.smileCount, v.about, v.category,
+                v.tagList, v.confidence, emptyList(), v.priority, true
+            )
+            val s = runCatching { l1b.analyze(v.id, v.uri, v.durationMs, prev) }.getOrNull() ?: continue
+            dao.applySemantic(v.id, s.category, s.tags.joinToString(","), s.about, s.confidence, 2)
+            l1bDone++
+        }
+        val tL1b = System.currentTimeMillis()
+
+        // ---- Identity maintenance ----
+        syncDenormalisedPersons()
+        val flagged = splitter.scanAll()
+        namer.applyAllSuggestions()
+        db.supportDao().put("diag.lastRun", "$l1aDone|$l1bDone|${System.currentTimeMillis() - t0}|$flagged")
+        db.supportDao().put("diag.tScan", "${tScan - t0}")
+        db.supportDao().put("diag.tL1a", "${tL1a - tScan}")
+        db.supportDao().put("diag.tL1b", "${tL1b - tL1a}")
+        frameCache.prune()
+        db.supportDao().pruneEvents(20000)
+
         val nm = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        nm.notify(NOTIF_ID, doneNotification(fresh.size))
+        nm.notify(NOTIF_ID, doneNotification(l1aDone, l1bDone))
     }
 
-    /**
-     * Identity pass: cluster dominant-face embeddings, assign stable personIds.
-     * New clusters inherit old ids by majority overlap; singletons stay -1.
-     */
-    private suspend fun runIdentityPass() {
+    /** Keep videos.personId aligned with the best vector per video. */
+    private suspend fun syncDenormalisedPersons() = withContext(Dispatchers.IO) {
         val dao = db.videoDao()
-        val all = dao.getAllSync()
-        val withEmb = all.mapNotNull { v ->
-            FaceEmbedder.fromBytes(v.faceEmbedding)?.let { v.id to it }
-        }
-        if (withEmb.size < 2) return
-        val ids = withEmb.map { it.first }
-        val vecs = withEmb.map { it.second }
-        val clusters = com.brain.gallery.engine.ClusterMath.clusterCosine(vecs, 0.50f, false)
-        // Map new cluster index -> old personId by majority overlap.
-        val byId = all.associateBy { it.id }
-        val newGroups = mutableMapOf<Int, MutableList<Long>>()
-        ids.forEachIndexed { i, id ->
-            val c = clusters[i]
-            if (c >= 0) newGroups.getOrPut(c) { mutableListOf() } += id
-        }
-        var nextPerson = (all.maxOfOrNull { it.personId } ?: -1).coerceAtLeast(-1) + 1
-        val oldOf: (Long) -> Int = { id -> byId[id]?.personId ?: -1 }
-        for ((_, members) in newGroups) {
-            val votes = members.map { oldOf(it) }.filter { it >= 0 }.groupingBy { it }.eachCount()
-            val keep = votes.maxByOrNull { it.value }?.key
-            val pid = if (keep != null) keep else { val p = nextPerson; nextPerson++; p }
-            members.forEach { dao.setPerson(it, pid) }
-        }
-        // Videos that lost their cluster (no embedding match) keep old ids; singletons -> -1.
-        val clustered = newGroups.values.flatten().toSet()
-        withEmb.forEach { (id, _) ->
-            if (id !in clustered && (byId[id]?.personId ?: -1) >= 0) {
-                // Re-check: still has embedding but unclustered -> singleton.
-                dao.setPerson(id, -1)
-            }
+        val pdao = db.personDao()
+        val personIds = pdao.allPersons().map { it.id }.toSet()
+        for (v in dao.getAllSync()) {
+            val vs = pdao.vectorsForVideo(v.id)
+            val best = vs.filter { it.personId >= 0 }.maxByOrNull { it.quality }?.personId ?: -1
+            if (best != v.personId) dao.setPerson(v.id, if (best in personIds) best else -1)
         }
     }
 
@@ -160,10 +181,12 @@ class BrainScanService : LifecycleService() {
         return n
     }
 
-    private fun doneNotification(count: Int): Notification =
+    private fun doneNotification(perceptual: Int, semantic: Int): Notification =
         NotificationCompat.Builder(this, CHANNEL)
             .setContentTitle("BrainGallery")
-            .setContentText(if (count == 0) "Library up to date" else "Organized $count videos")
+            .setContentText(
+                if (perceptual == 0 && semantic == 0) "Library up to date"
+                else "Indexed $perceptual · $semantic enriched")
             .setSmallIcon(android.R.drawable.stat_sys_download_done)
             .setAutoCancel(true)
             .build()
@@ -179,8 +202,10 @@ class BrainScanService : LifecycleService() {
     companion object {
         const val CHANNEL = "brain_index"
         const val NOTIF_ID = 41
-        fun start(ctx: Context) {
+        const val EXTRA_IDS = "delta_ids"
+        fun start(ctx: Context, deltaIds: List<Long>? = null) {
             val i = Intent(ctx, BrainScanService::class.java)
+            deltaIds?.let { i.putExtra(EXTRA_IDS, it.toLongArray()) }
             if (Build.VERSION.SDK_INT >= 26) ctx.startForegroundService(i)
             else ctx.startService(i)
         }

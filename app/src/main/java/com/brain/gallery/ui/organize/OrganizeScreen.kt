@@ -27,7 +27,9 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.DropdownMenu
@@ -65,6 +67,7 @@ import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.CardShape
 import com.brain.gallery.ui.theme.Cyan
 import com.brain.gallery.ui.theme.Green
+import com.brain.gallery.ui.theme.Pink
 import com.brain.gallery.ui.theme.Text1
 import com.brain.gallery.ui.theme.Text2
 import com.brain.gallery.ui.theme.Yellow
@@ -77,6 +80,8 @@ fun OrganizeScreen(player: PlayerManager, vm: OrganizeViewModel = hiltViewModel(
     val selected by vm.selected.collectAsState()
     val spotlight by vm.spotlight.collectAsState()
     val similar by vm.similar.collectAsState()
+    val persons by vm.persons.collectAsState()
+    var showDiag by remember { mutableStateOf(false) }
     val deleteAsk by vm.deleteAsk.collectAsState()
 
     val delLauncher = rememberLauncherForActivityResult(
@@ -91,10 +96,16 @@ fun OrganizeScreen(player: PlayerManager, vm: OrganizeViewModel = hiltViewModel(
     }
 
     if (selected != null) {
-        GroupDetail(group = selected!!, onBack = { vm.close() }, onFav = { vm.toggleFav(it) },
+        GroupDetail(
+            group = selected!!,
+            person = selected!!.personId.takeIf { it >= 0 }?.let { pid -> persons.firstOrNull { it.id == pid } },
+            onBack = { vm.close() }, onFav = { vm.toggleFav(it) },
             onDeleteRedundant = { vm.requestDelete(it) }, onPlay = { vm.play(it) },
             onDeleteOne = { vm.requestDelete(listOf(it.id)) },
-            onSimilar = { vm.play(it) })
+            onSimilar = { vm.play(it) },
+            onRename = { pid, n -> vm.renamePerson(pid, n) },
+            onSplitOut = { pid, vid -> vm.splitVideoOut(pid, vid) },
+            onDismissSplit = { vm.dismissSplitWarning(it) })
     } else {
     Column(Modifier.fillMaxSize().background(Bg)) {
         // Header
@@ -104,6 +115,16 @@ fun OrganizeScreen(player: PlayerManager, vm: OrganizeViewModel = hiltViewModel(
                 Text("Library", color = Text1, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
                 Text("Organized by your on-device brain", color = Text2, fontSize = 12.5.sp)
             }
+            IconButton(onClick = { vm.exportMemory() },
+                modifier = Modifier.background(Color(0xFF1D2534), CircleShape).size(40.dp)) {
+                Icon(Icons.Default.Save, null, tint = Text1, modifier = Modifier.size(18.dp))
+            }
+            Spacer(Modifier.width(8.dp))
+            IconButton(onClick = { showDiag = true },
+                modifier = Modifier.background(Color(0xFF1D2534), CircleShape).size(40.dp)) {
+                Icon(Icons.Default.BugReport, null, tint = Text1, modifier = Modifier.size(18.dp))
+            }
+            Spacer(Modifier.width(8.dp))
             IconButton(onClick = { vm.rescan() },
                 modifier = Modifier.background(Color(0xFF1D2534), CircleShape).size(40.dp)) {
                 Icon(Icons.Default.Refresh, null, tint = Text1, modifier = Modifier.size(18.dp))
@@ -120,6 +141,7 @@ fun OrganizeScreen(player: PlayerManager, vm: OrganizeViewModel = hiltViewModel(
                 StatCard("${stats.total}", "videos", Accent, Modifier.weight(1f))
                 StatCard("${stats.memories}", "memories", Green, Modifier.weight(1f))
                 StatCard("${stats.clutter}", "clutter", Yellow, Modifier.weight(1f))
+                StatCard("${stats.people}", "people", Pink, Modifier.weight(1f))
             }
             if (stats.pending > 0) {
                 Row(Modifier.fillMaxWidth().padding(20.dp, 0.dp, 20.dp, 6.dp),
@@ -169,6 +191,9 @@ fun OrganizeScreen(player: PlayerManager, vm: OrganizeViewModel = hiltViewModel(
         SpotlightPlayer(video = spotlight!!, similar = similar, manager = player,
             onClose = { vm.closeSpotlight() }, onPick = { vm.play(it) },
             onFav = { vm.toggleFav(it) })
+    }
+    if (showDiag) {
+        DiagnosticsScreen(vm = vm, onBack = { showDiag = false })
     }
 }
 

@@ -22,8 +22,8 @@ object MemoryDocBuilder {
     fun personLabel(personId: Int): String =
         if (personId < 0) "" else "Person ${'A' + (personId % 26)}${if (personId >= 26) (personId / 26 + 1).toString() else ""}"
 
-    fun build(v: VideoEntity): MemoryDoc {
-        val who = personLabel(v.personId)
+    fun build(v: VideoEntity, personName: String? = null): MemoryDoc {
+        val who = personName?.takeIf { it.isNotBlank() } ?: personLabel(v.personId)
         val what = listOf(v.category, v.tagList.joinToString(" "), v.about)
             .filter { it.isNotBlank() && it != "unknown" }.joinToString(" ")
         val where = v.folderName

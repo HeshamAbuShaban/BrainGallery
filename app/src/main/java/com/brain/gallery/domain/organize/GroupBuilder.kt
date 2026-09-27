@@ -1,5 +1,6 @@
 package com.brain.gallery.domain.organize
 
+import com.brain.gallery.data.local.PersonEntity
 import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.engine.DuplicateFinder
 import java.util.Calendar
@@ -15,7 +16,9 @@ data class SmartGroup(
     val accent: Long, // ARGB for card gradient
     val keeperIds: Set<Long> = emptySet(),
     val redundantIds: Set<Long> = emptySet(),
-    val savingsBytes: Long = 0L
+    val savingsBytes: Long = 0L,
+    val personId: Int = -1,
+    val splitSuggested: Boolean = false
 )
 
 enum class GroupKind { MEMORIES, PEOPLE, DUPLICATES, JUNK, FAVORITES, CATEGORY, EVENT, GEMS, ON_THIS_DAY, UNREVIEWED }
@@ -23,30 +26,36 @@ enum class GroupKind { MEMORIES, PEOPLE, DUPLICATES, JUNK, FAVORITES, CATEGORY, 
 @Singleton
 class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
 
-    fun build(all: List<VideoEntity>): List<SmartGroup> {
+    fun build(all: List<VideoEntity>, persons: List<PersonEntity> = emptyList()): List<SmartGroup> {
         if (all.isEmpty()) return emptyList()
         val out = mutableListOf<SmartGroup>()
         val memories = all.filter { it.junkScore < 0.5f }
         val junk = all.filter { it.junkScore >= 0.5f }
         val favs = all.filter { it.isFavorite }
+        val byId = persons.associateBy { it.id }
 
         out += SmartGroup("memories", "Memories", "${memories.size} videos worth keeping",
             GroupKind.MEMORIES, memories.sortedByDescending { it.dateAddedSec }.take(30), 0xFF8B5CF6)
 
-        // Identity: clustered dominant faces -> Person groups (the Google Photos key).
-        val persons = all.filter { it.personId >= 0 }.groupBy { it.personId }
-            .entries.sortedByDescending { it.value.size }
-        for ((pid, list) in persons) {
+        // Identity: real names when known, split warnings when bimodality detected.
+        val grouped = all.filter { it.personId >= 0 }.groupBy { it.personId }
+        for ((pid, list) in grouped.entries.sortedByDescending { it.value.size }) {
             if (list.size < 2) continue
-            val label = com.brain.gallery.engine.MemoryDocBuilder.personLabel(pid)
+            val p = byId[pid]
+            val label = p?.name?.takeIf { it.isNotBlank() }
+                ?: p?.suggestedName?.takeIf { it.isNotBlank() }
+                ?: "Unknown person"
             val smiles = list.sumOf { it.smileCount }
-            out += SmartGroup("person_$pid", label,
-                "${list.size} videos${if (smiles > 0) " • $smiles smiles" else ""}",
-                GroupKind.PEOPLE,
-                list.sortedByDescending { it.dateAddedSec }.take(30), 0xFFEC4899)
+            val note = when {
+                p?.splitSuggested == true -> "might be two people"
+                p?.suggestedName?.isNotBlank() == true && p.name.isBlank() -> "named \"${p.suggestedName}\" by context"
+                else -> "${list.size} videos${if (smiles > 0) " • $smiles smiles" else ""}"
+            }
+            out += SmartGroup("person_$pid", label, note, GroupKind.PEOPLE,
+                list.sortedByDescending { it.dateAddedSec }.take(30), 0xFFEC4899,
+                personId = pid, splitSuggested = p?.splitSuggested == true)
         }
-        // Fallback when identity hasn't clustered yet: face-count group.
-        if (persons.isEmpty()) {
+        if (grouped.isEmpty()) {
             val people = memories.filter { it.faceCount > 0 }
             if (people.isNotEmpty()) {
                 val smiles = people.sumOf { it.smileCount }
