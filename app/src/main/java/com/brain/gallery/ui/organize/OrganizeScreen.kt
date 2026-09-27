@@ -28,7 +28,14 @@ import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.FolderOpen
+import androidx.compose.material.icons.filled.Merge
+import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,6 +55,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -61,7 +70,7 @@ import com.brain.gallery.domain.organize.SmartGroup
 import com.brain.gallery.ui.components.SpotlightPlayer
 import com.brain.gallery.ui.components.ShimmerBar
 import com.brain.gallery.ui.components.VideoThumb
-import com.brain.gallery.ui.player.PlayerManager
+import com.brain.gallery.ui.spotlight.SpotlightController
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.CardShape
@@ -73,16 +82,17 @@ import com.brain.gallery.ui.theme.Text2
 import com.brain.gallery.ui.theme.Yellow
 
 @Composable
-fun OrganizeScreen(player: PlayerManager, vm: OrganizeViewModel = hiltViewModel()) {
+fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltViewModel()) {
     val groups by vm.groupList.collectAsState()
     val stats by vm.stats.collectAsState()
     val loading by vm.loading.collectAsState()
     val selected by vm.selected.collectAsState()
-    val spotlight by vm.spotlight.collectAsState()
-    val similar by vm.similar.collectAsState()
+    val open by spotlight.current.collectAsState()
+    val similar by spotlight.similar.collectAsState()
     val persons by vm.persons.collectAsState()
     val personCounts by vm.personCounts.collectAsState()
     var showDiag by remember { mutableStateOf(false) }
+    var renameTarget by remember { mutableStateOf<SmartGroup?>(null) }
     val deleteAsk by vm.deleteAsk.collectAsState()
 
     val delLauncher = rememberLauncherForActivityResult(
@@ -101,9 +111,9 @@ fun OrganizeScreen(player: PlayerManager, vm: OrganizeViewModel = hiltViewModel(
             group = selected!!,
             person = selected!!.personId.takeIf { it >= 0 }?.let { pid -> persons.firstOrNull { it.id == pid } },
             onBack = { vm.close() }, onFav = { vm.toggleFav(it) },
-            onDeleteRedundant = { vm.requestDelete(it) }, onPlay = { vm.play(it) },
+            onDeleteRedundant = { vm.requestDelete(it) }, onPlay = { spotlight.open(it) },
             onDeleteOne = { vm.requestDelete(listOf(it.id)) },
-            onSimilar = { vm.play(it) },
+            onSimilar = { spotlight.open(it) },
             onRename = { pid, n -> vm.renamePerson(pid, n) },
             onSplitOut = { pid, vid -> vm.splitVideoOut(pid, vid) },
             onDismissSplit = { vm.dismissSplitWarning(it) },
@@ -176,10 +186,14 @@ fun OrganizeScreen(player: PlayerManager, vm: OrganizeViewModel = hiltViewModel(
                     AnimatedVisibility(vis,
                         enter = fadeIn(tween(350, i * 60)) +
                             slideInVertically(tween(350, i * 60)) { it / 3 }) {
-                        GroupCardFull(group = g,
+                        GroupCardFull(
+                            group = g,
                             persons = groups.filter { it.kind == GroupKind.PEOPLE },
                             onOpen = { vm.open(g) },
-                            onPlayFirst = { g.videos.firstOrNull()?.let { vm.play(it) } },
+                            onPlayAll = { spotlight.openPlaylist(g.videos) },
+                            onSimilar = { g.videos.firstOrNull()?.let { spotlight.open(it) } },
+                            onRename = { renameTarget = g },
+                            onHide = { vm.hideGroup(g) },
                             onMerge = { from, to ->
                                 val f = from.id.removePrefix("person_").toIntOrNull()
                                 val t = to.id.removePrefix("person_").toIntOrNull()
@@ -191,13 +205,28 @@ fun OrganizeScreen(player: PlayerManager, vm: OrganizeViewModel = hiltViewModel(
         }
     }
     }
-    if (spotlight != null) {
-        SpotlightPlayer(video = spotlight!!, similar = similar, manager = player,
-            onClose = { vm.closeSpotlight() }, onPick = { vm.play(it) },
-            onFav = { vm.toggleFav(it) })
+    open?.let { v ->
+        SpotlightPlayer(video = v, similar = similar, manager = spotlight.player,
+            onClose = { spotlight.close() },
+            onPick = { spotlight.pick(it) },
+            onFav = { vm.toggleFav(it) },
+            hasPrev = spotlight.hasPrev(), hasNext = spotlight.hasNext(),
+            onPrev = { spotlight.prev() }, onNext = { spotlight.next() },
+            onMoreLikeThis = { spotlight.open(it) })
     }
     if (showDiag) {
         BrainScreen(vm = vm, onBack = { showDiag = false })
+    }
+    renameTarget?.let { g ->
+        val pid = g.personId
+        val person = persons.firstOrNull { it.id == pid }
+        RenameGroupDialog(
+            initial = g.title,
+            onDismiss = { renameTarget = null },
+            onSave = { name ->
+                renameTarget = null
+                if (pid >= 0) vm.renamePerson(pid, name)
+            })
     }
 }
 
@@ -209,23 +238,21 @@ private fun StatCard(value: String, label: String, color: Color, modifier: Modif
     }
 }
 
-@Composable
-fun GroupCard(g: SmartGroup, onClick: () -> Unit) {
-    GroupCardFull(group = g, persons = emptyList(), onOpen = onClick,
-        onPlayFirst = {}, onMerge = { _, _ -> })
-}
-
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun GroupCardFull(
     group: SmartGroup,
     persons: List<SmartGroup>,
     onOpen: () -> Unit,
-    onPlayFirst: () -> Unit,
-    onMerge: (SmartGroup, SmartGroup) -> Unit
+    onPlayAll: () -> Unit,
+    onSimilar: () -> Unit,
+    onRename: (() -> Unit)? = null,
+    onMerge: (SmartGroup, SmartGroup) -> Unit,
+    onHide: (() -> Unit)? = null
 ) {
     val g = group
     val accent = Color(g.accent)
+    val haptics = LocalHapticFeedback.current
     var menu by remember { mutableStateOf(false) }
     var merge by remember { mutableStateOf(false) }
     Box(Modifier
@@ -233,7 +260,13 @@ fun GroupCardFull(
         .aspectRatio(0.86f)
         .clip(CardShape)
         .background(Color(0xFF151B26))
-        .combinedClickable(onClick = onOpen, onLongClick = { menu = true })) {
+        .combinedClickable(
+            onClick = onOpen,
+            onLongClick = {
+                menu = true
+                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            }
+        )) {
         val cover = g.videos.firstOrNull()
         if (cover != null) VideoThumb(cover, Modifier.fillMaxSize())
         Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
@@ -243,6 +276,21 @@ fun GroupCardFull(
             .background(accent.copy(alpha = 0.9f), CircleShape).padding(8.dp, 3.dp)) {
             Text("${g.videos.size}", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
         }
+        // Visible control affordance, not hidden behind a long-press.
+        Box(Modifier.align(Alignment.TopEnd).padding(6.dp)
+            .background(Color.Black.copy(alpha = 0.55f), CircleShape)
+            .clickable { menu = true; haptics.performHapticFeedback(HapticFeedbackType.LongPress) }
+            .size(26.dp), contentAlignment = Alignment.Center) {
+            Icon(Icons.Default.MoreHoriz, "Group actions", tint = Color.White,
+                modifier = Modifier.size(16.dp))
+        }
+        if (g.splitSuggested || g.nameCollision != null) {
+            Box(Modifier.align(Alignment.TopEnd).padding(top = 36.dp, end = 6.dp)
+                .background(Color(0xFFF59E0B), CircleShape).size(18.dp),
+                contentAlignment = Alignment.Center) {
+                Text("!", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Black)
+            }
+        }
         Column(Modifier.align(Alignment.BottomStart).padding(12.dp)) {
             Text(g.title, color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(2.dp))
@@ -251,12 +299,28 @@ fun GroupCardFull(
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false },
             modifier = Modifier.background(Color(0xFF1D2534))) {
             DropdownMenuItem(text = { Text("Open", color = Text1) },
+                leadingIcon = { Icon(Icons.Default.FolderOpen, null, tint = Text1, modifier = Modifier.size(18.dp)) },
                 onClick = { menu = false; onOpen() })
-            DropdownMenuItem(text = { Text("Play first video", color = Text1) },
-                onClick = { menu = false; onPlayFirst() })
+            DropdownMenuItem(text = { Text("Play all", color = Text1) },
+                leadingIcon = { Icon(Icons.Default.PlayArrow, null, tint = Text1, modifier = Modifier.size(18.dp)) },
+                onClick = { menu = false; onPlayAll() })
+            DropdownMenuItem(text = { Text("Find more similar", color = Cyan) },
+                leadingIcon = { Icon(Icons.Default.AutoAwesome, null, tint = Cyan, modifier = Modifier.size(18.dp)) },
+                onClick = { menu = false; onSimilar() })
+            if (onRename != null) {
+                DropdownMenuItem(text = { Text("Rename person", color = Text1) },
+                    leadingIcon = { Icon(Icons.Default.Edit, null, tint = Text1, modifier = Modifier.size(18.dp)) },
+                    onClick = { menu = false; onRename() })
+            }
             if (g.kind == GroupKind.PEOPLE && persons.size > 1) {
                 DropdownMenuItem(text = { Text("Merge with another person…", color = Text1) },
+                    leadingIcon = { Icon(Icons.Default.Merge, null, tint = Text1, modifier = Modifier.size(18.dp)) },
                     onClick = { menu = false; merge = true })
+            }
+            if (onHide != null) {
+                DropdownMenuItem(text = { Text("Hide this group", color = Text2) },
+                    leadingIcon = { Icon(Icons.Default.VisibilityOff, null, tint = Text2, modifier = Modifier.size(18.dp)) },
+                    onClick = { menu = false; onHide() })
             }
         }
     }

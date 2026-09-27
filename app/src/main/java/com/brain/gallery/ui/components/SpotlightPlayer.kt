@@ -23,12 +23,18 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Slider
@@ -78,7 +84,14 @@ fun SpotlightPlayer(
     manager: PlayerManager,
     onClose: () -> Unit,
     onPick: (VideoEntity) -> Unit,
-    onFav: (VideoEntity) -> Unit
+    onFav: (VideoEntity) -> Unit,
+    hasPrev: Boolean = false,
+    hasNext: Boolean = false,
+    onPrev: () -> Unit = {},
+    onNext: () -> Unit = {},
+    onMoreLikeThis: (VideoEntity) -> Unit = {},
+    onDelete: (VideoEntity) -> Unit = {},
+    onNotInterested: (VideoEntity) -> Unit = {}
 ) {
     val exo = remember(video.uri) { manager.playerFor(video.uri) }
     val haptics = LocalHapticFeedback.current
@@ -154,15 +167,30 @@ fun SpotlightPlayer(
         AnimatedVisibility(visible = controls, enter = fadeIn(tween<Float>(Motion.fastMs)),
             exit = fadeOut(tween<Float>(Motion.fastMs)),
             modifier = Modifier.align(Alignment.Center)) {
-            Box(Modifier.background(Color.Black.copy(alpha = 0.45f), CircleShape)
-                .clickable {
-                    if (exo.isPlaying) exo.pause() else exo.play()
-                    tick++
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+            Row(horizontalArrangement = Arrangement.spacedBy(28.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                if (hasPrev) {
+                    Icon(Icons.Default.SkipPrevious, "Previous",
+                        tint = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(38.dp)
+                            .clickable { onPrev(); tick++ })
                 }
-                .padding(14.dp)) {
-                Icon(if (exo.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    null, tint = Color.White, modifier = Modifier.size(36.dp))
+                Box(Modifier.background(Color.Black.copy(alpha = 0.45f), CircleShape)
+                    .clickable {
+                        if (exo.isPlaying) exo.pause() else exo.play()
+                        tick++
+                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    }
+                    .padding(14.dp)) {
+                    Icon(if (exo.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        null, tint = Color.White, modifier = Modifier.size(36.dp))
+                }
+                if (hasNext) {
+                    Icon(Icons.Default.SkipNext, "Next",
+                        tint = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(38.dp)
+                            .clickable { onNext(); tick++ })
+                }
             }
         }
 
@@ -178,7 +206,13 @@ fun SpotlightPlayer(
                 LazyRow(contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     items(similar, key = { it.id }) { s ->
-                        VideoThumb(s, Modifier.size(104.dp, 142.dp)) { onPick(s) }
+                        Box {
+                            VideoThumb(s, Modifier.size(104.dp, 142.dp)) { onPick(s) }
+                            Icon(Icons.Default.AutoAwesome, "Grow from this",
+                                tint = Cyan, modifier = Modifier.align(Alignment.BottomEnd)
+                                    .padding(5.dp).size(14.dp)
+                                    .clickable { onMoreLikeThis(s) })
+                        }
                     }
                 }
                 Spacer(Modifier.height(10.dp))

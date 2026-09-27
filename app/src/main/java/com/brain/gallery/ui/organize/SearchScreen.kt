@@ -41,18 +41,18 @@ import com.brain.gallery.ui.components.SpotlightPlayer
 import com.brain.gallery.ui.components.VideoActionsSheet
 import com.brain.gallery.ui.components.VideoDetailsDialog
 import com.brain.gallery.ui.components.VideoThumb
-import com.brain.gallery.ui.player.PlayerManager
+import com.brain.gallery.ui.spotlight.SpotlightController
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.Surface
 import com.brain.gallery.ui.theme.Text1
 import com.brain.gallery.ui.theme.Text2
 
 @Composable
-fun SearchScreen(player: PlayerManager, vm: SearchViewModel = hiltViewModel()) {
+fun SearchScreen(spotlight: SpotlightController, vm: SearchViewModel = hiltViewModel()) {
     val q by vm.query.collectAsState()
     val results by vm.results.collectAsState()
-    val spotlight by vm.spotlight.collectAsState()
-    val similar by vm.similar.collectAsState()
+    val open by spotlight.current.collectAsState()
+    val similar by spotlight.similar.collectAsState()
     val deleteAsk by vm.deleteAsk.collectAsState()
     var menuFor by remember { mutableStateOf<VideoEntity?>(null) }
     var detailsFor by remember { mutableStateOf<VideoEntity?>(null) }
@@ -93,24 +93,28 @@ fun SearchScreen(player: PlayerManager, vm: SearchViewModel = hiltViewModel()) {
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(results, key = { it.id }) { v ->
                     VideoThumb(v, Modifier.aspectRatio(0.7f),
-                        onClick = { vm.play(v) }, onLongClick = { menuFor = v })
+                        onClick = { spotlight.open(v) }, onLongClick = { menuFor = v })
                 }
             }
         }
         menuFor?.let { mv ->
             VideoActionsSheet(video = mv,
                 onDismiss = { menuFor = null },
-                onPlay = { menuFor = null; vm.play(mv) },
+                onPlay = { menuFor = null; spotlight.open(mv) },
                 onFav = { menuFor = null; vm.toggleFav(mv) },
-                onSimilar = { menuFor = null; vm.play(mv) },
+                onSimilar = { menuFor = null; spotlight.open(mv) },
                 onDetails = { detailsFor = mv; menuFor = null },
                 onDelete = { menuFor = null; vm.requestDelete(listOf(mv.id)) })
         }
         detailsFor?.let { VideoDetailsDialog(video = it, onDismiss = { detailsFor = null }) }
     }
-    if (spotlight != null) {
-        SpotlightPlayer(video = spotlight!!, similar = similar, manager = player,
-            onClose = { vm.closeSpotlight() }, onPick = { vm.play(it) },
-            onFav = { vm.toggleFav(it) })
+    open?.let { v ->
+        SpotlightPlayer(video = v, similar = similar, manager = spotlight.player,
+            onClose = { spotlight.close() },
+            onPick = { spotlight.pick(it) },
+            onFav = { vm.toggleFav(it) },
+            hasPrev = spotlight.hasPrev(), hasNext = spotlight.hasNext(),
+            onPrev = { spotlight.prev() }, onNext = { spotlight.next() },
+            onMoreLikeThis = { spotlight.open(it) })
     }
 }

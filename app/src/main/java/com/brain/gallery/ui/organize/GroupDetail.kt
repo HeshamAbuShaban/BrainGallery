@@ -194,6 +194,11 @@ fun GroupDetail(
 }
 
 @Composable
+fun RenameGroupDialog(initial: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    RenameDialog(initial = initial, onDismiss = onDismiss, onSave = onSave)
+}
+
+@Composable
 private fun RenameDialog(initial: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
     var text by remember { mutableStateOf(initial) }
     Dialog(onDismissRequest = onDismiss) {

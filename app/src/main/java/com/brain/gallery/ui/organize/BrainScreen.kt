@@ -130,6 +130,52 @@ fun BrainScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
             Stat("Model timeouts", "${d.stalled}", if (d.stalled > 0) Yellow else Green)
             ActionRow("Re-index now", Accent) { vm.rescan() }
 
+            // ---------------- Repairs ----------------
+            val unassignedCount = d.unassigned
+            if (unassignedCount > 0 || collisions.isNotEmpty() || d.splitsFlagged > 0) {
+                Head("Needs your input")
+                Text("The brain is not certain about these. Answering once teaches it.",
+                    color = Text2, fontSize = 12.sp, modifier = Modifier.padding(bottom = 8.dp))
+                if (unassignedCount > 0) {
+                    Card(Cyan) {
+                        Text("$unassignedCount faces couldn't be placed",
+                            color = Text1, fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        Text("They looked like two people at once, so the brain refused to " +
+                            "guess. Open a person group and long-press the clip to move it, " +
+                            "or use \"Move to…\" from the clip menu.",
+                            color = Text2, fontSize = 12.sp)
+                    }
+                }
+                if (collisions.isNotEmpty()) {
+                    Card(Yellow) {
+                        Text("One person, split into several groups", color = Text1,
+                            fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        collisions.keys.take(5).forEach { name ->
+                            Row(Modifier.fillMaxWidth().padding(top = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically) {
+                                Text("\"$name\" · ${collisions[name]} clusters", color = Text1,
+                                    fontSize = 12.5.sp, modifier = Modifier.weight(1f))
+                                Text("MERGE", color = Green, fontSize = 12.sp,
+                                    fontWeight = FontWeight.ExtraBold,
+                                    modifier = Modifier.clickable { vm.mergeAllNamed(name) }
+                                        .padding(6.dp))
+                            }
+                        }
+                    }
+                }
+                if (d.splitsFlagged > 0) {
+                    Card(Yellow) {
+                        Text("${d.splitsFlagged} group(s) may be two different people",
+                            color = Text1, fontSize = 13.5.sp, fontWeight = FontWeight.Bold)
+                        Spacer(Modifier.height(4.dp))
+                        Text("Open the group: tap the wrong clip to split it out, or dismiss.",
+                            color = Text2, fontSize = 12.sp)
+                    }
+                }
+            }
+
             // ---------------- Identity ----------------
             Head("People")
             Stat("People found", "${d.persons}")
@@ -137,28 +183,6 @@ fun BrainScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
             Stat("Needs a decision", "${d.unassigned} unassigned",
                 if (d.unassigned > 0) Yellow else Green)
             Stat("Split warnings", "${d.splitsFlagged}", if (d.splitsFlagged > 0) Yellow else Green)
-            if (collisions.isNotEmpty()) {
-                Card(Yellow) {
-                    Text("Looks like one person, split up", color = Text1, fontSize = 13.5.sp,
-                        fontWeight = FontWeight.Bold)
-                    Spacer(Modifier.height(4.dp))
-                    Text(
-                        "${collisions.size} name(s) were claimed by more than one cluster. " +
-                            "That usually means the same face is in two groups.",
-                        color = Text2, fontSize = 12.sp)
-                    collisions.keys.take(4).forEach { name ->
-                        Row(Modifier.fillMaxWidth().padding(top = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically) {
-                            Text("\"$name\" · ${collisions[name]} clusters", color = Text1,
-                                fontSize = 12.5.sp, modifier = Modifier.weight(1f))
-                            Text("MERGE", color = Green, fontSize = 12.sp,
-                                fontWeight = FontWeight.ExtraBold,
-                                modifier = Modifier.clickable { vm.mergeAllNamed(name) }
-                                    .padding(6.dp))
-                        }
-                    }
-                }
-            }
             persons.filter { it.verified && it.name.isNotBlank() }.take(12).forEach { p ->
                 Row(Modifier.fillMaxWidth().padding(vertical = 4.dp),
                     verticalAlignment = Alignment.CenterVertically) {

@@ -35,8 +35,12 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.foundation.clickable
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.foundation.clickable
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.KeyboardArrowDownBorder
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
@@ -91,6 +95,7 @@ import com.brain.gallery.ui.components.VideoActionsSheet
 import com.brain.gallery.ui.components.VideoDetailsDialog
 import com.brain.gallery.ui.components.fmtDur
 import com.brain.gallery.ui.player.PlayerManager
+import com.brain.gallery.ui.spotlight.SpotlightController
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.Cyan
 import com.brain.gallery.ui.theme.Motion
@@ -104,7 +109,12 @@ private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun FeedScreen(player: PlayerManager, vm: FeedViewModel = hiltViewModel()) {
+fun FeedScreen(
+    player: PlayerManager,
+    spotlight: SpotlightController,
+    onLeaveFeed: () -> Unit,
+    vm: FeedViewModel = hiltViewModel()
+) {
     val feed by vm.feed.collectAsState()
     val loading by vm.loading.collectAsState()
     val ctx = LocalContext.current
@@ -178,7 +188,11 @@ fun FeedScreen(player: PlayerManager, vm: FeedViewModel = hiltViewModel()) {
                 onFav = { vm.toggleFav(item.video.id, !item.video.isFavorite) },
                 onReport = { c -> vm.onWatched(item.video.id, c, c < 0.15f) },
                 onMenu = { menuFor = item.video },
-                onEnded = { advance() }
+                onEnded = { advance() },
+                onSimilar = {
+                    spotlight.openPlaylist(feed.map { it.video }, page)
+                },
+                onDismiss = onLeaveFeed
             )
         }
 
@@ -192,7 +206,7 @@ fun FeedScreen(player: PlayerManager, vm: FeedViewModel = hiltViewModel()) {
                     vm.toggleFav(live.id, !live.isFavorite)
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 },
-                onSimilar = { menuFor = null },
+                onSimilar = { menuFor = null; spotlight.open(live) },
                 onDetails = { detailsFor = live; menuFor = null },
                 onDelete = { menuFor = null; vm.requestDelete(listOf(live.id)) },
                 onNotInterested = {
@@ -359,13 +373,21 @@ private fun ReelPage(
         AnimatedVisibility(visible = chrome, enter = fadeIn(tween(160)), exit = fadeOut(tween(220)),
             modifier = Modifier.fillMaxSize()) {
             Box(Modifier.fillMaxSize().alpha(railAlpha)) {
-                // top: single-feed label, centred like TikTok's tab strip
+                // top: single-feed label + swipe-down-to-leave affordance
                 Row(Modifier.align(Alignment.TopCenter).padding(top = 14.dp),
                     verticalAlignment = Alignment.CenterVertically) {
                     Box(Modifier.size(5.dp).clip(CircleShape).background(Color.White))
                     Spacer(Modifier.width(6.dp))
                     Text("For You", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
                 }
+                Icon(
+                    Icons.Default.KeyboardArrowDown, "Back to library",
+                    tint = Color.White.copy(alpha = 0.7f),
+                    modifier = Modifier
+                        .align(Alignment.TopCenter).padding(top = 46.dp)
+                        .size(30.dp)
+                        .clickable { onDismiss() }
+                )
 
                 // right action rail
                 Column(
@@ -379,7 +401,7 @@ private fun ReelPage(
                         tint = if (v.isFavorite) Pink else Color.White,
                         count = if (v.watchCount > 0) "${v.watchCount}" else null
                     ) { onFav(); tick++ }
-                    RailButton(Icons.Default.AutoAwesome, Color.White, null) { onMenu() }
+                    RailButton(Icons.Default.AutoAwesome, Cyan, null) { onSimilar() }
                     RailButton(Icons.Default.Speed, if (speed != 1f) Color(0xFFF59E0B) else Color.White,
                         "${speed}x") {
                         val i = SPEEDS.indexOf(speed)

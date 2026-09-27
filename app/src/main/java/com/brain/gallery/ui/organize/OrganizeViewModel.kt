@@ -159,6 +159,17 @@ class OrganizeViewModel @Inject constructor(
         viewModelScope.launch { db.personDao().clearSplitSuggested(personId) }
     }
 
+    /** "Hide this group": suppress every clip in it, now and for good. */
+    fun hideGroup(g: com.brain.gallery.domain.organize.SmartGroup) {
+        viewModelScope.launch(Dispatchers.IO) {
+            g.videos.forEach {
+                db.supportDao().addNotInterested(
+                    com.brain.gallery.data.local.NotInterestedEntity(it.id, System.currentTimeMillis())
+                )
+            }
+        }
+    }
+
     fun rescan() { BrainScanService.start(ctx) }
 
     /** Repair: send a wrongly-clustered video to the right person (or a new one). */
