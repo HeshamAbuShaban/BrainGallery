@@ -64,6 +64,18 @@ interface VideoDao {
     @Query("DELETE FROM videos WHERE id IN (:ids)")
     suspend fun deleteByIds(ids: List<Long>)
 
+    /** Wipe everything the brain derived, keep favourites + history (Tier 1). */
+    @Query("""UPDATE videos SET category = 'unknown', tags = '', about = '', confidence = 0,
+        brainLevel = 0, pendingSemantic = 0, priority = 0, faceCount = 0, smileCount = 0,
+        phash = 0, sharpness = 0, personId = -1""")
+    suspend fun resetDerived()
+
+    @Query("""UPDATE videos SET category = 'unknown', tags = '', about = '', confidence = 0,
+        brainLevel = 0, pendingSemantic = 0, priority = 0, faceCount = 0, smileCount = 0,
+        phash = 0, sharpness = 0, personId = -1, watchCount = 0, completionSum = 0,
+        skipCount = 0, lastWatchedMs = 0, isFavorite = 0""")
+    suspend fun resetEverything()
+
     @Query("SELECT * FROM videos WHERE personId = :person ORDER BY dateAddedSec DESC")
     suspend fun personGroup(person: Int): List<VideoEntity>
 

@@ -12,6 +12,8 @@ import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.data.portability.MemoryBundle
 import com.brain.gallery.data.service.BrainScanService
 import com.brain.gallery.domain.BatteryOptims
+import com.brain.gallery.domain.EngineSettings
+import com.brain.gallery.domain.SettingsStore
 import com.brain.gallery.domain.organize.GroupBuilder
 import com.brain.gallery.domain.organize.SmartGroup
 import com.brain.gallery.engine.MemoryDocBuilder
@@ -49,6 +51,7 @@ class OrganizeViewModel @Inject constructor(
     private val groups: GroupBuilder,
     private val bundle: MemoryBundle,
     private val battery: BatteryOptims,
+    private val store: SettingsStore,
     @ApplicationContext private val ctx: android.content.Context
 ) : ViewModel() {
     private val _groups = MutableStateFlow<List<SmartGroup>>(emptyList())
@@ -69,9 +72,14 @@ class OrganizeViewModel @Inject constructor(
     val diagnostics: StateFlow<Diagnostics> = _diag
     private val _batteryExempt = MutableStateFlow(false)
     val batteryExempt: StateFlow<Boolean> = _batteryExempt
+    private val _settings = MutableStateFlow(EngineSettings())
+    val settings: StateFlow<EngineSettings> = _settings
+    private val _personCounts = MutableStateFlow<Map<Int, Int>>(emptyMap())
+    val personCounts: StateFlow<Map<Int, Int>> = _personCounts
     private var allVideos: List<VideoEntity> = emptyList()
 
     init {
+        viewModelScope.launch { _settings.value = store.load() }
         viewModelScope.launch {
             // conflate: collapse bursts of writes into one rebuild, and skip the
             // rebuild entirely when nothing structural actually changed.
@@ -90,7 +98,12 @@ class OrganizeViewModel @Inject constructor(
                         lastFingerprint = fingerprint
                         allVideos = videos
                         _persons.value = people
-                        val built = withContext(Dispatchers.Default) { groups.build(videos, people) }
+                        _personCounts.value = videos.filter { it.personId >= 0 }
+                            .groupingBy { it.personId }.eachCount()
+                        val cfg = _settings.value
+                        val built = withContext(Dispatchers.Default) {
+                            groups.build(videos, people, cfg.duplicatesEnabled, cfg.junkSensitivity)
+                        }
                         _groups.value = built
                         _stats.value = withContext(Dispatchers.Default) {
                             LibraryStats(
@@ -148,6 +161,57 @@ class OrganizeViewModel @Inject constructor(
 
     fun rescan() { BrainScanService.start(ctx) }
 
+    /** Repair: send a wrongly-clustered video to the right person (or a new one). */
+    fun moveVideoToPerson(videoId: Long, targetPersonId: Int) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val vectors = db.personDao().vectorsForVideo(videoId)
+            if (vectors.isEmpty()) return@launch
+            val target = if (targetPersonId >= 0) targetPersonId else {
+                db.personDao().insertPerson(
+                    com.brain.gallery.data.local.PersonEntity(createdAt = System.currentTimeMillis())
+                ).toInt()
+            }
+            for (v in vectors) db.personDao().assignVector(v.id, target)
+            db.videoDao().setPerson(videoId, target)
+        }
+    }
+
+    /** Repair: every cluster that claimed this name is probably one person. */
+    fun mergeAllNamed(name: String) {
+        viewModelScope.launch(Dispatchers.IO) {
+            val matches = db.personDao().allPersons()
+                .filter { it.name.equals(name, true) || it.suggestedName.equals(name, true) }
+            if (matches.size < 2) return@launch
+            val counts = matches.associate { it.id to db.personDao().vectorsForPerson(it.id).size }
+            val keep = counts.maxByOrNull { it.second }!!.first
+            for (p in matches) {
+                if (p.id == keep) continue
+                db.personDao().mergePersons(p.id, keep)
+                db.videoDao().mergePersons(p.id, keep)
+            }
+            db.personDao().rename(keep, name)
+        }
+    }
+
+    fun updateSettings(s: EngineSettings) {
+        _settings.value = s
+        viewModelScope.launch(Dispatchers.IO) { store.save(s) }
+    }
+    fun resetDerived() {
+        viewModelScope.launch(Dispatchers.IO) {
+            db.videoDao().resetDerived()
+            db.personDao().deleteAllVectors()
+            BrainScanService.start(ctx)
+        }
+    }
+    fun resetEverything() {
+        viewModelScope.launch(Dispatchers.IO) {
+            db.videoDao().resetEverything()
+            db.personDao().deleteAllVectors()
+            db.supportDao().clearEvents()
+            BrainScanService.start(ctx)
+        }
+    }
     fun refreshBattery() { _batteryExempt.value = battery.isIgnoringOptimizations() }
     fun batteryRequestIntent() = battery.requestIntent()
     fun batterySettingsIntent() = battery.settingsIntent()
@@ -241,6 +305,7 @@ class SearchViewModel @Inject constructor(
     private val db: BrainDatabase,
     private val bundle: MemoryBundle,
     private val battery: BatteryOptims,
+    private val store: SettingsStore,
     @ApplicationContext private val ctx: android.content.Context
 ) : ViewModel() {
     private val _q = MutableStateFlow("")

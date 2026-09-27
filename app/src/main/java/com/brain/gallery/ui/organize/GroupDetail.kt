@@ -73,14 +73,17 @@ fun GroupDetail(
     onSimilar: (VideoEntity) -> Unit = {},
     onRename: (Int, String) -> Unit = { _, _ -> },
     onSplitOut: (Int, Long) -> Unit = { _, _ -> },
-    onDismissSplit: (Int) -> Unit = {}
+    onDismissSplit: (Int) -> Unit = {},
+    onMoveVideo: ((Long, Int) -> Unit)? = null,
+    persons: List<PersonEntity> = emptyList(),
+    personCounts: Map<Int, Int> = emptyMap()
 ) {
     val isDups = group.kind == GroupKind.DUPLICATES
     val redundant = group.videos.filter { it.id in group.redundantIds }
     var menuFor by remember { mutableStateOf<VideoEntity?>(null) }
     var detailsFor by remember { mutableStateOf<VideoEntity?>(null) }
     var renameOpen by remember { mutableStateOf(false) }
-    var mergeOpen by remember { mutableStateOf(false) }
+    var moveTarget by remember { mutableStateOf<Long?>(null) }
 
     Column(Modifier.fillMaxSize().background(Bg)) {
         Row(Modifier.fillMaxWidth().padding(8.dp, 16.dp, 16.dp, 4.dp),
@@ -168,7 +171,19 @@ fun GroupDetail(
             onFav = { menuFor = null; onFav(mv) },
             onSimilar = { menuFor = null; onSimilar(mv) },
             onDetails = { detailsFor = mv; menuFor = null },
-            onDelete = { menuFor = null; onDeleteOne(mv) })
+            onDelete = { menuFor = null; onDeleteOne(mv) },
+            hasIdentity = mv.faceCount > 0,
+            inPersonGroup = person != null,
+            onMovePerson = { menuFor = null; moveTarget = mv.id },
+            onRemoveFromPerson = {
+                menuFor = null
+                person?.let { onSplitOut(it.id, mv.id) }
+            })
+    }
+    moveTarget?.let { vid ->
+        MovePersonDialog(persons = persons, counts = personCounts,
+            onDismiss = { moveTarget = null },
+            onPick = { target -> moveTarget = null; onMoveVideo?.let { it(vid, target) } })
     }
     detailsFor?.let { VideoDetailsDialog(video = it, onDismiss = { detailsFor = null }) }
     if (renameOpen && person != null) {
@@ -176,7 +191,6 @@ fun GroupDetail(
             onDismiss = { renameOpen = false },
             onSave = { n -> onRename(person.id, n); renameOpen = false })
     }
-    if (mergeOpen) mergeOpen = false
 }
 
 @Composable

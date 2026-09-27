@@ -80,4 +80,10 @@ interface PersonDao {
 
     @Query("DELETE FROM face_vectors WHERE videoId = :videoId")
     suspend fun deleteVectorsForVideo(videoId: Long)
+
+    @Query("DELETE FROM face_vectors")
+    suspend fun deleteAllVectors()
+
+    @Query("DELETE FROM persons")
+    suspend fun deleteAllPersons()
 }

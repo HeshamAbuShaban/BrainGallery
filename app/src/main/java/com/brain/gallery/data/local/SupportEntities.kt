@@ -53,4 +53,7 @@ interface SupportDao {
 
     @Query("INSERT OR REPLACE INTO app_kv (k, v) VALUES (:k, :v)")
     suspend fun put(k: String, v: String)
+
+    @Query("DELETE FROM semantic_vectors")
+    suspend fun clearSemanticVectors()
 }

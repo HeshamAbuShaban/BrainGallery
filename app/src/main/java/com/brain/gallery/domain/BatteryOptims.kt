@@ -1,4 +1,4 @@
-package com.brain.gallery.ui.organize
+package com.brain.gallery.domain
 
 import android.content.Context
 import android.content.Intent

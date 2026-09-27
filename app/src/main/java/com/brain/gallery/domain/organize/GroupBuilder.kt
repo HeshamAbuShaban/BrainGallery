@@ -18,7 +18,9 @@ data class SmartGroup(
     val redundantIds: Set<Long> = emptySet(),
     val savingsBytes: Long = 0L,
     val personId: Int = -1,
-    val splitSuggested: Boolean = false
+    val splitSuggested: Boolean = false,
+    /** Several clusters independently named the same thing => probably one person. */
+    val nameCollision: String? = null
 )
 
 enum class GroupKind { MEMORIES, PEOPLE, DUPLICATES, JUNK, FAVORITES, CATEGORY, EVENT, GEMS, ON_THIS_DAY, UNREVIEWED }
@@ -26,11 +28,16 @@ enum class GroupKind { MEMORIES, PEOPLE, DUPLICATES, JUNK, FAVORITES, CATEGORY, 
 @Singleton
 class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
 
-    fun build(all: List<VideoEntity>, persons: List<PersonEntity> = emptyList()): List<SmartGroup> {
+    fun build(
+        all: List<VideoEntity>,
+        persons: List<PersonEntity> = emptyList(),
+        duplicatesOn: Boolean = true,
+        junkThreshold: Float = 0.5f
+    ): List<SmartGroup> {
         if (all.isEmpty()) return emptyList()
         val out = mutableListOf<SmartGroup>()
-        val memories = all.filter { it.junkScore < 0.5f }
-        val junk = all.filter { it.junkScore >= 0.5f }
+        val memories = all.filter { it.junkScore < junkThreshold }
+        val junk = all.filter { it.junkScore >= junkThreshold }
         val favs = all.filter { it.isFavorite }
         val byId = persons.associateBy { it.id }
 
@@ -38,6 +45,11 @@ class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
             GroupKind.MEMORIES, memories.sortedByDescending { it.dateAddedSec }.take(30), 0xFF8B5CF6)
 
         // Identity: real names when known, split warnings when bimodality detected.
+        // How many distinct clusters independently claim each name? More than one
+        // for the same name is a fragmentation signal we can offer to repair.
+        val nameHits = persons.filter { it.name.isBlank() && it.suggestedName.isNotBlank() }
+            .groupingBy { it.suggestedName.lowercase() }.eachCount()
+
         val grouped = all.filter { it.personId >= 0 }.groupBy { it.personId }
         for ((pid, list) in grouped.entries.sortedByDescending { it.value.size }) {
             if (list.size < 2) continue
@@ -51,9 +63,13 @@ class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
                 p?.suggestedName?.isNotBlank() == true && p.name.isBlank() -> "named \"${p.suggestedName}\" by context"
                 else -> "${list.size} videos${if (smiles > 0) " • $smiles smiles" else ""}"
             }
+            val key = (p?.suggestedName ?: p?.name ?: "").lowercase()
+            val collision = if (p?.name.isNullOrBlank() && (nameHits[key] ?: 0) > 1)
+                p?.suggestedName else null
             out += SmartGroup("person_$pid", label, note, GroupKind.PEOPLE,
                 list.sortedByDescending { it.dateAddedSec }.take(30), 0xFFEC4899,
-                personId = pid, splitSuggested = p?.splitSuggested == true)
+                personId = pid, splitSuggested = p?.splitSuggested == true,
+                nameCollision = collision)
         }
         if (grouped.isEmpty()) {
             val people = memories.filter { it.faceCount > 0 }
@@ -67,7 +83,7 @@ class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
         }
 
         // Duplicates: keeper first per set, actionable savings.
-        val dupSets = dups.find(all)
+        val dupSets = if (duplicatesOn) dups.find(all) else emptyList()
         if (dupSets.isNotEmpty()) {
             val redundantCount = dupSets.sumOf { it.redundant.size }
             val savings = dupSets.sumOf { it.savingsBytes }

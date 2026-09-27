@@ -81,6 +81,7 @@ fun OrganizeScreen(player: PlayerManager, vm: OrganizeViewModel = hiltViewModel(
     val spotlight by vm.spotlight.collectAsState()
     val similar by vm.similar.collectAsState()
     val persons by vm.persons.collectAsState()
+    val personCounts by vm.personCounts.collectAsState()
     var showDiag by remember { mutableStateOf(false) }
     val deleteAsk by vm.deleteAsk.collectAsState()
 
@@ -105,7 +106,10 @@ fun OrganizeScreen(player: PlayerManager, vm: OrganizeViewModel = hiltViewModel(
             onSimilar = { vm.play(it) },
             onRename = { pid, n -> vm.renamePerson(pid, n) },
             onSplitOut = { pid, vid -> vm.splitVideoOut(pid, vid) },
-            onDismissSplit = { vm.dismissSplitWarning(it) })
+            onDismissSplit = { vm.dismissSplitWarning(it) },
+            onMoveVideo = { vid, target -> vm.moveVideoToPerson(vid, target) },
+            persons = persons,
+            personCounts = personCounts)
     } else {
     Column(Modifier.fillMaxSize().background(Bg)) {
         // Header
@@ -193,7 +197,7 @@ fun OrganizeScreen(player: PlayerManager, vm: OrganizeViewModel = hiltViewModel(
             onFav = { vm.toggleFav(it) })
     }
     if (showDiag) {
-        DiagnosticsScreen(vm = vm, onBack = { showDiag = false })
+        BrainScreen(vm = vm, onBack = { showDiag = false })
     }
 }
 

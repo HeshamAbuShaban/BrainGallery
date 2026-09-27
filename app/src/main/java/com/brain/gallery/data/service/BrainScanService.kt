@@ -17,6 +17,8 @@ import com.brain.gallery.data.brain.PerceptualResult
 import com.brain.gallery.data.local.BrainDatabase
 import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.data.scan.MediaScanner
+import com.brain.gallery.domain.EngineSettings
+import com.brain.gallery.domain.SettingsStore
 import com.brain.gallery.data.vision.FrameCache
 import com.brain.gallery.engine.NameSuggester
 import com.brain.gallery.engine.PersonConsolidator
@@ -44,6 +46,7 @@ class BrainScanService : LifecycleService() {
     @Inject lateinit var l1b: L1bAnalyzer
     @Inject lateinit var matcher: PersonMatcher
     @Inject lateinit var consolidator: PersonConsolidator
+    @Inject lateinit var settings: SettingsStore
     @Inject lateinit var splitter: SplitDetector
     @Inject lateinit var namer: NameSuggester
     @Inject lateinit var frameCache: FrameCache
@@ -71,6 +74,7 @@ class BrainScanService : LifecycleService() {
         val dao = db.videoDao()
         val t0 = System.currentTimeMillis()
         val scanId = t0
+        val cfg = settings.load()
 
         val scanned = if (deltaIds != null) scanner.scanIds(deltaIds) else scanner.scan()
         val existingIds = dao.getAllSync().map { it.id }.toSet()
@@ -115,7 +119,7 @@ class BrainScanService : LifecycleService() {
         val tScan = System.currentTimeMillis()
 
         // ---- L1a: unbudgeted, looped until drained or the time budget runs out ----
-        val deadline = t0 + RUN_BUDGET_MS
+        val deadline = t0 + cfg.runBudgetSeconds * 1000L
         var totalL1a = 0
         var totalL1b = 0
         var unreadable = 0
@@ -145,7 +149,9 @@ class BrainScanService : LifecycleService() {
                     faces = r.faceCount, smiles = r.smileCount, phash = r.phash,
                     sharpness = r.sharpness, priority = r.priority, pending = r.pendingSemantic
                 )
-                for (cand in r.vectors) matcher.assignOrCreate(v.id, cand.vec, cand.quality)
+                if (cfg.identityEnabled) {
+                    for (cand in r.vectors) matcher.assignOrCreate(v.id, cand.vec, cand.quality, cfg.matchSim)
+                }
                 totalL1a++
                 if (i % 25 == 0) {
                     val remaining = dao.perceptualPendingCount()
@@ -158,7 +164,8 @@ class BrainScanService : LifecycleService() {
 
         // ---- L1b: budget scales with how much of the library is still unknown ----
         val semPending = dao.semanticPendingCount()
-        val semBudget = semPending.coerceIn(SEMANTIC_MIN, SEMANTIC_MAX)
+        val semBudget = if (cfg.semanticEnabled)
+            semPending.coerceIn(SEMANTIC_MIN, cfg.semanticBudget.coerceIn(SEMANTIC_MIN, 600)) else 0
         var semIndex = 0
         while (semIndex < semBudget && System.currentTimeMillis() < deadline + SEMANTIC_GRACE_MS) {
             val batch = dao.pendingSemantic(SEMANTIC_BATCH)
@@ -178,16 +185,17 @@ class BrainScanService : LifecycleService() {
         val tL1b = System.currentTimeMillis()
 
         // ---- Identity maintenance: repair fragmentation, then look for over-merges ----
-        val merged = consolidator.consolidate()
+        val merged = consolidator.consolidate(cfg.mergeSim)
         val adopted = consolidator.adoptUnassigned()
         syncDenormalisedPersons()
-        val flagged = splitter.scanAll()
+        val flagged = splitter.scanAll(cfg.splitSensitivity)
         namer.applyAllSuggestions()
         db.supportDao().put("diag.lastRun",
             "$totalL1a|$totalL1b|${System.currentTimeMillis() - t0}|$flagged|$merged|$adopted|$unreadable")
         db.supportDao().put("diag.tScan", "${tScan - t0}")
         db.supportDao().put("diag.tL1a", "${tL1a - tScan}")
         db.supportDao().put("diag.tL1b", "${tL1b - tL1a}")
+        db.supportDao().put("diag.config", cfg.toJson())
         frameCache.prune()
         db.supportDao().pruneEvents(20000)
 

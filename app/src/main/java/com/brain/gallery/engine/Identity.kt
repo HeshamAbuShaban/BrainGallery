@@ -33,8 +33,10 @@ class PersonMatcher @Inject constructor(private val db: BrainDatabase) {
         return MatchDecision(best.first, false, best.second, margin)
     }
 
-    suspend fun assignOrCreate(videoId: Long, vec: FloatArray, quality: Float): Int {
-        val decision = match(vec)
+    suspend fun assignOrCreate(
+        videoId: Long, vec: FloatArray, quality: Float, minSim: Float = 0.42f
+    ): Int {
+        val decision = match(vec, minSim)
         val personId = if (decision.ambiguous) {
             -1 // surface to user: "Person A, or someone new?"
         } else if (decision.personId >= 0) {
@@ -133,11 +135,11 @@ class PersonConsolidator @Inject constructor(
 @Singleton
 class SplitDetector @Inject constructor(private val db: BrainDatabase) {
 
-    suspend fun scanAll(): Int {
+    suspend fun scanAll(minSeparation: Float = 0.25f): Int {
         var flagged = 0
         for (p in db.personDao().allPersons()) {
             val vs = db.personDao().vectorsForPerson(p.id).mapNotNull { FaceEmbedder.fromBytes(it.vec) }
-            val bimodal = Spherical.looksLikeTwoPeople(vs)
+            val bimodal = Spherical.looksLikeTwoPeople(vs, minSeparation = minSeparation)
             if (bimodal != p.splitSuggested) {
                 if (bimodal) db.personDao().setSplitSuggested(p.id) else db.personDao().clearSplitSuggested(p.id)
                 if (bimodal) flagged++

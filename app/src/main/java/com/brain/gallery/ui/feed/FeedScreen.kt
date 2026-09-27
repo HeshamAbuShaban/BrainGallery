@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -99,6 +100,7 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.launch
 
 private const val CHROME_IDLE_MS = 2500L
+private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -228,6 +230,7 @@ private fun ReelPage(
     var scrubbing by remember { mutableFloatStateOf(-1f) }
     var seekMs by remember { mutableStateOf(0L) }
     var stageSize by remember { mutableStateOf(IntSize.Zero) }
+    var speed by remember { mutableFloatStateOf(1f) }
     val heartScale = remember { Animatable(0.4f) }
 
     // ONLY the active page acquires the shared player. An adjacent page asking
@@ -249,8 +252,9 @@ private fun ReelPage(
     }
 
     // Playback state + honest progress measurement.
-    LaunchedEffect(exo, paused) {
+    LaunchedEffect(exo, paused, speed) {
         val p = exo ?: return@LaunchedEffect
+        p.playbackParameters = androidx.media3.common.PlaybackParameters(speed)
         if (paused) p.pause() else p.play()
         while (true) {
             delay(300)
@@ -376,6 +380,13 @@ private fun ReelPage(
                         count = if (v.watchCount > 0) "${v.watchCount}" else null
                     ) { onFav(); tick++ }
                     RailButton(Icons.Default.AutoAwesome, Color.White, null) { onMenu() }
+                    RailButton(Icons.Default.Speed, if (speed != 1f) Color(0xFFF59E0B) else Color.White,
+                        "${speed}x") {
+                        val i = SPEEDS.indexOf(speed)
+                        speed = SPEEDS[(i + 1) % SPEEDS.size]
+                        manager.setSpeed(speed)
+                        tick++
+                    }
                     RailButton(Icons.Default.MoreHoriz, Color.White, null) { onMenu() }
                 }
 

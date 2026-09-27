@@ -19,6 +19,8 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PersonOff
+import androidx.compose.material.icons.filled.PersonSearch
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -58,7 +60,12 @@ fun VideoActionsSheet(
     onSimilar: () -> Unit,
     onDetails: () -> Unit,
     onDelete: (() -> Unit)? = null,
-    onNotInterested: (() -> Unit)? = null
+    onNotInterested: (() -> Unit)? = null,
+    /** Shown only when the clip actually has a face vector to re-place. */
+    hasIdentity: Boolean = false,
+    inPersonGroup: Boolean = false,
+    onMovePerson: (() -> Unit)? = null,
+    onRemoveFromPerson: (() -> Unit)? = null
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss,
         containerColor = Surface, contentColor = Text1) {
@@ -80,6 +87,13 @@ fun VideoActionsSheet(
         SheetRow(Icons.Default.Info, "Details", Text1, onDetails)
         if (onNotInterested != null)
             SheetRow(Icons.Default.VisibilityOff, "Not interested — show less", Text1, onNotInterested)
+        if (hasIdentity && onMovePerson != null) {
+            SheetRow(Icons.Default.PersonSearch,
+                if (inPersonGroup) "Wrong person — move to…" else "Add to a person…", Cyan, onMovePerson)
+        }
+        if (inPersonGroup && onRemoveFromPerson != null) {
+            SheetRow(Icons.Default.PersonOff, "Not this person", Text1, onRemoveFromPerson)
+        }
         if (onDelete != null)
             SheetRow(Icons.Default.Delete, "Delete from device", Color(0xFFF87171), onDelete)
         Spacer(Modifier.height(20.dp))
