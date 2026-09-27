@@ -138,7 +138,7 @@ class OrganizeViewModel @Inject constructor(
         }
     }
     fun dismissSplitWarning(personId: Int) {
-        viewModelScope.launch { db.personDao().setSplitSuggested(personId, false) }
+        viewModelScope.launch { db.personDao().clearSplitSuggested(personId) }
     }
 
     fun rescan() { BrainScanService.start(ctx) }

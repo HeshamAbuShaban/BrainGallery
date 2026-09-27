@@ -69,7 +69,7 @@ class SplitDetector @Inject constructor(private val db: BrainDatabase) {
             val vs = db.personDao().vectorsForPerson(p.id).mapNotNull { FaceEmbedder.fromBytes(it.vec) }
             val bimodal = Spherical.looksLikeTwoPeople(vs)
             if (bimodal != p.splitSuggested) {
-                db.personDao().setSplitSuggested(p.id, bimodal)
+                if (bimodal) db.personDao().setSplitSuggested(p.id) else db.personDao().clearSplitSuggested(p.id)
                 if (bimodal) flagged++
             }
         }
