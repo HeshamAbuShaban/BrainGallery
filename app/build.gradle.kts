@@ -6,6 +6,14 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+// A shared signing key keeps every build installable in place. Override by
+// dropping a keystore.properties next to this file (never commit a real one).
+val keystoreProps = java.util.Properties().apply {
+    val f = rootProject.file("keystore.properties")
+    if (f.exists()) f.inputStream().use { load(it) }
+}
+val hasSharedKey = keystoreProps.isNotEmpty()
+
 android {
     namespace = "com.brain.gallery"
     compileSdk = 36
@@ -22,8 +30,24 @@ android {
         ndk { abiFilters += "arm64-v8a" }
     }
 
+    signingConfigs {
+        if (hasSharedKey) {
+            create("shared") {
+                storeFile = rootProject.file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            // Same key as release so upgrades work between CI runs.
+            if (hasSharedKey) signingConfig = signingConfigs.getByName("shared")
+        }
         release {
+            if (hasSharedKey) signingConfig = signingConfigs.getByName("shared")
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(
