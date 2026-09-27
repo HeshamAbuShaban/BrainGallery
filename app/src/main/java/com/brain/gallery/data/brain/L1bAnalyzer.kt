@@ -48,6 +48,9 @@ class L1bAnalyzer @Inject constructor(
                 if (framesToUse.isEmpty()) {
                     return@withContext prev.toSemantic(0.6f)
                 }
+                // Conditional frame cache: only escalated videos (the ones we decode
+                // 3-4x) persist a frame, and the cache is a bounded LRU.
+                cache.put(videoId, framesToUse.first())
                 val all = linkedSetOf<String>()
                 for (b in framesToUse) {
                     val labels = runCatching {

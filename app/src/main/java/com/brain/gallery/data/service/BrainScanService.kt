@@ -13,6 +13,7 @@ import androidx.lifecycle.lifecycleScope
 import com.brain.gallery.data.brain.L1aAnalyzer
 import com.brain.gallery.data.brain.L1bAnalyzer
 import com.brain.gallery.data.brain.Level0Analyzer
+import com.brain.gallery.data.brain.PerceptualResult
 import com.brain.gallery.data.local.BrainDatabase
 import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.data.scan.MediaScanner
@@ -122,7 +123,7 @@ class BrainScanService : LifecycleService() {
         val semanticPending = dao.pendingSemantic(25)
         var l1bDone = 0
         for (v in semanticPending) {
-            val prev = com.brain.gallery.data.brain.PerceptualResult(
+            val prev = PerceptualResult(
                 v.phash, v.sharpness, v.faceCount, v.smileCount, v.about, v.category,
                 v.tagList, v.confidence, emptyList(), v.priority, true
             )
