@@ -66,7 +66,10 @@ class PersonMatcher @Inject constructor(private val db: BrainDatabase) {
  * which makes identity independent of insertion order.
  */
 @Singleton
-class PersonConsolidator @Inject constructor(private val db: BrainDatabase) {
+class PersonConsolidator @Inject constructor(
+    private val db: BrainDatabase,
+    private val matcher: PersonMatcher
+) {
 
     suspend fun consolidate(mergeSim: Float = 0.45f, maxMerges: Int = 40): Int {
         var merges = 0
@@ -113,7 +116,7 @@ class PersonConsolidator @Inject constructor(private val db: BrainDatabase) {
         var adopted = 0
         for (row in pending) {
             val vec = FaceEmbedder.fromBytes(row.vec) ?: continue
-            val d = match(vec, minSim, minMargin)
+            val d = matcher.match(vec, minSim, minMargin)
             if (d.personId >= 0 && !d.ambiguous) {
                 db.personDao().assignVector(row.id, d.personId)
                 adopted++
