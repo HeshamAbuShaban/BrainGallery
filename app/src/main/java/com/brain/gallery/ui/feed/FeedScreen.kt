@@ -345,7 +345,12 @@ private fun ReelPage(
         }
         if (exo != null) {
             AndroidView(factory = { c ->
-                PlayerView(c).also { pv -> pv.player = exo; pv.useController = false }
+                PlayerView(c).also { pv ->
+                    pv.player = exo
+                    pv.useController = false
+                    // Fill the screen like a short-video player, crop the overflow.
+                    pv.resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+                }
             }, modifier = Modifier.fillMaxSize().alpha(if (ready) 1f else 0f))
         }
 

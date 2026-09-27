@@ -136,7 +136,11 @@ fun SpotlightPlayer(
     Box(Modifier.fillMaxSize().background(Color.Black)
         .clickable { controls = !controls; tick++ }) {
         AndroidView(factory = { c ->
-            PlayerView(c).also { pv -> pv.player = exo; pv.useController = false } },
+            PlayerView(c).also { pv ->
+                pv.player = exo
+                pv.useController = false
+                pv.resizeMode = androidx.media3.ui.AspectRatioFrameLayout.RESIZE_MODE_ZOOM
+            } },
             modifier = Modifier.fillMaxSize())
 
         // top bar
