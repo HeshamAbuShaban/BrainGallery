@@ -39,9 +39,9 @@ jobs:
         run: |
           APK=app/build/outputs/apk/release/app-release-unsigned.apk
           echo "=== release APK: $(du -h "$APK" | cut -f1) ==="
-          unzip -l "$APK" | awk 'NR>3 && NF>=4 {split($4,a,"/"); key=a[1]; if (a[1]=="lib" && NF>=5) key="lib/"a[2]; else if (a[1]=="assets") key="assets"; else if (a[1]=="res") key="res"; s[key]+=$1} END {for (k in s) printf "%10.2f MB  %s\n", s[k]/1048576, k}' | sort -rn | head -25
+          unzip -l "$APK" | awk 'NF>=4 && $1 ~ /^[0-9]+$/ {split($4,a,"/"); k=a[1]; if (a[1]=="lib" && a[2]!="") k="lib/"a[2]; s[k]+=$1} END {for (x in s) printf "%10.2f MB  %s\n", s[x]/1048576, x}' | sort -rn
           echo "--- largest individual entries ---"
-          unzip -l "$APK" | sort -rn | head -15
+          unzip -l "$APK" | awk 'NF>=4 && $1 ~ /^[0-9]+$/ {printf "%10.2f MB  %s\n", $1/1048576, $4}' | sort -rn | head -15
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
