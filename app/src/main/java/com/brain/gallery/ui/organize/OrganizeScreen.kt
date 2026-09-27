@@ -16,7 +16,10 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -139,7 +142,9 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
             persons = persons,
             personCounts = personCounts)
     } else {
-    Column(Modifier.fillMaxSize().background(Bg)) {
+    Column(Modifier.fillMaxSize().background(Bg)
+        .windowInsetsPadding(WindowInsets.navigationBars)
+        .padding(bottom = 84.dp)) {
         // Header
         Row(Modifier.fillMaxWidth().padding(20.dp, 20.dp, 20.dp, 4.dp),
             verticalAlignment = Alignment.CenterVertically) {

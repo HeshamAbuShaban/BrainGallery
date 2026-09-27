@@ -149,7 +149,7 @@ private fun Root(spotlight: SpotlightController) {
                 }
             }
         }
-    ) { pad ->
+    ) { _ ->
         val forward = tab >= prev
         // Feed is edge-to-edge but must clear the system gesture bar.
         val systemBottom = WindowInsets.navigationBars
@@ -175,12 +175,8 @@ private fun Root(spotlight: SpotlightController) {
                             onLeaveFeed = { go(1) }
                         )
                     }
-                    1 -> Box(Modifier.fillMaxSize().padding(pad)) {
-                        OrganizeScreen(spotlight)
-                    }
-                    else -> Box(Modifier.fillMaxSize().padding(pad)) {
-                        SearchScreen(spotlight)
-                    }
+                    1 -> Box(Modifier.fillMaxSize()) { OrganizeScreen(spotlight) }
+                    else -> Box(Modifier.fillMaxSize()) { SearchScreen(spotlight) }
                 }
             }
         }

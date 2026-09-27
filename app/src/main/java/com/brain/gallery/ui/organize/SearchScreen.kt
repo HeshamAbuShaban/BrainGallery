@@ -10,7 +10,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -69,7 +72,8 @@ fun SearchScreen(spotlight: SpotlightController, vm: SearchViewModel = hiltViewM
     }
 
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().background(Bg).padding(top = 20.dp)) {
+        Column(Modifier.fillMaxSize().background(Bg).padding(top = 20.dp)
+        .windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = 84.dp)) {
             Text("Search", color = Text1, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier.padding(horizontal = 20.dp))
             Text("Names, tags, categories, folders", color = Text2, fontSize = 12.5.sp,

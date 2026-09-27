@@ -10,7 +10,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -89,7 +92,9 @@ fun GroupDetail(
     var renameOpen by remember { mutableStateOf(false) }
     var moveTarget by remember { mutableStateOf<Long?>(null) }
 
-    Column(Modifier.fillMaxSize().background(Bg)) {
+    Column(Modifier.fillMaxSize().background(Bg)
+        .windowInsetsPadding(WindowInsets.navigationBars)
+        .padding(bottom = 84.dp)) {
         Row(Modifier.fillMaxWidth().padding(8.dp, 16.dp, 16.dp, 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack,
