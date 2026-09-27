@@ -41,15 +41,14 @@ class FeedViewModel @Inject constructor(
     fun refresh() { BrainScanService.start(ctx) }
 
     fun onWatched(videoId: Long, completion: Float, skipped: Boolean) {
-        viewModelScope.launch {
+        viewModelScope.launch(Dispatchers.IO) {
             val cal = Calendar.getInstance()
             db.watchDao().insert(WatchEventEntity(videoId = videoId, atMs = System.currentTimeMillis(),
                 completion = completion, skipped = skipped, hourOfDay = cal.get(Calendar.HOUR_OF_DAY)))
-            val v = db.videoDao().getById(videoId) ?: return@launch
-            db.videoDao().upsert(v.copy(
-                lastWatchedMs = System.currentTimeMillis(), watchCount = v.watchCount + 1,
-                completionSum = v.completionSum + completion,
-                skipCount = v.skipCount + if (skipped) 1 else 0))
+            db.videoDao().recordWatch(
+                id = videoId, now = System.currentTimeMillis(),
+                completion = completion, skipped = if (skipped) 1 else 0
+            )
         }
     }
 

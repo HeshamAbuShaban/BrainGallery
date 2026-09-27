@@ -75,6 +75,9 @@ interface PersonDao {
     @Query("UPDATE face_vectors SET personId = :personId WHERE id = :id")
     suspend fun assignVector(id: Long, personId: Int)
 
+    @Query("UPDATE face_vectors SET personId = :to WHERE personId = :from")
+    suspend fun mergePersons(from: Int, to: Int)
+
     @Query("DELETE FROM face_vectors WHERE videoId = :videoId")
     suspend fun deleteVectorsForVideo(videoId: Long)
 }

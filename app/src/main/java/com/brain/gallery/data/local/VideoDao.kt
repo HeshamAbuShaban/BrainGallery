@@ -47,6 +47,11 @@ interface VideoDao {
     @Query("SELECT COUNT(*) FROM videos WHERE pendingSemantic = 1")
     fun observeSemanticPending(): Flow<Int>
 
+    @Query("""UPDATE videos SET lastWatchedMs = :now, watchCount = watchCount + 1,
+        completionSum = completionSum + :completion, skipCount = skipCount + :skipped
+        WHERE id = :id""")
+    suspend fun recordWatch(id: Long, now: Long, completion: Float, skipped: Int)
+
     @Query("UPDATE videos SET isFavorite = :fav WHERE id = :id")
     suspend fun setFavorite(id: Long, fav: Boolean)
 

@@ -45,10 +45,14 @@ class L1aAnalyzer @Inject constructor(
 
     suspend fun analyze(uri: String, durationMs: Long, fileName: String, folder: String): PerceptualResult {
         val l0 = Level0Analyzer.analyze(fileName, folder, durationMs)
-        val bmp: Bitmap? = frames.mid(uri, durationMs)
-            ?: return PerceptualResult(0L, 0f, 0, 0, l0.about, l0.category, l0.tags,
-                l0.confidence, emptyList(), PriorityScorer.score(l0.junkScore, durationMs, 0, l0.category),
+        val raw = frames.mid(uri, durationMs)
+        if (raw == null) {
+            return PerceptualResult(0L, 0f, 0, 0, l0.about, l0.category, l0.tags,
+                l0.confidence, emptyList(),
+                PriorityScorer.score(l0.junkScore, durationMs, 0, l0.category),
                 l0.category == "unknown" || l0.confidence < 0.6f)
+        }
+        val bmp: Bitmap = raw
 
         return try {
             val phash = runCatching { VisionUtils.dHash(bmp) }.getOrDefault(0L)
