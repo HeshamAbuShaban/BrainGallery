@@ -92,6 +92,7 @@ import com.brain.gallery.domain.engine.FeedItem
 import com.brain.gallery.ui.components.VideoActionsSheet
 import com.brain.gallery.ui.components.VideoDetailsDialog
 import com.brain.gallery.ui.components.fmtDur
+import com.brain.gallery.ui.components.thumbAtMs
 import com.brain.gallery.ui.player.PlayerManager
 import com.brain.gallery.ui.spotlight.SpotlightController
 import com.brain.gallery.ui.theme.Bg
@@ -334,7 +335,8 @@ private fun ReelPage(
         // ---- stage ----
         if (!ready) {
             AsyncImage(
-                model = ImageRequest.Builder(ctx).data(v.uri).videoFrameMillis(400).build(),
+                model = ImageRequest.Builder(ctx).data(v.uri)
+                    .videoFrameMillis(thumbAtMs(v)).build(),
                 imageLoader = ctx.imageLoader, contentDescription = null,
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         }

@@ -24,6 +24,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
@@ -47,6 +49,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import kotlinx.coroutines.delay
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -81,6 +84,7 @@ import com.brain.gallery.ui.theme.Text1
 import com.brain.gallery.ui.theme.Text2
 import com.brain.gallery.ui.theme.Yellow
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltViewModel()) {
     val groups by vm.groupList.collectAsState()
@@ -106,6 +110,19 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
         }
     }
 
+    var refreshing by remember { mutableStateOf(false) }
+    LaunchedEffect(refreshing) {
+        if (refreshing) {
+            vm.rescan()
+            delay(2500)
+            refreshing = false
+        }
+    }
+    PullToRefreshBox(
+        isRefreshing = refreshing,
+        onRefresh = { refreshing = true },
+        modifier = Modifier.fillMaxSize()
+    ) {
     if (selected != null) {
         GroupDetail(
             group = selected!!,
@@ -118,6 +135,7 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
             onSplitOut = { pid, vid -> vm.splitVideoOut(pid, vid) },
             onDismissSplit = { vm.dismissSplitWarning(it) },
             onMoveVideo = { vid, target -> vm.moveVideoToPerson(vid, target) },
+            onSwipeNotInterested = { vid -> vm.markNotInterested(vid) },
             persons = persons,
             personCounts = personCounts)
     } else {
@@ -178,7 +196,7 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
             }
         } else {
             LazyVerticalGrid(GridCells.Fixed(2),
-                contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 24.dp),
+                contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 32.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 itemsIndexed(groups, key = { _, g -> g.id }) { i, g ->
@@ -213,6 +231,7 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
             hasPrev = spotlight.hasPrev(), hasNext = spotlight.hasNext(),
             onPrev = { spotlight.prev() }, onNext = { spotlight.next() },
             onMoreLikeThis = { spotlight.open(it) })
+    }
     }
     if (showDiag) {
         BrainScreen(vm = vm, onBack = { showDiag = false })

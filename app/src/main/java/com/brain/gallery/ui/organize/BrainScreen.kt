@@ -1,5 +1,6 @@
 package com.brain.gallery.ui.organize
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -65,6 +66,7 @@ fun BrainScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
     val ctx = LocalContext.current
     var confirmReset by remember { mutableStateOf(false) }
 
+    BackHandler(enabled = true) { onBack() }
     LaunchedEffect(Unit) { vm.refreshDiagnostics(); vm.refreshBattery() }
 
     // Fragmentation repair offers: clusters sharing one name.

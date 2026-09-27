@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -185,7 +186,8 @@ private fun Root(spotlight: SpotlightController) {
         }
     }
 
-    // One spotlight for the whole app.
+    // One spotlight for the whole app. Back closes it before anything else.
+    BackHandler(enabled = open != null) { spotlight.close() }
     open?.let { v ->
         SpotlightPlayer(
             video = v,

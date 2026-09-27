@@ -9,7 +9,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.layout.offset
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlin.math.roundToInt
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.VideocamOff
 import androidx.compose.material3.Icon
@@ -42,11 +49,15 @@ fun VideoThumb(
     video: VideoEntity,
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    onLongClick: (() -> Unit)? = null
+    onLongClick: (() -> Unit)? = null,
+    onSwipeRight: (() -> Unit)? = null,
+    onSwipeLeft: (() -> Unit)? = null
 ) {
     val ctx = LocalContext.current
     val loader = ctx.imageLoader // single app-level cache, not one per cell
+    var dragX by androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     Box(modifier
+        .offset { androidx.compose.ui.unit.IntOffset(dragX.roundToInt(), 0) }
         .clip(CardShape)
         .background(Color(0xFF151B26))
         .then(
@@ -66,7 +77,8 @@ fun VideoThumb(
             }
         } else {
             AsyncImage(
-                model = ImageRequest.Builder(ctx).data(video.uri).videoFrameMillis(500).build(),
+                model = ImageRequest.Builder(ctx).data(video.uri)
+                    .videoFrameMillis(thumbAtMs(video)).build(),
                 imageLoader = loader, contentDescription = null,
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize()
             )
@@ -83,6 +95,10 @@ fun VideoThumb(
             modifier = Modifier.align(Alignment.BottomEnd).padding(6.dp))
     }
 }
+
+/** A frame a third in is almost always content; 0.5s is often black. */
+fun thumbAtMs(v: VideoEntity): Long =
+    if (v.durationMs <= 0) 400L else (v.durationMs / 3).coerceIn(300L, 4000L)
 
 fun fmtDur(ms: Long): String {
     if (ms <= 0) return ""

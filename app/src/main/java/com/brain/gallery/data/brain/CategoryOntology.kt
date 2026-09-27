@@ -16,8 +16,17 @@ object CategoryOntology {
         "vlog" to listOf("vlog", "daily", "blog"),
         "movie" to listOf("movie", "film", "episode", "series", "netflix")
     )
-    val JUNK_FOLDERS = setOf("whatsapp", "telegram", "download", "downloads", "screenshots", "screenshot", "screenrecordings", "instagram", "tiktok", "snapchat", "memes")
-    val MEMORY_FOLDERS = setOf("camera", "dcim", "photos", "videos")
+    // Matched as substrings, not equality: real folders are named "TikTok-Vids",
+    // "Screen recordings", "WhatsApp Video", and exact matching missed all of them.
+    val JUNK_TOKENS = listOf(
+        "whatsapp", "telegram", "instagram", "tiktok", "snapchat", "twitter", "facebook",
+        "download", "screenrecord", "screen_record", "screenshot", "meme", "reels", "shorts",
+        "ringtone", "cache", "temp", "trashed", "blender", "recorder", "voice msg", "voicemsg"
+    )
+    val MEMORY_TOKENS = listOf("camera", "dcim", "pictures", "camera roll", "camera_roll")
+    val JUNK_NAME_TOKENS = listOf(
+        "screenrecording", "screen_record", "screenshot", "snap ", "vid_202", "screen 20"
+    )
 
     fun matchFile(name: String): String? {
         val lower = name.lowercase()
@@ -26,13 +35,15 @@ object CategoryOntology {
     }
 
     fun junkScore(folder: String, name: String): Float {
-        val f = folder.lowercase()
+        val f = folder.lowercase().trim()
         val n = name.lowercase()
         var s = 0f
-        if (f in JUNK_FOLDERS) s += 0.6f
-        if (f.contains("screenshot") || n.contains("screenshot") || n.contains("screenrec")) s += 0.4f
-        if (f in MEMORY_FOLDERS) s -= 0.5f
-        if (n.startsWith("vid_") || n.startsWith("img_") || n.startsWith("video")) s -= 0.1f
+        if (JUNK_TOKENS.any { f.contains(it) }) s += 0.75f
+        if (JUNK_NAME_TOKENS.any { n.contains(it) }) s += 0.45f
+        if (MEMORY_TOKENS.any { f.contains(it) }) s -= 0.55f
+        // Camera-shaped filenames are almost always real captured moments.
+        if (n.startsWith("vid_20") || n.startsWith("img_20") || n.startsWith("mmvideo")
+            || n.startsWith("wxv") || n.startsWith("panora")) s -= 0.45f
         return s.coerceIn(0f, 1f)
     }
 }

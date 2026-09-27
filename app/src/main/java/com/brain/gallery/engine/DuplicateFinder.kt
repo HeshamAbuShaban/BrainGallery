@@ -4,6 +4,19 @@ import com.brain.gallery.data.local.VideoEntity
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** Why this one survived — shown to the user so the choice is explainable. */
+fun keeperReason(v: VideoEntity, others: List<VideoEntity>): String {
+    val sharper = others.count { it.sharpness > v.sharpness }
+    val happier = others.sumOf { it.smileCount }
+    return when {
+        happier == 0 && sharper == 0 -> "The only one of its kind"
+        happier > 0 && v.smileCount >= happier -> "Everyone in it is smiling"
+        sharper == 0 -> "The sharpest frame"
+        v.avgCompletion > 0.6f -> "The one you actually finished"
+        else -> "Best overall quality"
+    }
+}
+
 data class DupSet(
     val keeper: VideoEntity,
     val redundant: List<VideoEntity>
@@ -38,7 +51,13 @@ class DuplicateFinder @Inject constructor() {
                 if (mates.isEmpty()) continue
                 val set = listOf(a) + mates
                 val keeper = set.maxWithOrNull(
-                    compareBy({ it.sharpness }, { it.width * it.height }, { it.watchCount })
+                    compareBy(
+                        { it.sharpness },
+                        { it.avgCompletion },
+                        { it.smileCount },
+                        { it.width * it.height },
+                        { it.watchCount }
+                    )
                 ) ?: a
                 used += set.map { it.id }
                 out += DupSet(keeper, set.filter { it.id != keeper.id })

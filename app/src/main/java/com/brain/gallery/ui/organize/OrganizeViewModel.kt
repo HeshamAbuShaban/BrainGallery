@@ -160,6 +160,14 @@ class OrganizeViewModel @Inject constructor(
         }
     }
 
+    fun markNotInterested(videoId: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            db.supportDao().addNotInterested(
+                com.brain.gallery.data.local.NotInterestedEntity(videoId, System.currentTimeMillis())
+            )
+        }
+    }
+
     fun rescan() { BrainScanService.start(ctx) }
 
     /** Repair: send a wrongly-clustered video to the right person (or a new one). */

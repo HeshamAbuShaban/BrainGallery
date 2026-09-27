@@ -1,5 +1,6 @@
 package com.brain.gallery.ui.organize
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +49,7 @@ import androidx.compose.ui.window.Dialog
 import com.brain.gallery.data.local.PersonEntity
 import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.domain.organize.GroupKind
+import com.brain.gallery.engine.keeperReason
 import com.brain.gallery.domain.organize.SmartGroup
 import com.brain.gallery.domain.organize.fmtSize
 import com.brain.gallery.ui.components.VideoActionsSheet
@@ -75,9 +77,11 @@ fun GroupDetail(
     onSplitOut: (Int, Long) -> Unit = { _, _ -> },
     onDismissSplit: (Int) -> Unit = {},
     onMoveVideo: ((Long, Int) -> Unit)? = null,
+    onSwipeNotInterested: ((Long) -> Unit)? = null,
     persons: List<PersonEntity> = emptyList(),
     personCounts: Map<Int, Int> = emptyMap()
 ) {
+    BackHandler(enabled = true) { onBack() }
     val isDups = group.kind == GroupKind.DUPLICATES
     val redundant = group.videos.filter { it.id in group.redundantIds }
     var menuFor by remember { mutableStateOf<VideoEntity?>(null) }
@@ -127,7 +131,7 @@ fun GroupDetail(
             }
         }
         LazyVerticalGrid(GridCells.Fixed(3),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(group.videos, key = { it.id }) { v ->
@@ -135,12 +139,23 @@ fun GroupDetail(
                 val redund = v.id in group.redundantIds
                 Box(Modifier.aspectRatio(0.7f).alpha(if (redund) 0.55f else 1f)) {
                     VideoThumb(v, Modifier.fillMaxSize(),
-                        onClick = { onPlay(v) }, onLongClick = { menuFor = v })
+                        onClick = { onPlay(v) }, onLongClick = { menuFor = v },
+                        onSwipeRight = { onFav(v) },
+                        onSwipeLeft = { onSwipeNotInterested?.let { it(v.id) } ?: onDeleteOne(v) })
                     if (keeper) {
                         Text("KEEPER", color = Color.Black, fontSize = 9.sp,
                             fontWeight = FontWeight.ExtraBold,
                             modifier = Modifier.align(Alignment.BottomStart).padding(5.dp)
                                 .background(Green, CircleShape).padding(6.dp, 2.dp))
+                        if (isDups) {
+                            Text(
+                                keeperReason(v, group.videos.filter { it.id in group.redundantIds }),
+                                color = Color.White, fontSize = 9.sp,
+                                modifier = Modifier.align(Alignment.BottomStart)
+                                    .padding(start = 5.dp, bottom = 22.dp)
+                                    .background(Color.Black.copy(alpha = 0.65f), CardShape)
+                                    .padding(horizontal = 5.dp, vertical = 2.dp))
+                        }
                     }
                     if (v.faceCount > 0 && !keeper) {
                         Text("☺ ${v.faceCount}", color = Color.White, fontSize = 9.sp,
