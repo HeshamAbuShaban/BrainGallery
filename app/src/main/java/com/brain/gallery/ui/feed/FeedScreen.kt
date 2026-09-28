@@ -16,6 +16,8 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -68,6 +70,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -178,8 +182,64 @@ fun FeedScreen(
         }
     }
 
-    Box(Modifier.fillMaxSize()) {
-        VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize().background(Bg)) { page ->
+    // ---- swipe-down to leave the feed ----
+    // The pager owns vertical drags, so this observes them in the Final pass
+    // instead of consuming them: the reel still pages normally, and a long
+    // downward pull additionally scales the stage away and exits.
+    val dismissY = remember { Animatable(0f) }
+    var stageH by remember { mutableFloatStateOf(0f) }
+    var dragBasePage by remember { mutableIntStateOf(0) }
+    var dragArmed by remember { mutableStateOf(false) }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Bg)
+            .onSizeChanged { stageH = it.height.toFloat() }
+            .graphicsLayer {
+                val p = if (stageH > 0f) (dismissY.value / stageH).coerceIn(0f, 1f) else 0f
+                translationY = dismissY.value
+                scaleX = 1f - p * 0.22f
+                scaleY = 1f - p * 0.22f
+                alpha = 1f - p * 0.75f
+            }
+            .pointerInput(pagerState, stageH) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Final)
+                    dragBasePage = pagerState.currentPage
+                    dragArmed = false
+                    val baseY = down.position.y
+                    var travelled = 0f
+                    var maxV = 0f
+                    do {
+                        val ev = awaitPointerEvent(PointerEventPass.Final)
+                        val c = ev.changes.firstOrNull { it.id == down.id } ?: break
+                        val dy = c.position.y - baseY
+                        val dx = c.position.x - down.position.x
+                        // Arm only on a clearly vertical, downward pull.
+                        if (dy > 6f && dy > kotlin.math.abs(dx) * 1.2f) dragArmed = true
+                        if (dragArmed && c.pressed) {
+                            travelled = dy.coerceAtLeast(0f)
+                            maxV = kotlin.math.max(maxV, c.velocity.y)
+                            dismissY.snapTo(travelled * 0.55f)
+                        }
+                    } while (c.pressed)
+
+                    val far = stageH > 0f && travelled > stageH * 0.22f
+                    val fling = maxV > 1400f && travelled > stageH * 0.10f
+                    // If the pager already turned the page, this was a page swipe.
+                    val paged = pagerState.currentPage != dragBasePage
+                    if (dragArmed && (far || fling) && !paged) {
+                        dismissY.animateTo(stageH * 1.1f, tween(220))
+                        onLeaveFeed()
+                    } else {
+                        dismissY.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+                    }
+                    dragArmed = false
+                }
+            }
+    ) {
+        VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
             val item = feed[page]
             ReelPage(
                 item = item,
@@ -207,7 +267,7 @@ fun FeedScreen(
                     vm.toggleFav(live.id, !live.isFavorite)
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 },
-                onSimilar = { menuFor = null; spotlight.open(live) },
+                onSimilar = { menuFor = null; spotlight.open(live, feed.map { it.video }) },
                 onDetails = { detailsFor = live; menuFor = null },
                 onDelete = { menuFor = null; vm.requestDelete(listOf(live.id)) },
                 onNotInterested = {
