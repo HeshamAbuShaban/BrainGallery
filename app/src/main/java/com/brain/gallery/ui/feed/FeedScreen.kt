@@ -189,10 +189,30 @@ fun FeedScreen(
     // The pager owns vertical drags, so this observes them in the Final pass
     // instead of consuming them: the reel still pages normally, and a long
     // downward pull additionally scales the stage away and exits.
-    val dismissY = remember { Animatable(0f) }
+    //
+    // The gesture scope is restricted (it may only await pointer events), so the
+    // drag only writes a plain float here and the animations run outside it.
+    val dismissAnim = remember { Animatable(0f) }
+    var dragLive by remember { mutableFloatStateOf(0f) }
     var stageH by remember { mutableFloatStateOf(0f) }
-    var dragBasePage by remember { mutableIntStateOf(0) }
-    var dragArmed by remember { mutableStateOf(false) }
+    var exitRequested by remember { mutableIntStateOf(0) }
+    var backRequested by remember { mutableIntStateOf(0) }
+
+    LaunchedEffect(exitRequested) {
+        if (exitRequested > 0) {
+            dismissAnim.snapTo(dragLive)
+            dragLive = 0f
+            dismissAnim.animateTo(stageH * 1.15f, tween(220))
+            onLeaveFeed()
+        }
+    }
+    LaunchedEffect(backRequested) {
+        if (backRequested > 0) {
+            dismissAnim.snapTo(dragLive)
+            dragLive = 0f
+            dismissAnim.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
+        }
+    }
 
     Box(
         Modifier
@@ -200,8 +220,9 @@ fun FeedScreen(
             .background(Bg)
             .onSizeChanged { stageH = it.height.toFloat() }
             .graphicsLayer {
-                val p = if (stageH > 0f) (dismissY.value / stageH).coerceIn(0f, 1f) else 0f
-                translationY = dismissY.value
+                val off = if (dragLive != 0f) dragLive else dismissAnim.value
+                val p = if (stageH > 0f) (off / stageH).coerceIn(0f, 1f) else 0f
+                translationY = off
                 scaleX = 1f - p * 0.22f
                 scaleY = 1f - p * 0.22f
                 alpha = 1f - p * 0.75f
@@ -209,8 +230,8 @@ fun FeedScreen(
             .pointerInput(pagerState, stageH) {
                 awaitEachGesture {
                     val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Final)
-                    dragBasePage = pagerState.currentPage
-                    dragArmed = false
+                    val basePage = pagerState.currentPage
+                    var armed = false
                     val baseY = down.position.y
                     var travelled = 0f
                     // Velocity tracked by hand: PointerInputChange has no velocity
@@ -225,29 +246,24 @@ fun FeedScreen(
                         val dy = c.position.y - baseY
                         val dx = c.position.x - down.position.x
                         // Arm only on a clearly vertical, downward pull.
-                        if (dy > 6f && dy > kotlin.math.abs(dx) * 1.2f) dragArmed = true
-                        if (dragArmed && c.pressed) {
+                        if (dy > 6f && dy > kotlin.math.abs(dx) * 1.2f) armed = true
+                        if (armed && c.pressed) {
                             travelled = dy.coerceAtLeast(0f)
                             val dt = (c.uptimeMillis - lastT).coerceAtLeast(1L)
                             val inst = (c.position.y - lastY) / dt * 1000f
                             vel = vel * 0.6f + inst * 0.4f
                             lastY = c.position.y
                             lastT = c.uptimeMillis
-                            dismissY.snapTo(travelled * 0.55f)
+                            dragLive = travelled * 0.55f
                         }
                     } while (c.pressed)
 
                     val far = stageH > 0f && travelled > stageH * 0.22f
                     val fling = vel > 1400f && travelled > stageH * 0.10f
                     // If the pager already turned the page, this was a page swipe.
-                    val paged = pagerState.currentPage != dragBasePage
-                    if (dragArmed && (far || fling) && !paged) {
-                        dismissY.animateTo(stageH * 1.1f, tween(220))
-                        onLeaveFeed()
-                    } else {
-                        dismissY.animateTo(0f, spring(stiffness = Spring.StiffnessMediumLow))
-                    }
-                    dragArmed = false
+                    val paged = pagerState.currentPage != basePage
+                    if (armed && (far || fling) && !paged) exitRequested++
+                    else if (dragLive != 0f) backRequested++
                 }
             }
     ) {
