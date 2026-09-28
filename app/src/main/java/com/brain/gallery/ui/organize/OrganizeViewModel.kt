@@ -71,6 +71,8 @@ class OrganizeViewModel @Inject constructor(
     val settings: StateFlow<EngineSettings> = _settings
     private val _personCounts = MutableStateFlow<Map<Int, Int>>(emptyMap())
     val personCounts: StateFlow<Map<Int, Int>> = _personCounts
+    private val _customNames = MutableStateFlow<Map<String, String>>(emptyMap())
+    val customNames: StateFlow<Map<String, String>> = _customNames
     private var allVideos: List<VideoEntity> = emptyList()
 
     init {
@@ -80,24 +82,31 @@ class OrganizeViewModel @Inject constructor(
             // rebuild entirely when nothing structural actually changed.
             combine(
                 db.videoDao().observeAll().conflate(),
-                db.personDao().observePersons().conflate()
-            ) { videos, people -> videos to people }
+                db.personDao().observePersons().conflate(),
+                db.supportDao().observeGroupOverrides().conflate()
+            ) { videos, people, over ->
+                Triple(videos, people, over.associate { it.groupId to it.name })
+            }
                 .distinctUntilChanged { old, new ->
                     old.first.size == new.first.size &&
                         old.second.size == new.second.size &&
+                        old.third == new.third &&
                         old.first.sumOf { it.watchCount } == new.first.sumOf { it.watchCount }
                 }
-                .collect { (videos, people) ->
-                    val fingerprint = videos.hashCode() to people.hashCode()
+                .collect { (videos, people, names) ->
+                    val fingerprint = Triple(videos.hashCode(), people.hashCode(), names.hashCode())
                     if (fingerprint != lastFingerprint) {
                         lastFingerprint = fingerprint
                         allVideos = videos
                         _persons.value = people
+                        _customNames.value = names
                         _personCounts.value = videos.filter { it.personId >= 0 }
                             .groupingBy { it.personId }.eachCount()
                         val cfg = _settings.value
                         val built = withContext(Dispatchers.Default) {
-                            groups.build(videos, people, cfg.duplicatesEnabled, cfg.junkSensitivity)
+                            groups.build(
+                                videos, people, cfg.duplicatesEnabled, cfg.junkSensitivity, names
+                            )
                         }
                         _groups.value = built
                         _stats.value = withContext(Dispatchers.Default) {
@@ -120,15 +129,40 @@ class OrganizeViewModel @Inject constructor(
         }
     }
 
-    private var lastFingerprint: Pair<Int, Int>? = null
+    private var lastFingerprint: Triple<Int, Int, Int>? = null
 
     fun open(g: SmartGroup) { _selected.value = g }
     fun close() { _selected.value = null }
 
     // ---- Identity corrections ----
-    fun renamePerson(personId: Int, name: String) {
+        fun renamePerson(personId: Int, name: String) {
         viewModelScope.launch { db.personDao().rename(personId, name) }
     }
+
+    /**
+     * Rename any group, whatever kind it is. Person groups also get the name
+     * written to the person row so it travels with export/import; everything
+     * else lands in the override table, which survives a reindex.
+     */
+    fun renameGroup(groupId: String, name: String) {
+        val clean = name.trim()
+        if (clean.isEmpty()) return
+        viewModelScope.launch {
+            db.supportDao().setGroupName(groupId, clean, System.currentTimeMillis())
+            groupId.removePrefix("person_").toIntOrNull()?.let { pid ->
+                db.personDao().rename(pid, clean)
+            }
+        }
+    }
+
+    /** Drop a user-chosen name and fall back to the engine's label. */
+    fun resetGroupName(groupId: String) {
+        viewModelScope.launch { db.supportDao().clearGroupName(groupId) }
+    }
+
+    fun isRenamed(groupId: String): Boolean = _customNames.value.containsKey(groupId)
+
+
     fun mergePersons(fromId: Int, toId: Int) {
         if (fromId == toId) return
         viewModelScope.launch(Dispatchers.IO) {

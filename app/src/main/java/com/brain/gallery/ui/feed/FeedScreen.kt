@@ -210,7 +210,12 @@ fun FeedScreen(
                     dragArmed = false
                     val baseY = down.position.y
                     var travelled = 0f
-                    var maxV = 0f
+                    // Velocity tracked by hand: PointerInputChange has no velocity
+                    // in this Compose version, and a fast flick should dismiss even
+                    // when it did not travel far.
+                    var lastY = baseY
+                    var lastT = down.uptimeMillis
+                    var vel = 0f
                     do {
                         val ev = awaitPointerEvent(PointerEventPass.Final)
                         val c = ev.changes.firstOrNull { it.id == down.id } ?: break
@@ -220,13 +225,17 @@ fun FeedScreen(
                         if (dy > 6f && dy > kotlin.math.abs(dx) * 1.2f) dragArmed = true
                         if (dragArmed && c.pressed) {
                             travelled = dy.coerceAtLeast(0f)
-                            maxV = kotlin.math.max(maxV, c.velocity.y)
+                            val dt = (c.uptimeMillis - lastT).coerceAtLeast(1L)
+                            val inst = (c.position.y - lastY) / dt * 1000f
+                            vel = vel * 0.6f + inst * 0.4f
+                            lastY = c.position.y
+                            lastT = c.uptimeMillis
                             dismissY.snapTo(travelled * 0.55f)
                         }
                     } while (c.pressed)
 
                     val far = stageH > 0f && travelled > stageH * 0.22f
-                    val fling = maxV > 1400f && travelled > stageH * 0.10f
+                    val fling = vel > 1400f && travelled > stageH * 0.10f
                     // If the pager already turned the page, this was a page swipe.
                     val paged = pagerState.currentPage != dragBasePage
                     if (dragArmed && (far || fling) && !paged) {

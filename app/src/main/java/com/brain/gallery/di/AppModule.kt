@@ -3,6 +3,7 @@ package com.brain.gallery.di
 import android.content.Context
 import androidx.room.Room
 import com.brain.gallery.data.local.BrainDatabase
+import com.brain.gallery.data.local.MIGRATION_4_5
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -16,7 +17,8 @@ object AppModule {
     @Provides @Singleton
     fun db(@ApplicationContext ctx: Context): BrainDatabase =
         Room.databaseBuilder(ctx, BrainDatabase::class.java, "brain_gallery.db")
-            .fallbackToDestructiveMigration().build()
+            .addMigrations(MIGRATION_4_5)
+            .build()
 
     @Provides fun videoDao(db: BrainDatabase) = db.videoDao()
     @Provides fun watchDao(db: BrainDatabase) = db.watchDao()

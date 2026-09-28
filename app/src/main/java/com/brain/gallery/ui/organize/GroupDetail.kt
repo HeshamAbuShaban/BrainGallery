@@ -214,22 +214,47 @@ fun GroupDetail(
 }
 
 @Composable
-fun RenameGroupDialog(initial: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
-    RenameDialog(initial = initial, onDismiss = onDismiss, onSave = onSave)
+fun RenameGroupDialog(
+    initial: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+    heading: String = "Name this group",
+    hint: String = "Your name sticks everywhere and survives a rebuild.",
+    placeholder: String = "e.g. Music & clips",
+    onReset: (() -> Unit)? = null
+) {
+    RenameDialog(initial, onDismiss, onSave, heading, hint, placeholder, onReset)
 }
 
 @Composable
-private fun RenameDialog(initial: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+private fun RenameDialog(
+    initial: String,
+    onDismiss: () -> Unit,
+    onSave: (String) -> Unit,
+    heading: String = "Name this person",
+    hint: String = "",
+    placeholder: String = "e.g. Sara",
+    onReset: (() -> Unit)? = null
+) {
     var text by remember { mutableStateOf(initial) }
     Dialog(onDismissRequest = onDismiss) {
         Column(Modifier.clip(CardShape).background(Color(0xFF151B26)).padding(20.dp)) {
-            Text("Name this person", color = Text1, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Text(heading, color = Text1, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            if (hint.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(hint, color = Text2, fontSize = 11.5.sp)
+            }
             Spacer(Modifier.height(10.dp))
             TextField(value = text, onValueChange = { text = it }, singleLine = true,
-                placeholder = { Text("e.g. Sara", color = Text2) },
+                placeholder = { Text(placeholder, color = Text2) },
                 modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                if (onReset != null) {
+                    Text("Reset", color = Yellow, fontSize = 14.sp,
+                        modifier = Modifier.clickable { onReset(); onDismiss() }.padding(10.dp))
+                }
+                Spacer(Modifier.weight(1f))
                 Text("Cancel", color = Text2, fontSize = 14.sp,
                     modifier = Modifier.clickable { onDismiss() }.padding(10.dp))
                 Spacer(Modifier.width(8.dp))

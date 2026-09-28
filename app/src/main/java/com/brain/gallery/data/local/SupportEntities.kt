@@ -31,6 +31,20 @@ data class AppKvEntity(
     val v: String
 )
 
+/**
+ * A name the user gave a group, keyed by the group's stable id
+ * ("cat_pet", "person_12", "event_..."). Group titles used to be recomputed from
+ * the engine's label on every rebuild, so renaming a non-person group wrote
+ * nowhere and silently did nothing. This is where a name now lives, which also
+ * means it survives a full reindex.
+ */
+@Entity(tableName = "group_overrides")
+data class GroupOverrideEntity(
+    @PrimaryKey val groupId: String,
+    val name: String,
+    val updatedAt: Long = 0
+)
+
 @Dao
 interface SupportDao {
     @Query("SELECT * FROM not_interested")
@@ -59,4 +73,19 @@ interface SupportDao {
 
     @Query("DELETE FROM semantic_vectors")
     suspend fun clearSemanticVectors()
+
+    @Query("SELECT * FROM group_overrides")
+    fun observeGroupOverrides(): Flow<List<GroupOverrideEntity>>
+
+    @Query("SELECT * FROM group_overrides")
+    suspend fun groupOverrides(): List<GroupOverrideEntity>
+
+    @Query("SELECT name FROM group_overrides WHERE groupId = :groupId")
+    suspend fun groupName(groupId: String): String?
+
+    @Query("INSERT OR REPLACE INTO group_overrides (groupId, name, updatedAt) VALUES (:groupId, :name, :at)")
+    suspend fun setGroupName(groupId: String, name: String, at: Long)
+
+    @Query("DELETE FROM group_overrides WHERE groupId = :groupId")
+    suspend fun clearGroupName(groupId: String)
 }

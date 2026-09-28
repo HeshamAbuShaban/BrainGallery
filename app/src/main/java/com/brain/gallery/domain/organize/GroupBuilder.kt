@@ -32,7 +32,9 @@ class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
         all: List<VideoEntity>,
         persons: List<PersonEntity> = emptyList(),
         duplicatesOn: Boolean = true,
-        junkThreshold: Float = 0.5f
+        junkThreshold: Float = 0.5f,
+        /** Names the user chose, keyed by group id. Always wins over the engine's label. */
+        customNames: Map<String, String> = emptyMap()
     ): List<SmartGroup> {
         if (all.isEmpty()) return emptyList()
         val out = mutableListOf<SmartGroup>()
@@ -124,7 +126,12 @@ class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
         if (junk.isNotEmpty()) out += SmartGroup("junk", "Clutter drawer",
             "${junk.size} memes, screenshots, downloads", GroupKind.JUNK,
             junk.sortedByDescending { it.dateAddedSec }.take(30), 0xFF30363D)
-        return out
+
+        // A name the user chose beats any engine label, for every kind of group.
+        if (customNames.isEmpty()) return out
+        return out.map { g ->
+            customNames[g.id]?.takeIf { it.isNotBlank() }?.let { g.copy(title = it) } ?: g
+        }
     }
 
     private fun clusterEvents(memories: List<VideoEntity>): List<SmartGroup> {

@@ -98,6 +98,7 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
     val similar by spotlight.similar.collectAsState()
     val persons by vm.persons.collectAsState()
     val personCounts by vm.personCounts.collectAsState()
+    val customNames by vm.customNames.collectAsState()
     var showDiag by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<SmartGroup?>(null) }
     val deleteAsk by vm.deleteAsk.collectAsState()
@@ -134,7 +135,7 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
             onDeleteRedundant = { vm.requestDelete(it) }, onPlay = { spotlight.open(it) },
             onDeleteOne = { vm.requestDelete(listOf(it.id)) },
             onSimilar = { spotlight.open(it) },
-            onRename = { pid, n -> vm.renamePerson(pid, n) },
+            onRename = { pid, n -> vm.renameGroup("person_$pid", n) },
             onSplitOut = { pid, vid -> vm.splitVideoOut(pid, vid) },
             onDismissSplit = { vm.dismissSplitWarning(it) },
             onMoveVideo = { vid, target -> vm.moveVideoToPerson(vid, target) },
@@ -214,7 +215,7 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
                             persons = groups.filter { it.kind == GroupKind.PEOPLE },
                             onOpen = { vm.open(g) },
                             onPlayAll = { spotlight.openPlaylist(g.videos) },
-                            onSimilar = { g.videos.firstOrNull()?.let { spotlight.open(it) } },
+                            onSimilar = { spotlight.open(it, g.videos) },
                             onRename = { renameTarget = g },
                             onHide = { vm.hideGroup(g) },
                             onMerge = { from, to ->
@@ -242,14 +243,17 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
         BrainScreen(vm = vm, onBack = { showDiag = false })
     }
     renameTarget?.let { g ->
-        val pid = g.personId
-        val person = persons.firstOrNull { it.id == pid }
+        val wasRenamed = customNames.containsKey(g.id)
         RenameGroupDialog(
             initial = g.title,
             onDismiss = { renameTarget = null },
+            heading = if (g.kind == GroupKind.PEOPLE) "Name this person" else "Name this group",
+            hint = "Your name sticks everywhere and survives a rebuild.",
+            placeholder = if (g.kind == GroupKind.PEOPLE) "e.g. Sara" else "e.g. Music & clips",
+            onReset = if (wasRenamed) ({ vm.resetGroupName(g.id) }) else null,
             onSave = { name ->
                 renameTarget = null
-                if (pid >= 0) vm.renamePerson(pid, name)
+                vm.renameGroup(g.id, name)
             })
     }
 }

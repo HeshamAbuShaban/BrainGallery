@@ -11,9 +11,10 @@ import androidx.room.RoomDatabase
         FaceVectorEntity::class,
         NotInterestedEntity::class,
         SemanticVectorEntity::class,
-        AppKvEntity::class
+        AppKvEntity::class,
+        GroupOverrideEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class BrainDatabase : RoomDatabase() {
