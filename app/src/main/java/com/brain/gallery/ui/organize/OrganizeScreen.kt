@@ -94,8 +94,6 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
     val stats by vm.stats.collectAsState()
     val loading by vm.loading.collectAsState()
     val selected by vm.selected.collectAsState()
-    val open by spotlight.current.collectAsState()
-    val similar by spotlight.similar.collectAsState()
     val persons by vm.persons.collectAsState()
     val personCounts by vm.personCounts.collectAsState()
     val customNames by vm.customNames.collectAsState()
@@ -215,7 +213,7 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
                             persons = groups.filter { it.kind == GroupKind.PEOPLE },
                             onOpen = { vm.open(g) },
                             onPlayAll = { spotlight.openPlaylist(g.videos) },
-                            onSimilar = { spotlight.open(it, g.videos) },
+                            onSimilar = { g.videos.firstOrNull()?.let { spotlight.open(it, g.videos) } },
                             onRename = { renameTarget = g },
                             onHide = { vm.hideGroup(g) },
                             onMerge = { from, to ->
@@ -228,15 +226,6 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
             }
         }
     }
-    }
-    open?.let { v ->
-        SpotlightPlayer(video = v, similar = similar, manager = spotlight.player,
-            onClose = { spotlight.close() },
-            onPick = { spotlight.pick(it) },
-            onFav = { vm.toggleFav(it) },
-            hasPrev = spotlight.hasPrev(), hasNext = spotlight.hasNext(),
-            onPrev = { spotlight.prev() }, onNext = { spotlight.next() },
-            onMoreLikeThis = { spotlight.open(it) })
     }
     }
     if (showDiag) {

@@ -14,9 +14,13 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * One ExoPlayer for the whole app. Pages must only acquire it while they are the
- * active page — an adjacent page asking for it would swap the media item out from
- * under the video you are watching.
+ * One ExoPlayer for the whole app, with a single owner at a time.
+ *
+ * The player is shared so audio never overlaps, but a shared player also means
+ * whoever acquires it last decides what is playing. Pages must therefore claim it
+ * explicitly: a reel page that is off-screen or covered by the spotlight must
+ * release it, so when the spotlight closes the reel re-acquires its own clip
+ * instead of continuing to play whatever the spotlight left behind.
  */
 @Singleton
 class PlayerManager @Inject constructor(@ApplicationContext private val ctx: Context) {
@@ -24,9 +28,17 @@ class PlayerManager @Inject constructor(@ApplicationContext private val ctx: Con
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying
     private var currentUri: String? = null
+    private var owner: String? = null
 
+    /** True when [ownerId] is the surface currently driving playback. */
+    fun isOwner(ownerId: String): Boolean = owner == ownerId
+
+    /**
+     * Claim the player for [ownerId] and point it at [uri]. Safe to call on every
+     * recomposition: it only touches the media item when the URI actually changed.
+     */
     @OptIn(UnstableApi::class)
-    fun playerFor(uri: String): ExoPlayer {
+    fun acquire(ownerId: String, uri: String): ExoPlayer {
         val p = player ?: ExoPlayer.Builder(ctx).build().also {
             it.repeatMode = Player.REPEAT_MODE_OFF
             it.volume = 1f
@@ -35,12 +47,21 @@ class PlayerManager @Inject constructor(@ApplicationContext private val ctx: Con
             })
             player = it
         }
+        owner = ownerId
         if (currentUri != uri) {
             currentUri = uri
             p.setMediaItem(MediaItem.fromUri(uri))
             p.prepare()
         }
         return p
+    }
+
+    /** Give the player up, but only if [ownerId] is the one holding it. */
+    fun release(ownerId: String) {
+        if (owner == ownerId) {
+            player?.pause()
+            owner = null
+        }
     }
 
     fun play() { player?.play() }
@@ -63,5 +84,5 @@ class PlayerManager @Inject constructor(@ApplicationContext private val ctx: Con
         return (p.currentPosition.toFloat() / d).coerceIn(0f, 1f)
     }
 
-    fun release() { player?.release(); player = null; currentUri = null }
+    fun release() { player?.release(); player = null; currentUri = null; owner = null }
 }

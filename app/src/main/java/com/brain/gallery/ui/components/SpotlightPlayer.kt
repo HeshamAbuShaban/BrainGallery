@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -53,6 +54,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -63,6 +65,7 @@ import androidx.media3.common.Player
 import androidx.media3.ui.PlayerView
 import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.ui.player.PlayerManager
+import com.brain.gallery.ui.player.ShareHelper
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Cyan
 import com.brain.gallery.ui.theme.Motion
@@ -94,7 +97,11 @@ fun SpotlightPlayer(
     onDelete: (VideoEntity) -> Unit = {},
     onNotInterested: (VideoEntity) -> Unit = {}
 ) {
-    val exo = remember(video.uri) { manager.playerFor(video.uri) }
+    val ctx = LocalContext.current
+    val exo = remember(video.uri) { manager.acquire("spotlight", video.uri) }
+    DisposableEffect(video.uri) {
+        onDispose { manager.release("spotlight") }
+    }
     val haptics = LocalHapticFeedback.current
     var controls by remember { mutableStateOf(true) }
     var tick by remember { mutableIntStateOf(0) }
@@ -164,6 +171,11 @@ fun SpotlightPlayer(
                     Icon(if (video.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         null, tint = if (video.isFavorite) Pink else Color.White,
                         modifier = Modifier.size(22.dp))
+                }
+                IconButton(onClick = { ShareHelper.share(ctx, video) },
+                    modifier = Modifier.size(38.dp)) {
+                    Icon(Icons.Default.Share, "Share", tint = Color.White,
+                        modifier = Modifier.size(20.dp))
                 }
             }
         }

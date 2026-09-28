@@ -8,7 +8,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -49,7 +52,9 @@ class SpotlightController @Inject constructor(
     private val _index = MutableStateFlow(0)
     val index: StateFlow<Int> = _index
 
-    val isOpen: Boolean get() = _current.value != null
+    /** Observable, so a surface can stand down while the spotlight is up. */
+    val isOpen: StateFlow<Boolean> = _current.map { it != null }
+        .stateIn(scope, SharingStarted.Eagerly, false)
 
     /**
      * Open a single clip. [pool] is the surface it was opened from (group,

@@ -54,8 +54,6 @@ import com.brain.gallery.ui.theme.Text2
 fun SearchScreen(spotlight: SpotlightController, vm: SearchViewModel = hiltViewModel()) {
     val q by vm.query.collectAsState()
     val results by vm.results.collectAsState()
-    val open by spotlight.current.collectAsState()
-    val similar by spotlight.similar.collectAsState()
     val deleteAsk by vm.deleteAsk.collectAsState()
     var menuFor by remember { mutableStateOf<VideoEntity?>(null) }
     var detailsFor by remember { mutableStateOf<VideoEntity?>(null) }
@@ -111,14 +109,5 @@ fun SearchScreen(spotlight: SpotlightController, vm: SearchViewModel = hiltViewM
                 onDelete = { menuFor = null; vm.requestDelete(listOf(mv.id)) })
         }
         detailsFor?.let { VideoDetailsDialog(video = it, onDismiss = { detailsFor = null }) }
-    }
-    open?.let { v ->
-        SpotlightPlayer(video = v, similar = similar, manager = spotlight.player,
-            onClose = { spotlight.close() },
-            onPick = { spotlight.pick(it) },
-            onFav = { vm.toggleFav(it) },
-            hasPrev = spotlight.hasPrev(), hasNext = spotlight.hasNext(),
-            onPrev = { spotlight.prev() }, onNext = { spotlight.next() },
-            onMoreLikeThis = { spotlight.open(it) })
     }
 }

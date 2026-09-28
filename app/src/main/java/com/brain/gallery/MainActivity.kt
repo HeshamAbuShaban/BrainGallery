@@ -38,6 +38,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -55,6 +56,7 @@ import com.brain.gallery.ui.components.SpotlightPlayer
 import com.brain.gallery.ui.feed.FeedScreen
 import com.brain.gallery.ui.organize.OrganizeScreen
 import com.brain.gallery.ui.organize.SearchScreen
+import com.brain.gallery.ui.organize.OrganizeViewModel
 import com.brain.gallery.ui.spotlight.SpotlightController
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
@@ -97,6 +99,7 @@ private data class Tab(val label: String, val icon: androidx.compose.ui.graphics
 
 @Composable
 private fun Root(spotlight: SpotlightController) {
+    val vm: OrganizeViewModel = hiltViewModel()
     var tab by remember { mutableIntStateOf(1) }
     var prev by remember { mutableIntStateOf(1) }
     val haptics = LocalHapticFeedback.current
@@ -194,14 +197,14 @@ private fun Root(spotlight: SpotlightController) {
             manager = spotlight.player,
             onClose = { spotlight.close() },
             onPick = { spotlight.pick(it) },
-            onFav = { },
+            onFav = { vm.toggleFav(it) },
             hasPrev = spotlight.hasPrev(),
             hasNext = spotlight.hasNext(),
             onPrev = { spotlight.prev() },
             onNext = { spotlight.next() },
-            onMoreLikeThis = { spotlight.open(it) },
-            onDelete = { },
-            onNotInterested = { }
+            onMoreLikeThis = { spotlight.open(it, similar) },
+            onDelete = { vm.requestDelete(listOf(it.id)) },
+            onNotInterested = { vm.markNotInterested(it.id) }
         )
     }
 }

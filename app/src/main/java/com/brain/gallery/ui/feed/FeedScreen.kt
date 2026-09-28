@@ -45,6 +45,7 @@ import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -98,6 +99,7 @@ import com.brain.gallery.ui.components.VideoDetailsDialog
 import com.brain.gallery.ui.components.fmtDur
 import com.brain.gallery.ui.components.thumbAtMs
 import com.brain.gallery.ui.player.PlayerManager
+import com.brain.gallery.ui.player.ShareHelper
 import com.brain.gallery.ui.spotlight.SpotlightController
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.Cyan
@@ -153,6 +155,7 @@ fun FeedScreen(
         return
     }
 
+    val spotlightOpen by spotlight.isOpen.collectAsState()
     val pagerState = rememberPagerState(pageCount = { feed.size })
     val scope = rememberCoroutineScope()
     val deleteAsk by vm.deleteAsk.collectAsState()
@@ -253,6 +256,8 @@ fun FeedScreen(
             ReelPage(
                 item = item,
                 isActive = pagerState.currentPage == page,
+                covered = spotlightOpen,
+                page = page,
                 manager = player,
                 onFav = { vm.toggleFav(item.video.id, !item.video.isFavorite) },
                 onReport = { c -> vm.onWatched(item.video.id, c, c < 0.15f) },
@@ -294,6 +299,8 @@ fun FeedScreen(
 private fun ReelPage(
     item: FeedItem,
     isActive: Boolean,
+    covered: Boolean,
+    page: Int,
     manager: PlayerManager,
     onFav: () -> Unit,
     onReport: (Float) -> Unit,
@@ -320,9 +327,18 @@ private fun ReelPage(
     var speed by remember { mutableFloatStateOf(1f) }
     val heartScale = remember { Animatable(0.4f) }
 
-    // ONLY the active page acquires the shared player. An adjacent page asking
-    // for it would swap the media item out from under the current video.
-    val exo = remember(v.uri, isActive) { if (isActive) manager.playerFor(v.uri) else null }
+    // Only the active, uncovered page claims the shared player. An adjacent page
+    // would swap the media item out from under the current video, and a page
+    // hidden behind the spotlight must stay out of the way so the reel gets its
+    // own clip back the moment the spotlight closes.
+    val ownerId = "feed:$page"
+    val exo = remember(v.uri, isActive, covered) {
+        if (isActive && !covered) manager.acquire(ownerId, v.uri) else null
+    }
+    DisposableEffect(exo, ownerId) {
+        if (exo == null) manager.release(ownerId)
+        onDispose { if (exo != null) manager.release(ownerId) }
+    }
 
     // First frame gate + end-of-item advance.
     DisposableEffect(exo) {
@@ -488,6 +504,7 @@ private fun ReelPage(
                         manager.setSpeed(speed)
                         tick++
                     }
+                    RailButton(Icons.Default.Share, Color.White, null) { ShareHelper.share(ctx, v) }
                     RailButton(Icons.Default.MoreHoriz, Color.White, null) { onMenu() }
                 }
 
