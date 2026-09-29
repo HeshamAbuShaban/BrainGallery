@@ -41,6 +41,8 @@ import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.filled.Save
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -77,6 +79,7 @@ import com.brain.gallery.ui.components.SpotlightPlayer
 import com.brain.gallery.ui.components.ShimmerBar
 import com.brain.gallery.ui.components.VideoThumb
 import com.brain.gallery.ui.GlassNavReserve
+import com.brain.gallery.ui.components.MoveToGroupSheet
 import com.brain.gallery.ui.spotlight.SpotlightController
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
@@ -98,6 +101,10 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
     val persons by vm.persons.collectAsState()
     val personCounts by vm.personCounts.collectAsState()
     val customNames by vm.customNames.collectAsState()
+    val picked by vm.selection.collectAsState()
+    // While anything is ticked, the screen becomes a workbench: tap a clip to
+    // add or drop it instead of opening it, and one bar moves the whole lot.
+    val selecting = picked.isNotEmpty()
     var showDiag by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<SmartGroup?>(null) }
     val deleteAsk by vm.deleteAsk.collectAsState()
@@ -138,6 +145,14 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
             onSplitOut = { pid, vid -> vm.splitVideoOut(pid, vid) },
             onDismissSplit = { vm.dismissSplitWarning(it) },
             onMoveVideo = { vid, target -> vm.moveVideoToPerson(vid, target) },
+            pickedIds = picked,
+            onTogglePick = { vm.togglePick(it) },
+            groupChoices = vm.groupChoices,
+            onMoveGroup = { ids, g ->
+                ids.forEach { vm.togglePick(it) }
+                vm.moveSelectionToGroup(g)
+                if (g.isNotBlank()) vm.rememberGroupName(g)
+            },
             onSwipeNotInterested = { vid -> vm.markNotInterested(vid) },
             persons = persons,
             personCounts = personCounts)
@@ -231,6 +246,13 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
     }
     if (showDiag) {
         BrainScreen(vm = vm, onBack = { showDiag = false })
+    }
+    if (selecting) {
+        SelectionBar(
+            count = picked.size,
+            groups = vm.groupChoices,
+            onMove = { vm.moveSelectionToGroup(it) },
+            onClear = { vm.clearPicks() })
     }
     renameTarget?.let { g ->
         val wasRenamed = customNames.containsKey(g.id)
@@ -376,5 +398,59 @@ private fun MergePersonDialog(
                 }
             }
         }
+    }
+}
+
+/**
+ * The bar that appears while clips are ticked. It sits above the glass nav so
+ * the two never stack up, and it is the only place a bulk move is offered:
+ * picking is cheap, acting on the selection is one tap.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun SelectionBar(
+    count: Int,
+    groups: List<String>,
+    onMove: (String) -> Unit,
+    onClear: () -> Unit
+) {
+    var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val shape = RoundedCornerShape(22.dp)
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+        Row(
+            Modifier
+                .padding(bottom = GlassNavReserve - 8.dp)
+                .padding(horizontal = 16.dp)
+                .fillMaxWidth()
+                .clip(shape)
+                .background(Color(0xFF1B2333))
+                .border(1.dp, Accent.copy(alpha = 0.45f), shape)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("$count selected", color = Text1, fontSize = 13.5.sp,
+                fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+            Text("Move to", color = Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable { open = true }
+                    .padding(horizontal = 12.dp, vertical = 7.dp))
+            Spacer(Modifier.width(6.dp))
+            Text("Clear", color = Text2, fontSize = 13.sp,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable { onClear() }
+                    .padding(horizontal = 12.dp, vertical = 7.dp))
+        }
+    }
+
+    if (open) {
+        MoveToGroupSheet(
+            current = "",
+            choices = groups,
+            selectedCount = count,
+            onDismiss = { open = false },
+            onPick = { g -> open = false; if (g.isNotBlank()) onMove(g) }
+        )
     }
 }

@@ -14,21 +14,30 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.CheckCircleOutline
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.DriveFileMove
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PersonOff
 import androidx.compose.material.icons.filled.PersonSearch
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -44,6 +53,7 @@ import com.brain.gallery.ui.theme.CardShape
 import com.brain.gallery.ui.theme.Cyan
 import com.brain.gallery.ui.theme.Pink
 import com.brain.gallery.ui.theme.Surface
+import com.brain.gallery.ui.theme.Green
 import com.brain.gallery.ui.theme.Text1
 import com.brain.gallery.ui.theme.Text2
 import java.text.SimpleDateFormat
@@ -66,7 +76,12 @@ fun VideoActionsSheet(
     hasIdentity: Boolean = false,
     inPersonGroup: Boolean = false,
     onMovePerson: (() -> Unit)? = null,
-    onRemoveFromPerson: (() -> Unit)? = null
+    onRemoveFromPerson: (() -> Unit)? = null,
+    /** Put this clip in a group by hand. */
+    onMoveGroup: (() -> Unit)? = null,
+    /** Tick it for a bulk action instead of opening it. */
+    onPick: (() -> Unit)? = null,
+    picked: Boolean = false
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss,
         containerColor = Surface, contentColor = Text1) {
@@ -94,6 +109,16 @@ fun VideoActionsSheet(
         }
         if (inPersonGroup && onRemoveFromPerson != null) {
             SheetRow(Icons.Default.PersonOff, "Not this person", Text1, onRemoveFromPerson)
+        }
+        if (onMoveGroup != null) {
+            SheetRow(Icons.Default.DriveFileMove, "Move to another group…", Cyan, onMoveGroup)
+        }
+        if (onPick != null) {
+            SheetRow(
+                if (picked) Icons.Default.CheckCircle else Icons.Default.CheckCircleOutline,
+                if (picked) "Unselect" else "Select for a group of actions",
+                if (picked) Green else Text1, onPick
+            )
         }
         if (onDelete != null)
             SheetRow(Icons.Default.Delete, "Delete from device", Color(0xFFF87171), onDelete)
@@ -153,5 +178,74 @@ private fun DetailLine(k: String, v: String) {
         Text(k, color = Text2, fontSize = 12.sp, modifier = Modifier.width(76.dp))
         Text(v, color = Text1, fontSize = 12.5.sp, fontWeight = FontWeight.Medium,
             modifier = Modifier.weight(1f))
+    }
+}
+
+/**
+ * Where should this clip live? Offers the groups already in use, the group it is
+ * in now, and the option to invent one. Choosing the current group clears the
+ * hand-placement and hands the clip back to the brain.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun MoveToGroupSheet(
+    current: String,
+    choices: List<String>,
+    selectedCount: Int,
+    onDismiss: () -> Unit,
+    onPick: (String) -> Unit
+) {
+    var creating by remember { mutableStateOf(false) }
+    var newName by remember { mutableStateOf("") }
+    val noun = if (selectedCount == 1) "this clip" else "these $selectedCount clips"
+
+    ModalBottomSheet(onDismissRequest = onDismiss, containerColor = Surface, contentColor = Text1) {
+        Row(Modifier.fillMaxWidth().padding(16.dp, 4.dp, 16.dp, 8.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.DriveFileMove, null, tint = Cyan, modifier = Modifier.size(22.dp))
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text("Move $noun to…", color = Text1, fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold)
+                Text(
+                    if (current.isBlank()) "The brain decides now"
+                    else "Currently in \"$current\"",
+                    color = Text2, fontSize = 11.5.sp, maxLines = 1
+                )
+            }
+        }
+
+        if (current.isNotBlank()) {
+            SheetRow(Icons.Default.Undo, "Hand it back to the brain", Text1) {
+                onPick("")
+            }
+        }
+
+        choices.filter { it != current }.take(12).forEach { g ->
+            SheetRow(Icons.Default.Label, g, Text1) { onPick(g) }
+        }
+
+        if (creating) {
+            Row(Modifier.fillMaxWidth().padding(18.dp, 6.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(
+                    value = newName,
+                    onValueChange = { newName = it },
+                    singleLine = true,
+                    placeholder = { Text("Name this group", color = Text2) },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(10.dp))
+                Text("Save", color = if (newName.isBlank()) Text2 else Green,
+                    fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable(enabled = newName.isNotBlank()) {
+                        onPick(newName.trim())
+                    }.padding(6.dp)
+                )
+            }
+        } else {
+            SheetRow(Icons.Default.Add, "New group…", Cyan) { creating = true }
+        }
+        Spacer(Modifier.height(20.dp))
     }
 }

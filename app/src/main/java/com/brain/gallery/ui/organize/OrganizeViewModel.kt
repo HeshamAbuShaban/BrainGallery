@@ -205,6 +205,57 @@ class OrganizeViewModel @Inject constructor(
 
     fun rescan() { BrainScanService.start(ctx) }
 
+    // ---- hand-placed groups and multi-select ----
+
+    private val _selection = MutableStateFlow<Set<Long>>(emptySet())
+    val selection: StateFlow<Set<Long>> = _selection
+
+    init {
+        viewModelScope.launch {
+            db.supportDao().observeSelection().collect { ids ->
+                _selection.value = ids.toSet()
+            }
+        }
+    }
+
+    fun togglePick(videoId: Long) {
+        viewModelScope.launch(Dispatchers.IO) {
+            if (videoId in _selection.value) db.supportDao().unpick(videoId)
+            else db.supportDao().pick(
+                com.brain.gallery.data.local.SelectionEntity(videoId, System.currentTimeMillis())
+            )
+        }
+    }
+
+    fun clearPicks() { viewModelScope.launch(Dispatchers.IO) { db.supportDao().clearSelection() } }
+
+    /** Move the current selection into [group]; empty string hands them back. */
+    fun moveSelectionToGroup(group: String) {
+        val ids = _selection.value.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            db.videoDao().setManualGroup(ids, group.trim())
+            db.supportDao().clearSelection()
+        }
+    }
+
+    /** Group names worth offering: the ones already in use, most-used first. */
+    val groupChoices: List<String>
+        get() = allVideos.map { it.effectiveGroup }
+            .filter { it.isNotBlank() && it != "unknown" }
+            .groupingBy { it }.eachCount()
+            .entries.sortedByDescending { it.value }
+            .map { it.key }
+
+    /** Remember a name the user invented, so it shows up in the picker later. */
+    fun rememberGroupName(name: String) {
+        val clean = name.trim()
+        if (clean.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            db.supportDao().setGroupName("manual_$clean", clean, System.currentTimeMillis())
+        }
+    }
+
     /** Repair: send a wrongly-clustered video to the right person (or a new one). */
     fun moveVideoToPerson(videoId: Long, targetPersonId: Int) {
         viewModelScope.launch(Dispatchers.IO) {

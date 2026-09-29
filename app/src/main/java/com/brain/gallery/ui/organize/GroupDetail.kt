@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
@@ -58,6 +59,7 @@ import com.brain.gallery.domain.organize.fmtSize
 import com.brain.gallery.ui.components.VideoActionsSheet
 import com.brain.gallery.ui.components.VideoDetailsDialog
 import com.brain.gallery.ui.components.VideoThumb
+import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.CardShape
 import com.brain.gallery.ui.theme.Green
@@ -80,6 +82,10 @@ fun GroupDetail(
     onSplitOut: (Int, Long) -> Unit = { _, _ -> },
     onDismissSplit: (Int) -> Unit = {},
     onMoveVideo: ((Long, Int) -> Unit)? = null,
+    pickedIds: Set<Long> = emptySet(),
+    onTogglePick: ((Long) -> Unit)? = null,
+    groupChoices: List<String> = emptyList(),
+    onMoveGroup: ((List<Long>, String) -> Unit)? = null,
     onSwipeNotInterested: ((Long) -> Unit)? = null,
     persons: List<PersonEntity> = emptyList(),
     personCounts: Map<Int, Int> = emptyMap()
@@ -91,6 +97,7 @@ fun GroupDetail(
     var detailsFor by remember { mutableStateOf<VideoEntity?>(null) }
     var renameOpen by remember { mutableStateOf(false) }
     var moveTarget by remember { mutableStateOf<Long?>(null) }
+    var moveGroupIds by remember { mutableStateOf<List<Long>?>(null) }
 
     Column(Modifier.fillMaxSize().background(Bg)
         .windowInsetsPadding(WindowInsets.navigationBars)
@@ -144,9 +151,18 @@ fun GroupDetail(
                 val redund = v.id in group.redundantIds
                 Box(Modifier.aspectRatio(0.7f).alpha(if (redund) 0.55f else 1f)) {
                     VideoThumb(v, Modifier.fillMaxSize(),
-                        onClick = { onPlay(v) }, onLongClick = { menuFor = v },
+                        onClick = {
+                            if (pickedIds.isNotEmpty() && onTogglePick != null) onTogglePick(v.id)
+                            else onPlay(v)
+                        },
+                        onLongClick = { menuFor = v },
                         onSwipeRight = { onFav(v) },
                         onSwipeLeft = { onSwipeNotInterested?.let { it(v.id) } ?: onDeleteOne(v) })
+                    if (v.id in pickedIds) {
+                        Box(Modifier.fillMaxSize().background(Accent.copy(alpha = 0.28f)))
+                        Icon(Icons.Default.CheckCircle, null, tint = Color.White,
+                            modifier = Modifier.align(Alignment.TopEnd).padding(5.dp).size(22.dp))
+                    }
                     if (keeper) {
                         Text("KEEPER", color = Color.Black, fontSize = 9.sp,
                             fontWeight = FontWeight.ExtraBold,
@@ -198,6 +214,22 @@ fun GroupDetail(
             onRemoveFromPerson = {
                 menuFor = null
                 person?.let { onSplitOut(it.id, mv.id) }
+            },
+            onMoveGroup = { menuFor = null; moveGroupIds = listOf(mv.id) },
+            onPick = { menuFor = null; onTogglePick?.let { it(mv.id) } },
+            picked = mv.id in pickedIds)
+    }
+    moveGroupIds?.let { ids ->
+        MoveToGroupSheet(
+            current = group.videos.firstOrNull { it.id == ids.firstOrNull() }?.effectiveGroup
+                ?.takeIf { ids.size == 1 } ?: "",
+            choices = groupChoices,
+            selectedCount = ids.size,
+            onDismiss = { moveGroupIds = null },
+            onPick = { g ->
+                moveGroupIds = null
+                if (g.isNotBlank()) onMoveGroup?.let { it(ids, g) }
+                else onMoveGroup?.let { it(ids, "") }
             })
     }
     moveTarget?.let { vid ->
