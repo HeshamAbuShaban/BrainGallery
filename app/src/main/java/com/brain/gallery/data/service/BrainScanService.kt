@@ -12,6 +12,7 @@ import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.brain.gallery.data.brain.L1aAnalyzer
+import com.brain.gallery.data.brain.AudioProbe
 import com.brain.gallery.data.brain.L1bAnalyzer
 import com.brain.gallery.data.brain.Level0Analyzer
 import com.brain.gallery.data.brain.PerceptualResult
@@ -45,6 +46,7 @@ class BrainScanService : LifecycleService() {
     @Inject lateinit var scanner: MediaScanner
     @Inject lateinit var l1a: L1aAnalyzer
     @Inject lateinit var l1b: L1bAnalyzer
+    @Inject lateinit var audio: AudioProbe
     @Inject lateinit var matcher: PersonMatcher
     @Inject lateinit var consolidator: PersonConsolidator
     @Inject lateinit var settings: SettingsStore
@@ -231,6 +233,32 @@ class BrainScanService : LifecycleService() {
         totalL1b = semIndex
         val tL1b = System.currentTimeMillis()
 
+        // ---- Optional voice layer, only on clips that look like someone talking ----
+        // Gated twice: a setting, and a queue that only holds clips the brain
+        // already believes have a person in them. Turning it on therefore costs a
+        // fraction of a pass rather than a re-index of the library.
+        var prosodyDone = 0
+        if (cfg.prosodyEnabled) {
+            phase("voice")
+            var budget = PROSODY_BUDGET
+            while (budget > 0 && System.currentTimeMillis() < hardDeadline) {
+                val batch = dao.prosodyPending(budget.coerceAtMost(PROSODY_BATCH))
+                if (batch.isEmpty()) break
+                for (v in batch) {
+                    val p = audio.probe(v.uri, v.durationMs)
+                    // "not sampled" must still write something, or the clip stays
+                    // in the queue forever and the pass never converges.
+                    val tags = if (p.sampled) p.tags() else listOf("no readable audio")
+                    dao.applyProsody(v.id, tags.joinToString(","), p.speechRatio)
+                    prosodyDone++
+                    budget--
+                    if (budget % 10 == 0) {
+                        Log.i(TAG, "voice $prosodyDone pending=${dao.prosodyPendingCount()}")
+                    }
+                }
+            }
+        }
+
         // ---- Identity maintenance: repair fragmentation, then look for over-merges ----
         phase("identity")
         val merged = consolidator.consolidate(cfg.mergeSim)
@@ -334,6 +362,9 @@ class BrainScanService : LifecycleService() {
         const val SEMANTIC_MAX = 250
         /** Per-video ceiling so one bad file cannot stall the run. */
         const val PER_VIDEO_TIMEOUT_MS = 12_000L
+        /** Ceiling for the optional voice pass, so it can never eat the run. */
+        const val PROSODY_BUDGET = 60
+        const val PROSODY_BATCH = 20
         /** Slack on top of the run budget so bookkeeping is always reached. */
         const val HARD_GRACE_MS = 60_000L
         fun start(ctx: Context, deltaIds: List<Long>? = null) {

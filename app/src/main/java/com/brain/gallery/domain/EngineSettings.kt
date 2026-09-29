@@ -18,7 +18,12 @@ data class EngineSettings(
     val mergeSim: Float = 0.45f,
     val splitSensitivity: Float = 0.25f,
     val junkSensitivity: Float = 0.5f,
-    val runBudgetSeconds: Int = 150
+    val runBudgetSeconds: Int = 150,
+    /**
+     * Voice and delivery, from the audio track. Off by default: it only runs on
+     * clips that look like speech, so it costs a little, never a lot.
+     */
+    val prosodyEnabled: Boolean = false
 ) {
     fun toJson(): String = JSONObject().apply {
         put("identityEnabled", identityEnabled)
@@ -30,6 +35,7 @@ data class EngineSettings(
         put("splitSensitivity", splitSensitivity.toDouble())
         put("junkSensitivity", junkSensitivity.toDouble())
         put("runBudgetSeconds", runBudgetSeconds)
+        put("prosodyEnabled", prosodyEnabled)
     }.toString()
 
     companion object {
@@ -47,7 +53,8 @@ data class EngineSettings(
                     mergeSim = o.optDouble("mergeSim", d.mergeSim.toDouble()).toFloat(),
                     splitSensitivity = o.optDouble("splitSensitivity", d.splitSensitivity.toDouble()).toFloat(),
                     junkSensitivity = o.optDouble("junkSensitivity", d.junkSensitivity.toDouble()).toFloat(),
-                    runBudgetSeconds = o.optInt("runBudgetSeconds", d.runBudgetSeconds)
+                    runBudgetSeconds = o.optInt("runBudgetSeconds", d.runBudgetSeconds),
+                    prosodyEnabled = o.optBoolean("prosodyEnabled", d.prosodyEnabled)
                 )
             }.getOrDefault(EngineSettings())
         }

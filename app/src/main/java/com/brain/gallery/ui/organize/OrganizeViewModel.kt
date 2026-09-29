@@ -211,6 +211,7 @@ class OrganizeViewModel @Inject constructor(
     val selection: StateFlow<Set<Long>> = _selection
 
     init {
+        refreshProsody()
         viewModelScope.launch {
             db.supportDao().observeSelection().collect { ids ->
                 _selection.value = ids.toSet()
@@ -241,6 +242,7 @@ class OrganizeViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             db.videoDao().setManualGroup(ids, group.trim())
             db.supportDao().clearSelection()
+            refreshProsody()
         }
     }
 
@@ -266,6 +268,42 @@ class OrganizeViewModel @Inject constructor(
 
     /** Faces still waiting to be placed; only moves after a reindex, so say so. */
     fun previewUnplaced(): Int = allVideos.count { it.faceCount > 0 && it.personId < 0 }
+
+    private val _prosody = MutableStateFlow(0 to 0)
+    val prosody: StateFlow<Pair<Int, Int>> = _prosody
+
+    fun prosodyPending(): Int = _prosody.value.first
+    fun prosodyLearned(): Int = _prosody.value.second
+
+    private fun refreshProsody() {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                db.videoDao().prosodyPendingCount() to db.videoDao().prosodyDoneCount()
+            }.onSuccess { _prosody.value = it }
+        }
+    }
+
+    /**
+     * Re-derive the voice reading for clips it got wrong. This is the answer to
+     * a subject the brain set badly: requeue only those, rather than wiping and
+     * rebuilding a library that is otherwise fine.
+     */
+    fun relearnUnclear() {
+        viewModelScope.launch(Dispatchers.IO) {
+            db.videoDao().requeueUnclear()
+            refreshProsody()
+            BrainScanService.start(ctx)
+        }
+    }
+
+    fun relearnAllVoice() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val all = db.videoDao().getAllSync()
+            db.videoDao().requeueProsody(all.map { it.id })
+            refreshProsody()
+            BrainScanService.start(ctx)
+        }
+    }
 
     /** Semantic work still owed, at the current budget. */
     fun previewSemanticPending(): Int = allVideos.count { it.pendingSemantic || it.brainLevel < 2 }

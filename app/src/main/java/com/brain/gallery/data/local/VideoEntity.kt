@@ -67,11 +67,19 @@ data class VideoEntity(
      */
     val manualGroup: String = "",
 
+    /** Voice and delivery, empty until the optional audio pass has run. */
+    val prosodyTags: String = "",
+    /** 0..1 share of the clip that is speech; 0 means not measured yet. */
+    val speechRatio: Float = 0f,
+
     // Mark-and-sweep bookkeeping
     val lastSeenScan: Long = 0
 ) {
     /** The group this clip actually belongs to, hand-placed or inferred. */
     val effectiveGroup: String get() = manualGroup.ifBlank { category }
+
+    /** True when the audio pass has actually looked at this clip. */
+    val prosodyKnown: Boolean get() = prosodyTags.isNotBlank()
     val avgCompletion: Float get() = if (watchCount == 0) 0f else completionSum / watchCount
     val tagList: List<String> get() = tags.split(",").map { it.trim() }.filter { it.isNotEmpty() }
 }

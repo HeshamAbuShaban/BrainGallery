@@ -50,3 +50,18 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
         )
     }
 }
+
+/**
+ * v6 -> v7: the optional voice layer.
+ *
+ * Two columns with defaults, plus an index so the pass can find its queue
+ * cheaply. Additive again: no existing row is rewritten, and clips the audio
+ * pass has not touched read as "not measured" rather than "measured and empty".
+ */
+val MIGRATION_6_7 = object : Migration(6, 7) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE videos ADD COLUMN prosodyTags TEXT NOT NULL DEFAULT ''")
+        db.execSQL("ALTER TABLE videos ADD COLUMN speechRatio REAL NOT NULL DEFAULT 0")
+        db.execSQL("CREATE INDEX IF NOT EXISTS idx_videos_prosody ON videos (prosodyTags)")
+    }
+}

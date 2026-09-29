@@ -105,6 +105,13 @@ fun BrainScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
                 "Find and rank redundant near-identical clips", cfg.duplicatesEnabled) {
                 vm.updateSettings(cfg.copy(duplicatesEnabled = it))
             }
+            SwitchRow("Voice and delivery",
+                "Reads the audio of clips that look like someone talking, and notes the " +
+                    "pitch, pace and emphasis. Off by default; it only ever looks at clips " +
+                    "with a person in them.",
+                cfg.prosodyEnabled) {
+                vm.updateSettings(cfg.copy(prosodyEnabled = it))
+            }
             SliderRow("Semantic budget per run", cfg.semanticBudget.toString(), 25f, 600f, 24,
                 cfg.semanticBudget.toFloat(),
                 help = "How many clips the slow labeler may look at in one pass.",
@@ -159,6 +166,15 @@ fun BrainScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
             Stat("Unreadable files", "${d.unreadable}")
             Stat("Model timeouts", "${d.stalled}", if (d.stalled > 0) Yellow else Green)
             ActionRow("Re-index now", Accent) { vm.rescan() }
+
+            if (cfg.prosodyEnabled) {
+                Text("Voice reading", color = Text1, fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
+                Stat("Waiting to be heard", "${vm.prosodyPending()}")
+                Stat("Already heard", "${vm.prosodyLearned()}")
+                ActionRow("Re-learn the ones it got wrong", Cyan) { vm.relearnUnclear() }
+                ActionRow("Re-learn every clip's voice", Text2) { vm.relearnAllVoice() }
+            }
 
             // ---------------- Repairs ----------------
             val unassignedCount = d.unassigned

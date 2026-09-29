@@ -191,6 +191,11 @@ fun VideoDetailsDialog(video: VideoEntity, onDismiss: () -> Unit) {
                 Spacer(Modifier.height(8.dp))
                 Text(video.tagList.joinToString("  •  "), color = Text2, fontSize = 11.5.sp)
             }
+            if (video.prosodyTags.isNotBlank()) {
+                Spacer(Modifier.height(6.dp))
+                Text("Voice: " + video.prosodyTags.split(",").joinToString("  •  "),
+                    color = Cyan, fontSize = 11.5.sp)
+            }
             Spacer(Modifier.height(8.dp))
             Row(Modifier.fillMaxWidth().clickable { onDismiss() }.padding(vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically) {

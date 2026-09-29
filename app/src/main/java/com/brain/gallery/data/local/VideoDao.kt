@@ -97,6 +97,50 @@ interface VideoDao {
     @Query("UPDATE videos SET manualGroup = :group WHERE id IN (:ids)")
     suspend fun setManualGroup(ids: List<Long>, group: String)
 
+    // ---- optional voice layer ----
+
+    @Query("UPDATE videos SET prosodyTags = :tags, speechRatio = :ratio WHERE id = :id")
+    suspend fun applyProsody(id: Long, tags: String, ratio: Float)
+
+    /**
+     * Candidates for the audio pass. Gated on the picture so the pass is never
+     * run over the whole library: a clip only qualifies if the brain already
+     * believes someone is in it and it is not obviously clutter.
+     */
+    @Query("""
+        SELECT * FROM videos
+        WHERE prosodyTags = ''
+          AND faceCount > 0
+          AND junkScore < 0.6
+          AND brainLevel >= 1
+        ORDER BY (speechRatio = 0) DESC, faceCount DESC, sizeBytes DESC
+        LIMIT :limit
+    """)
+    suspend fun prosodyPending(limit: Int): List<VideoEntity>
+
+    @Query("SELECT COUNT(*) FROM videos WHERE prosodyTags = '' AND faceCount > 0 AND junkScore < 0.6 AND brainLevel >= 1")
+    suspend fun prosodyPendingCount(): Int
+
+    @Query("SELECT COUNT(*) FROM videos WHERE prosodyTags != ''")
+    suspend fun prosodyDoneCount(): Int
+
+    /**
+     * Put a set of clips back in the queue. This is the recalculation path: the
+     * brain got a subject wrong, and the answer is to re-derive it rather than
+     * to start the whole library again.
+     */
+    @Query("UPDATE videos SET prosodyTags = '' WHERE id IN (:ids)")
+    suspend fun requeueProsody(ids: List<Long>)
+
+    /** Re-queue everything whose voice reading the user did not find useful. */
+    @Query("""
+        UPDATE videos SET prosodyTags = ''
+        WHERE prosodyTags LIKE '%unclear%'
+           OR prosodyTags LIKE '%flat delivery%'
+           OR (speechRatio > 0.35 AND speechRatio < 0.55)
+    """)
+    suspend fun requeueUnclear(): Int
+
     @Query("UPDATE videos SET personId = :to WHERE personId = :from")
     suspend fun mergePersons(from: Int, to: Int)
 
