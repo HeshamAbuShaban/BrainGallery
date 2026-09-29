@@ -12,8 +12,8 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -73,13 +74,12 @@ fun GlassNav(
     val bottomPad = 10.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
     Box(
-        modifier
-            .fillMaxWidth()
-            .padding(bottom = bottomPad),
+        modifier.fillMaxSize(),
         contentAlignment = Alignment.BottomCenter
     ) {
         Row(
             Modifier
+                .padding(bottom = bottomPad)
                 .graphicsLayer {
                     alpha = a
                     // Recede as it fades, so leaving the screen feels like it
@@ -87,7 +87,8 @@ fun GlassNav(
                     val s = 0.82f + 0.18f * a
                     scaleX = s
                     scaleY = s
-                    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 1f)
+                    // Scale about the bottom edge, which is where the pill sits.
+                    transformOrigin = TransformOrigin(0.5f, 1f)
                 }
                 .widthIn(min = 236.dp, max = 330.dp)
                 .height(56.dp)
