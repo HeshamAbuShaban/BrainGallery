@@ -325,7 +325,9 @@ fun GroupCardFull(
                 leadingIcon = { Icon(Icons.Default.AutoAwesome, null, tint = Cyan, modifier = Modifier.size(18.dp)) },
                 onClick = { menu = false; onSimilar() })
             if (onRename != null) {
-                DropdownMenuItem(text = { Text("Rename person", color = Text1) },
+                val isPerson = group.kind == GroupKind.PEOPLE
+                DropdownMenuItem(
+                    text = { Text(if (isPerson) "Rename person" else "Rename group", color = Text1) },
                     leadingIcon = { Icon(Icons.Default.Edit, null, tint = Text1, modifier = Modifier.size(18.dp)) },
                     onClick = { menu = false; onRename() })
             }
