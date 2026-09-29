@@ -514,7 +514,7 @@ private fun ReelPage(
                 // right action rail
                 Column(
                     Modifier.align(Alignment.BottomEnd)
-                        .padding(end = 10.dp, bottom = 96.dp + bottomOverlay),
+                        .padding(end = 10.dp, bottom = 150.dp + bottomOverlay),
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(18.dp)
                 ) {
@@ -535,13 +535,19 @@ private fun ReelPage(
                     RailButton(Icons.Default.MoreHoriz, Color.White, null) { onMenu() }
                 }
 
-                // bottom caption block
+                // Bottom caption block. These clips carry their own burned-in text
+                // right where a caption would go, so the scrim is deep and starts
+                // well above the block: without it both sets of text were
+                // unreadable on top of each other.
                 Column(Modifier.align(Alignment.BottomStart)
                     .fillMaxWidth()
                     .background(Brush.verticalGradient(
-                        listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)),
-                        startY = 240f))
-                    .padding(start = 14.dp, end = 86.dp, bottom = 26.dp + bottomOverlay)) {
+                        0f to Color.Black.copy(alpha = 0f),
+                        0.30f to Color.Black.copy(alpha = 0.34f),
+                        0.62f to Color.Black.copy(alpha = 0.62f),
+                        1f to Color.Black.copy(alpha = 0.80f)))
+                    .padding(start = 14.dp, end = 86.dp, top = 108.dp,
+                        bottom = 26.dp + bottomOverlay)) {
                     Text(item.why, color = Cyan, fontSize = 11.5.sp, fontWeight = FontWeight.Bold,
                         maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Spacer(Modifier.height(4.dp))
