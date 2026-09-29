@@ -396,7 +396,8 @@ private fun ReelPage(
         onDispose { if (maxSeen > 0.02f) onReport(maxSeen) }
     }
 
-    // Chrome auto-hides while playing, like the real thing.
+    // Chrome auto-hides while playing, like the real thing. Paused or paused by
+    // the spotlight, it stays put: a paused frame with no controls is just a still.
     LaunchedEffect(paused, isActive, tick) {
         if (paused || !isActive) return@LaunchedEffect
         delay(CHROME_IDLE_MS)
@@ -422,17 +423,23 @@ private fun ReelPage(
         .pointerInput(v.uri) {
         detectTapGestures(
             onTap = {
+                // Any touch brings the chrome back. Without this it hid once and
+                // never came back until the page changed, leaving the reel with no
+                // rail and no way to reach the nav.
+                chrome = true
                 paused = !paused
                 tick++
                 manager.toggle()
             },
             onDoubleTap = {
+                chrome = true
                 heartAt = Offset(size.width / 2f, size.height / 2f)
                 onFav()
                 tick++
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
             },
             onLongPress = {
+                chrome = true
                 paused = true
                 tick++
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
@@ -571,6 +578,7 @@ private fun ReelPage(
                 detectHorizontalDragGestures(
                     onDragStart = { off ->
                         val frac = (off.x / size.width).coerceIn(0f, 1f)
+                        chrome = true
                         scrubbing = frac
                         seekMs = (manager.durationMs() * frac).toLong()
                     },
