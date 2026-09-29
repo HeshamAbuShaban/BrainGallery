@@ -76,6 +76,7 @@ import com.brain.gallery.domain.organize.SmartGroup
 import com.brain.gallery.ui.components.SpotlightPlayer
 import com.brain.gallery.ui.components.ShimmerBar
 import com.brain.gallery.ui.components.VideoThumb
+import com.brain.gallery.ui.GlassNavReserve
 import com.brain.gallery.ui.spotlight.SpotlightController
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
@@ -143,7 +144,7 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
     } else {
     Column(Modifier.fillMaxSize().background(Bg)
         .windowInsetsPadding(WindowInsets.navigationBars)
-        .padding(bottom = 84.dp)) {
+        .padding(bottom = GlassNavReserve)) {
         // Header
         Row(Modifier.fillMaxWidth().padding(20.dp, 20.dp, 20.dp, 4.dp),
             verticalAlignment = Alignment.CenterVertically) {

@@ -118,6 +118,7 @@ fun FeedScreen(
     player: PlayerManager,
     spotlight: SpotlightController,
     onLeaveFeed: () -> Unit,
+    onChrome: (Boolean) -> Unit = {},
     bottomOverlay: androidx.compose.ui.unit.Dp = 0.dp,
     vm: FeedViewModel = hiltViewModel()
 ) {
@@ -283,6 +284,7 @@ fun FeedScreen(
                     spotlight.openPlaylist(feed.map { it.video }, page)
                 },
                 onDismiss = onLeaveFeed,
+                onChrome = { c -> if (pagerState.currentPage == page) onChrome(c) },
                 bottomOverlay = bottomOverlay
             )
         }
@@ -324,6 +326,7 @@ private fun ReelPage(
     onEnded: () -> Unit,
     onSimilar: () -> Unit,
     onDismiss: () -> Unit,
+    onChrome: (Boolean) -> Unit = {},
     bottomOverlay: androidx.compose.ui.unit.Dp = 0.dp
 ) {
     val ctx = LocalContext.current
@@ -333,6 +336,7 @@ private fun ReelPage(
     var paused by remember { mutableStateOf(false) }
     var ready by remember { mutableStateOf(false) }
     var chrome by remember { mutableStateOf(true) }
+    LaunchedEffect(chrome) { onChrome(chrome) }
     var tick by remember { mutableIntStateOf(0) }        // restarts the chrome timer
     var progress by remember { mutableFloatStateOf(0f) }
     var maxSeen by remember { mutableFloatStateOf(0f) }

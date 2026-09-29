@@ -44,6 +44,7 @@ import com.brain.gallery.ui.components.SpotlightPlayer
 import com.brain.gallery.ui.components.VideoActionsSheet
 import com.brain.gallery.ui.components.VideoDetailsDialog
 import com.brain.gallery.ui.components.VideoThumb
+import com.brain.gallery.ui.GlassNavReserve
 import com.brain.gallery.ui.spotlight.SpotlightController
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.Surface

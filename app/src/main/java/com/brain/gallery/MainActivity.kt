@@ -30,10 +30,6 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -57,6 +53,9 @@ import com.brain.gallery.ui.feed.FeedScreen
 import com.brain.gallery.ui.organize.OrganizeScreen
 import com.brain.gallery.ui.organize.SearchScreen
 import com.brain.gallery.ui.organize.OrganizeViewModel
+import com.brain.gallery.ui.GlassNav
+import com.brain.gallery.ui.GlassNavReserve
+import com.brain.gallery.ui.GlassTab
 import com.brain.gallery.ui.spotlight.SpotlightController
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
@@ -95,7 +94,7 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() { super.onDestroy(); spotlight.player.release() }
 }
 
-private data class Tab(val label: String, val icon: androidx.compose.ui.graphics.vector.ImageVector)
+private typealias Tab = GlassTab
 
 @Composable
 private fun Root(spotlight: SpotlightController) {
@@ -104,11 +103,12 @@ private fun Root(spotlight: SpotlightController) {
     var prev by remember { mutableIntStateOf(1) }
     val haptics = LocalHapticFeedback.current
     val open by spotlight.current.collectAsState()
+    var reelChrome by remember { mutableStateOf(true) }
     val similar by spotlight.similar.collectAsState()
     val tabs = listOf(
-        Tab("For You", Icons.Default.PlayArrow),
-        Tab("Organize", Icons.Default.GridView),
-        Tab("Search", Icons.Default.Search)
+        GlassTab("For You", Icons.Default.PlayArrow),
+        GlassTab("Organize", Icons.Default.GridView),
+        GlassTab("Search", Icons.Default.Search)
     )
 
     fun go(i: Int) {
@@ -118,74 +118,54 @@ private fun Root(spotlight: SpotlightController) {
         haptics.performHapticFeedback(HapticFeedbackType.LongPress)
     }
 
-    // The reel is immersive: no bottom bar stealing the scrubber, like a
-    // full-screen short-video player.
-    val chromeVisible by animateFloatAsState(
-        targetValue = if (open != null) 0f else 1f,
-        animationSpec = tween<Float>(Motion.fastMs), label = "chrome"
-    )
-    val density = LocalDensity.current
-    val navHeight = with(density) { 80.dp.toPx() }
+    // The pill is always reachable except in two situations: a spotlight is
+    // covering the screen, or a reel is playing with its own chrome hidden.
+    // Tapping the reel brings its chrome back, which brings this back too.
+    val navVisible = when {
+        open != null -> 0f
+        tab == 0 && !reelChrome -> 0f
+        else -> 1f
+    }
 
-    Scaffold(
-        containerColor = Bg,
-        bottomBar = {
-            Box(Modifier.graphicsLayer { alpha = chromeVisible; translationY = navHeight * (1f - chromeVisible) }) {
-                NavigationBar(
-                    containerColor = if (tab == 0) Color(0xB310151F) else Color(0xFF10151F),
-                    tonalElevation = 0.dp) {
-                    tabs.forEachIndexed { i, t ->
-                        NavigationBarItem(
-                            selected = tab == i,
-                            onClick = { go(i) },
-                            icon = { Icon(t.icon, null, modifier = Modifier.size(22.dp)) },
-                            label = {
-                                Text(t.label, style = MaterialTheme.typography.labelMedium)
-                            },
-                            colors = NavigationBarItemDefaults.colors(
-                                selectedIconColor = Accent,
-                                selectedTextColor = Accent,
-                                unselectedIconColor = Text2,
-                                unselectedTextColor = Text2,
-                                indicatorColor = Color(0x228B5CF6)
-                            )
-                        )
-                    }
+    // No Scaffold bottom bar any more: the nav floats over the content so the
+    // reel gets the whole screen and the library keeps its bottom row.
+    val forward = tab >= prev
+    val systemBottom = WindowInsets.navigationBars
+    Box(Modifier.fillMaxSize().background(Bg)) {
+        AnimatedContent(
+            targetState = tab,
+            transitionSpec = {
+                val off = if (forward) 1 else -1
+                (slideInHorizontally(tween(Motion.mediumMs, easing = Motion.emphasized)) { it / 6 * off } +
+                        fadeIn(tween(Motion.mediumMs)))
+                    .togetherWith(
+                        slideOutHorizontally(tween(Motion.mediumMs, easing = Motion.emphasized)) { -it / 6 * off } +
+                                fadeOut(tween(Motion.fastMs))
+                    )
+            },
+            label = "tab"
+        ) { t ->
+            when (t) {
+                0 -> Box(Modifier.fillMaxSize().windowInsetsPadding(systemBottom)) {
+                    FeedScreen(
+                        player = spotlight.player,
+                        spotlight = spotlight,
+                        onLeaveFeed = { go(1) },
+                        onChrome = { reelChrome = it },
+                        bottomOverlay = GlassNavReserve
+                    )
                 }
+                1 -> Box(Modifier.fillMaxSize()) { OrganizeScreen(spotlight) }
+                else -> Box(Modifier.fillMaxSize()) { SearchScreen(spotlight) }
             }
         }
-    ) { _ ->
-        val forward = tab >= prev
-        // Feed is edge-to-edge but must clear the system gesture bar.
-        val systemBottom = WindowInsets.navigationBars
-        Box(Modifier.fillMaxSize().background(Bg)) {
-            AnimatedContent(
-                targetState = tab,
-                transitionSpec = {
-                    val off = if (forward) 1 else -1
-                    (slideInHorizontally(tween(Motion.mediumMs, easing = Motion.emphasized)) { it / 6 * off } +
-                            fadeIn(tween(Motion.mediumMs)))
-                        .togetherWith(
-                            slideOutHorizontally(tween(Motion.mediumMs, easing = Motion.emphasized)) { -it / 6 * off } +
-                                    fadeOut(tween(Motion.fastMs))
-                        )
-                },
-                label = "tab"
-            ) { t ->
-                when (t) {
-                    0 -> Box(Modifier.fillMaxSize().windowInsetsPadding(systemBottom)) {
-                        FeedScreen(
-                            player = spotlight.player,
-                            spotlight = spotlight,
-                            onLeaveFeed = { go(1) },
-                            bottomOverlay = 80.dp
-                        )
-                    }
-                    1 -> Box(Modifier.fillMaxSize()) { OrganizeScreen(spotlight) }
-                    else -> Box(Modifier.fillMaxSize()) { SearchScreen(spotlight) }
-                }
-            }
-        }
+
+        GlassNav(
+            tabs = tabs,
+            selected = tab,
+            onSelect = { go(it) },
+            visible = navVisible
+        )
     }
 
     // One spotlight for the whole app. Back closes it before anything else.
