@@ -151,7 +151,8 @@ fun VideoActionsSheet(
         }
         if (onDelete != null)
             SheetRow(Icons.Default.Delete, "Delete from device", Color(0xFFF87171), onDelete)
-        }
+        } // ROOT
+      } // when
         Spacer(Modifier.height(20.dp))
     }
 }
