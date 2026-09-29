@@ -110,14 +110,35 @@ class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
         // Events: cluster same-folder videos added within 3 days of each other.
         out += clusterEvents(memories).take(4)
 
-        // Top categories.
+        // Subject categories, but only where the evidence actually holds up.
+        //
+        // A category is a guess from labels on single frames, so a raw count
+        // means little: "baby" once fired on an adult speaker and "pet" on a
+        // picture of text, and a group titled that is worse than no group at all.
+        // A category is only offered when the clips agree, the brain is confident
+        // in them, and the bucket is big enough to be a real theme. Everything
+        // else stays in the library, unlabelled and unhurried, until it does.
+        val library = memories.size.coerceAtLeast(1)
         all.groupBy { it.category }
-            .filter { (cat, list) -> cat != "unknown" && list.size >= 2 }
-            .entries.sortedByDescending { it.value.size }.take(4)
-            .forEach { (cat, list) ->
-                out += SmartGroup("cat_$cat", cat.replaceFirstChar { it.uppercase() },
-                    "${list.size} videos", GroupKind.CATEGORY,
-                    list.sortedByDescending { it.dateAddedSec }.take(30), accentFor(cat))
+            .filter { (cat, list) -> cat != "unknown" && list.size >= MIN_CATEGORY_VIDEOS }
+            .mapNotNull { (cat, list) ->
+                val confident = list.count { it.confidence >= CATEGORY_MIN_CONFIDENCE }
+                val tagAgree = list.count { cat in it.tagList }.toFloat() / list.size
+                // Share of the library this bucket claims, and how it is spread.
+                val spread = list.map { it.folderName.lowercase() }.distinct().size
+                if (confident.toFloat() / list.size < CATEGORY_MIN_CONFIDENT_SHARE) null
+                else Triple(cat, list, tagAgree)
+            }
+            .sortedByDescending { (_, list, agree) -> list.size * (0.5f + agree) }
+            .take(4)
+            .forEach { (cat, list, agree) ->
+                val solid = agree >= 0.6f
+                out += SmartGroup(
+                    "cat_$cat", cat.replaceFirstChar { it.uppercase() },
+                    "${list.size} videos" + if (solid) "" else " • still learning",
+                    GroupKind.CATEGORY,
+                    list.sortedByDescending { it.dateAddedSec }.take(30), accentFor(cat)
+                )
             }
 
         val unreviewed = all.filter { it.brainLevel < 1 }.take(30)
@@ -163,6 +184,15 @@ class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
 
     private fun ageDays(v: VideoEntity) =
         (System.currentTimeMillis() / 1000 - v.dateAddedSec) / 86400
+
+    private companion object {
+        /** A bucket smaller than this is a coincidence, not a theme. */
+        const val MIN_CATEGORY_VIDEOS = 8
+        /** The brain has to be reasonably sure about the clip. */
+        const val CATEGORY_MIN_CONFIDENCE = 0.5f
+        /** ...and reasonably sure about most of the bucket, not just one or two. */
+        const val CATEGORY_MIN_CONFIDENT_SHARE = 0.6f
+    }
 
     private fun isOnThisDay(dateAddedSec: Long): Boolean {
         if (dateAddedSec <= 0) return false

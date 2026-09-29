@@ -24,6 +24,12 @@ data class PerceptualResult(
     val vectors: List<VectorCandidate>,
     val priority: Float,
     val pendingSemantic: Boolean,
+    /**
+     * L0's junk verdict, recomputed on every pass. The service used to persist
+     * the previous value instead of this one, so improving the tokenizer changed
+     * nothing for videos that had already been analysed.
+     */
+    val junkScore: Float = 0f,
     /** False only when no frame could be decoded at all (dead/corrupt file). */
     val frameRead: Boolean = true
 )
@@ -53,6 +59,7 @@ class L1aAnalyzer @Inject constructor(
                 l0.confidence, emptyList(),
                 PriorityScorer.score(l0.junkScore, durationMs, 0, l0.category),
                 l0.category == "unknown" || l0.confidence < 0.6f,
+                junkScore = l0.junkScore,
                 frameRead = false)
         }
         val bmp: Bitmap = raw
@@ -82,11 +89,12 @@ class L1aAnalyzer @Inject constructor(
                 confidence = max(l0.confidence, if (reading.count > 0) 0.6f else 0f),
                 vectors = vectors,
                 priority = priority,
-                pendingSemantic = l0.category == "unknown" || l0.confidence < 0.6f
+                pendingSemantic = l0.category == "unknown" || l0.confidence < 0.6f,
+                junkScore = l0.junkScore
             )
         } catch (_: Exception) {
             PerceptualResult(0L, 0f, 0, 0, l0.about, l0.category, l0.tags, l0.confidence,
-                emptyList(), 0.3f, true)
+                emptyList(), 0.3f, true, junkScore = l0.junkScore)
         } finally {
             runCatching { if (!bmp.isRecycled) bmp.recycle() }
         }

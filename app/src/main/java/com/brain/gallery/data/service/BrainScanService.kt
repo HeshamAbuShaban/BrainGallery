@@ -185,7 +185,7 @@ class BrainScanService : LifecycleService() {
                 }
                 dao.applyPerceptual(
                     id = v.id, category = r.category, tags = r.tags.joinToString(","),
-                    about = r.about, confidence = r.confidence, level = 1, junk = v.junkScore,
+                    about = r.about, confidence = r.confidence, level = 1, junk = r.junkScore,
                     faces = r.faceCount, smiles = r.smileCount, phash = r.phash,
                     sharpness = r.sharpness, priority = r.priority, pending = r.pendingSemantic
                 )
