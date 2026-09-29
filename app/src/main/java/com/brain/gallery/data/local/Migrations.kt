@@ -57,11 +57,19 @@ val MIGRATION_5_6 = object : Migration(5, 6) {
  * Two columns with defaults, plus an index so the pass can find its queue
  * cheaply. Additive again: no existing row is rewritten, and clips the audio
  * pass has not touched read as "not measured" rather than "measured and empty".
+ *
+ * The index name is not free: Room names an index `index_<table>_<column>` and
+ * then compares it against the one in [VideoEntity.indices] after migrating.
+ * A name that differs, or an index the entity does not declare, fails the
+ * check and rolls the whole migration back — which is how v7 first shipped
+ * crashing on an unchanged database.
  */
 val MIGRATION_6_7 = object : Migration(6, 7) {
     override fun migrate(db: SupportSQLiteDatabase) {
         db.execSQL("ALTER TABLE videos ADD COLUMN prosodyTags TEXT NOT NULL DEFAULT ''")
         db.execSQL("ALTER TABLE videos ADD COLUMN speechRatio REAL NOT NULL DEFAULT 0")
-        db.execSQL("CREATE INDEX IF NOT EXISTS idx_videos_prosody ON videos (prosodyTags)")
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS index_videos_prosodyTags ON videos (prosodyTags)"
+        )
     }
 }

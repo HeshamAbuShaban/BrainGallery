@@ -34,7 +34,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.brain.gallery.ui.theme.Motion
 
 data class GlassTab(val label: String, val icon: ImageVector)
 
@@ -141,12 +140,12 @@ private fun RowScope.GlassNavItem(
     val labelAlpha = rememberGlassNavLabelAlpha(selected)
     val iconInk by animateColorAsState(
         targetValue = if (selected) selectedColor else idleColor,
-        animationSpec = Motion.enter(),
+        animationSpec = GlassMotion.enter(),
         label = "navIconInk"
     )
     val labelInk by animateColorAsState(
         targetValue = if (selected) selectedLabelColor else idleColor,
-        animationSpec = Motion.enter(),
+        animationSpec = GlassMotion.enter(),
         label = "navLabelInk"
     )
 

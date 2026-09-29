@@ -40,7 +40,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.brain.gallery.ui.theme.Motion
 
 /** How small the pane is at the start of its entrance. Enough to read as growing. */
 private const val EnterScale = 0.94f
@@ -140,10 +139,10 @@ fun GlassMenu(
     AnimatedVisibility(
         visible = visible,
         modifier = modifier.width(anchorWidth),
-        enter = fadeIn(tween(Motion.mediumMs, easing = Motion.emphasized)) +
-            scaleIn(initialScale = EnterScale, animationSpec = tween(Motion.mediumMs, easing = Motion.emphasized)),
-        exit = fadeOut(tween(Motion.fastMs, easing = Motion.exit)) +
-            scaleOut(targetScale = EnterScale, animationSpec = tween(Motion.fastMs, easing = Motion.exit))
+        enter = fadeIn(tween(GlassMotion.mediumMs, easing = GlassMotion.emphasized)) +
+            scaleIn(initialScale = EnterScale, animationSpec = tween(GlassMotion.mediumMs, easing = GlassMotion.emphasized)),
+        exit = fadeOut(tween(GlassMotion.fastMs, easing = GlassMotion.exit)) +
+            scaleOut(targetScale = EnterScale, animationSpec = tween(GlassMotion.fastMs, easing = GlassMotion.exit))
     ) {
         if (items.isEmpty()) return@AnimatedVisibility
         Column(
@@ -182,7 +181,7 @@ private fun GlassMenuRow(
     val pressed by interactionSource.collectIsPressedAsState()
     val wash by animateColorAsState(
         targetValue = selectedColor.copy(alpha = if (pressed) PressWashAlpha else 0f),
-        animationSpec = tween(Motion.fastMs, easing = Motion.standard),
+        animationSpec = tween(GlassMotion.fastMs, easing = GlassMotion.standard),
         label = "menuRowWash"
     )
 
@@ -265,7 +264,7 @@ fun GlassMenuOverlay(
     val items = glassMenuItems(content)
     val scrim by animateFloatAsState(
         targetValue = if (visible) 1f else 0f,
-        animationSpec = tween(Motion.mediumMs, easing = Motion.standard),
+        animationSpec = tween(GlassMotion.mediumMs, easing = GlassMotion.standard),
         label = "menuScrim"
     )
 

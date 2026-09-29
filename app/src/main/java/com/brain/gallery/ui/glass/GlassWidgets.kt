@@ -35,7 +35,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.brain.gallery.ui.theme.Motion
 import kotlin.math.roundToInt
 
 /**
@@ -95,8 +94,9 @@ fun GlassCard(
 /**
  * A pill for tags and filters.
  *
- * The fill, the hairline and the label all cross-fade on [Motion]'s standard
- * curve, so a chip reads as lighting up rather than switching. The wash is built
+ * The fill, the hairline and the label all cross-fade on [GlassMotion]'s
+ * standard curve, so a chip reads as lighting up rather than switching. The wash
+ * is built
  * from [style] instead of the full [glass] modifier because a row of chips, each
  * casting a 20dp shadow, is not a row of chips any more — it is a row of plates.
  */
@@ -114,7 +114,7 @@ fun GlassChip(
     height: Dp = 34.dp
 ) {
     val pill = RoundedCornerShape(height / 2)
-    val spec = Motion.enter<Color>()
+    val spec = GlassMotion.enter<Color>()
     val fill by animateColorAsState(
         targetValue = if (selected) accentColor.copy(alpha = 0.30f) else style.tint.copy(alpha = 0.07f),
         animationSpec = spec,
@@ -183,7 +183,7 @@ fun GlassSegmented(
     val cell = RoundedCornerShape(percent = 50)
     val travel by animateFloatAsState(
         targetValue = index.toFloat(),
-        animationSpec = Motion.enter(),
+        animationSpec = GlassMotion.enter(),
         label = "segmentedTravel"
     )
 
@@ -217,7 +217,7 @@ fun GlassSegmented(
                 val isSelected = i == index
                 val ink by animateColorAsState(
                     targetValue = if (isSelected) selectedColor else labelColor,
-                    animationSpec = Motion.enter<Color>(),
+                    animationSpec = GlassMotion.enter<Color>(),
                     label = "segmentedLabel$i"
                 )
                 Box(

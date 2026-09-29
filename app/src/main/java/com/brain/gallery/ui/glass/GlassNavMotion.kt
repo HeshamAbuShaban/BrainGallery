@@ -16,7 +16,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
-import com.brain.gallery.ui.theme.Motion
 import kotlin.math.roundToInt
 
 /**
@@ -24,8 +23,8 @@ import kotlin.math.roundToInt
  * reactions a tab makes when it becomes — or stops being — the selected one.
  *
  * Nothing here is tied to an app's palette. Colours arrive as parameters and the
- * only thing borrowed from the app is [Motion], so this file travels with the
- * glass into another project.
+ * motion tokens live in [GlassMotion], so this file travels with the glass into
+ * another project.
  *
  * Every animated value is exposed as a `State` or a lambda rather than a value,
  * and is read inside a layout or layer block. That is deliberate: reading an
@@ -93,12 +92,12 @@ fun rememberGlassNavIndicatorMotion(
     return GlassNavIndicatorMotion(
         travel = animateFloatAsState(
             targetValue = index.toFloat(),
-            animationSpec = Motion.enter(),
+            animationSpec = GlassMotion.enter(),
             label = "navIndicatorTravel"
         ),
         pillWidth = animateFloatAsState(
             targetValue = targetWidth,
-            animationSpec = Motion.bouncy(),
+            animationSpec = GlassMotion.bouncy(),
             label = "navIndicatorWidth"
         ),
         slotPx = { slot }
@@ -112,7 +111,7 @@ fun rememberGlassNavIndicatorMotion(
 @Composable
 fun rememberGlassNavAlpha(visible: Float): State<Float> = animateFloatAsState(
     targetValue = visible.coerceIn(0f, 1f),
-    animationSpec = tween(Motion.mediumMs, easing = Motion.standard),
+    animationSpec = tween(GlassMotion.mediumMs, easing = GlassMotion.standard),
     label = "navAlpha"
 )
 
@@ -134,7 +133,7 @@ fun Modifier.glassNavReveal(alpha: () -> Float): Modifier = graphicsLayer {
 @Composable
 fun rememberGlassNavIconScale(selected: Boolean): State<Float> = animateFloatAsState(
     targetValue = if (selected) 1.06f else 1f,
-    animationSpec = Motion.bouncy(),
+    animationSpec = GlassMotion.bouncy(),
     label = "navIconScale"
 )
 
@@ -145,7 +144,7 @@ fun rememberGlassNavIconScale(selected: Boolean): State<Float> = animateFloatAsS
 @Composable
 fun rememberGlassNavLabelAlpha(selected: Boolean): State<Float> = animateFloatAsState(
     targetValue = if (selected) 1f else 0.62f,
-    animationSpec = Motion.enter(),
+    animationSpec = GlassMotion.enter(),
     label = "navLabelAlpha"
 )
 

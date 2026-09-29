@@ -65,11 +65,14 @@ wash, so one value governs the pane rather than three independent ones.
 
 ## Taking it elsewhere
 
-Nothing in the package references this app's theme, palette, or navigation. The
-only app-specific values are passed in at the call site: `selectedColor`,
-`idleColor`, and the accent used for the shadow glow. Copy the folder into
-another Compose project, hand it that project's colours, and the material comes
-with it.
+The kit's only dependency is itself. Nothing in the package references this
+app's theme, palette, or navigation, and the motion tokens travel with it as
+`GlassMotion` — so the app's `Motion.kt` is not needed. The only app-specific
+values are passed in at the call site: `selectedColor`, `idleColor`, and the
+accent used for the shadow glow.
+
+To reuse it: copy this folder into the other Compose project, nothing else.
+Then hand it that project's colours, and the material comes with it.
 
 ## What is in the kit
 
@@ -92,6 +95,11 @@ with it.
 
 - `GlassWidgets.kt` — `GlassCard`, `GlassChip`, `GlassSegmented` (moving indicator),
   `GlassStatTile`
+
+**Motion**
+
+- `GlassMotion.kt` — durations and easings as named tokens, the kit's own copy of
+  the app's motion system, so nothing outside this folder is imported
 
 ## Notes for reuse
 

@@ -16,7 +16,8 @@ import androidx.room.PrimaryKey
         Index("personId"),
         Index("brainLevel"),
         Index("category"),
-        Index("junkScore")
+        Index("junkScore"),
+        Index("prosodyTags")
     ]
 )
 data class VideoEntity(
