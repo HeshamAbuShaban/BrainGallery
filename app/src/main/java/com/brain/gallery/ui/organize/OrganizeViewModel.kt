@@ -265,7 +265,12 @@ class OrganizeViewModel @Inject constructor(
     fun moveVideoToPerson(videoId: Long, targetPersonId: Int) {
         viewModelScope.launch(Dispatchers.IO) {
             val vectors = db.personDao().vectorsForVideo(videoId)
-            if (vectors.isEmpty()) return@launch
+            if (vectors.isEmpty()) {
+                // Nothing to re-point: still record the decision, otherwise the
+                // tap looks broken. The clip joins the person's group by id.
+                if (targetPersonId >= 0) db.videoDao().setPerson(videoId, targetPersonId)
+                return@launch
+            }
             val target = if (targetPersonId >= 0) targetPersonId else {
                 db.personDao().insertPerson(
                     com.brain.gallery.data.local.PersonEntity(createdAt = System.currentTimeMillis())

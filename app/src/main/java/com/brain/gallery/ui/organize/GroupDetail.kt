@@ -59,7 +59,7 @@ import com.brain.gallery.domain.organize.fmtSize
 import com.brain.gallery.ui.components.VideoActionsSheet
 import com.brain.gallery.ui.components.VideoDetailsDialog
 import com.brain.gallery.ui.components.VideoThumb
-import com.brain.gallery.ui.components.MoveToGroupSheet
+import com.brain.gallery.ui.components.SheetMode
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.CardShape
@@ -97,8 +97,7 @@ fun GroupDetail(
     var menuFor by remember { mutableStateOf<VideoEntity?>(null) }
     var detailsFor by remember { mutableStateOf<VideoEntity?>(null) }
     var renameOpen by remember { mutableStateOf(false) }
-    var moveTarget by remember { mutableStateOf<Long?>(null) }
-    var moveGroupIds by remember { mutableStateOf<List<Long>?>(null) }
+    var sheetMode by remember { mutableStateOf(SheetMode.ROOT) }
 
     Column(Modifier.fillMaxSize().background(Bg)
         .windowInsetsPadding(WindowInsets.navigationBars)
@@ -211,33 +210,29 @@ fun GroupDetail(
             onDelete = { menuFor = null; onDeleteOne(mv) },
             hasIdentity = mv.faceCount > 0,
             inPersonGroup = person != null,
-            onMovePerson = { menuFor = null; moveTarget = mv.id },
+            onMovePerson = { sheetMode = SheetMode.PERSON },
             onRemoveFromPerson = {
                 menuFor = null
                 person?.let { onSplitOut(it.id, mv.id) }
             },
-            onMoveGroup = { menuFor = null; moveGroupIds = listOf(mv.id) },
+            onMoveGroup = { sheetMode = SheetMode.GROUP },
             onPick = { menuFor = null; onTogglePick?.let { it(mv.id) } },
-            picked = mv.id in pickedIds)
-    }
-    val movingIds = moveGroupIds
-    if (movingIds != null) {
-        MoveToGroupSheet(
-            current = if (movingIds.size == 1) {
-                group.videos.firstOrNull { it.id == movingIds.first() }?.effectiveGroup.orEmpty()
-            } else "",
-            choices = groupChoices,
-            selectedCount = movingIds.size,
-            onDismiss = { moveGroupIds = null },
-            onPick = { g ->
-                moveGroupIds = null
-                onMoveGroup?.invoke(movingIds, g)
-            })
-    }
-    moveTarget?.let { vid ->
-        MovePersonDialog(persons = persons, counts = personCounts,
-            onDismiss = { moveTarget = null },
-            onPick = { target -> moveTarget = null; onMoveVideo?.let { it(vid, target) } })
+            picked = mv.id in pickedIds,
+            mode = sheetMode,
+            groupChoices = groupChoices,
+            onBack = { sheetMode = SheetMode.ROOT },
+            onPickGroup = { g ->
+                sheetMode = SheetMode.ROOT
+                menuFor = null
+                onMoveGroup?.invoke(listOf(mv.id), g)
+            },
+            onPickPerson = { pid ->
+                sheetMode = SheetMode.ROOT
+                menuFor = null
+                onMoveVideo?.invoke(mv.id, pid)
+            },
+            persons = persons,
+            personCounts = personCounts)
     }
     detailsFor?.let { VideoDetailsDialog(video = it, onDismiss = { detailsFor = null }) }
     if (renameOpen && person != null) {

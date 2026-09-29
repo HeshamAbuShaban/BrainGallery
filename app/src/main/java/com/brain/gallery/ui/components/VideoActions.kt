@@ -2,6 +2,7 @@ package com.brain.gallery.ui.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,9 +13,12 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CheckCircleOutline
 import androidx.compose.material.icons.filled.Delete
@@ -24,6 +28,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PersonAdd
 import androidx.compose.material.icons.filled.PersonOff
 import androidx.compose.material.icons.filled.PersonSearch
 import androidx.compose.material.icons.filled.Search
@@ -83,10 +88,31 @@ fun VideoActionsSheet(
     onMoveGroup: (() -> Unit)? = null,
     /** Tick it for a bulk action instead of opening it. */
     onPick: (() -> Unit)? = null,
-    picked: Boolean = false
+    picked: Boolean = false,
+
+    // ---- sub-views, drawn by this same sheet ----
+    // These used to be a second ModalBottomSheet opened from the first. Two
+    // sheets in the same frame is a race: the first starts animating out and the
+    // second is dropped, so the tap looked like it did nothing at all. One sheet
+    // that switches content cannot lose itself.
+    mode: SheetMode = SheetMode.ROOT,
+    groupChoices: List<String> = emptyList(),
+    onBack: () -> Unit = {},
+    onPickGroup: (String) -> Unit = {},
+    onPickPerson: (Int) -> Unit = {},
+    persons: List<com.brain.gallery.data.local.PersonEntity> = emptyList(),
+    personCounts: Map<Int, Int> = emptyMap()
 ) {
     ModalBottomSheet(onDismissRequest = onDismiss,
         containerColor = Surface, contentColor = Text1) {
+      when (mode) {
+        SheetMode.GROUP -> {
+            MoveToGroupBody(video, groupChoices, 1, onBack, onPickGroup)
+        }
+        SheetMode.PERSON -> {
+            MovePersonBody(persons, personCounts, onBack, onPickPerson)
+        }
+        SheetMode.ROOT -> {
         Row(Modifier.fillMaxWidth().padding(16.dp, 4.dp, 16.dp, 8.dp),
             verticalAlignment = Alignment.CenterVertically) {
             VideoThumb(video, Modifier.size(56.dp, 76.dp))
@@ -107,7 +133,8 @@ fun VideoActionsSheet(
             SheetRow(Icons.Default.VisibilityOff, "Not interested — show less", Text1, onNotInterested)
         if (hasIdentity && onMovePerson != null) {
             SheetRow(Icons.Default.PersonSearch,
-                if (inPersonGroup) "Wrong person — move to…" else "Add to a person…", Cyan, onMovePerson)
+                if (inPersonGroup) "Wrong person — move to…" else "Add to a person…", Cyan,
+                { onMovePerson() })
         }
         if (inPersonGroup && onRemoveFromPerson != null) {
             SheetRow(Icons.Default.PersonOff, "Not this person", Text1, onRemoveFromPerson)
@@ -124,6 +151,7 @@ fun VideoActionsSheet(
         }
         if (onDelete != null)
             SheetRow(Icons.Default.Delete, "Delete from device", Color(0xFFF87171), onDelete)
+        }
         Spacer(Modifier.height(20.dp))
     }
 }
@@ -188,6 +216,9 @@ private fun DetailLine(k: String, v: String) {
  * in now, and the option to invent one. Choosing the current group clears the
  * hand-placement and hands the clip back to the brain.
  */
+/** Which view the actions sheet is showing. */
+enum class SheetMode { ROOT, GROUP, PERSON }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MoveToGroupSheet(
@@ -249,5 +280,96 @@ fun MoveToGroupSheet(
             SheetRow(Icons.Default.Add, "New group…", Cyan) { creating = true }
         }
         Spacer(Modifier.height(20.dp))
+    }
+}
+
+/** The group sub-view, drawn inside the actions sheet rather than over it. */
+@Composable
+private fun MoveToGroupBody(
+    video: VideoEntity,
+    choices: List<String>,
+    count: Int,
+    onBack: () -> Unit,
+    onPick: (String) -> Unit
+) {
+    var creating by remember { mutableStateOf(false) }
+    var newName by remember { mutableStateOf("") }
+    val current = video.effectiveGroup
+
+    SheetHeader(Icons.Default.ArrowBack, "Move this clip to…", onBack)
+    if (current.isNotBlank()) {
+        SheetRow(Icons.Default.Undo, "Hand it back to the brain", Text1) { onPick("") }
+    }
+    choices.filter { it != current }.take(12).forEach { g ->
+        SheetRow(Icons.Default.Label, g, Text1) { onPick(g) }
+    }
+    if (creating) {
+        Row(Modifier.fillMaxWidth().padding(18.dp, 6.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            OutlinedTextField(value = newName, onValueChange = { newName = it },
+                singleLine = true, placeholder = { Text("Name this group", color = Text2) },
+                modifier = Modifier.weight(1f))
+            Spacer(Modifier.width(10.dp))
+            Text("Save", color = if (newName.isBlank()) Text2 else Green,
+                fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clickable(enabled = newName.isNotBlank()) { onPick(newName.trim()) }
+                    .padding(6.dp))
+        }
+    } else {
+        SheetRow(Icons.Default.Add, "New group…", Cyan) { creating = true }
+    }
+}
+
+/** The person sub-view, drawn inside the actions sheet. */
+@Composable
+private fun MovePersonBody(
+    persons: List<com.brain.gallery.data.local.PersonEntity>,
+    counts: Map<Int, Int>,
+    onBack: () -> Unit,
+    onPick: (Int) -> Unit
+) {
+    SheetHeader(Icons.Default.ArrowBack, "Move to which person?", onBack)
+    persons.sortedByDescending { counts[it.id] ?: 0 }.forEach { p ->
+        Row(Modifier.fillMaxWidth()
+            .clip(RoundedCornerShape(14.dp))
+            .clickable { onPick(p.id) }
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            val initial = p.name.ifBlank { p.suggestedName.ifBlank { "?" } }.take(1).uppercase()
+            Box(Modifier.size(38.dp).clip(CircleShape).background(Color(0xFF26324A)),
+                contentAlignment = Alignment.Center) {
+                Text(initial, color = Text1, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
+            }
+            Spacer(Modifier.width(12.dp))
+            Column(Modifier.weight(1f)) {
+                Text(p.name.ifBlank { p.suggestedName.ifBlank { "Person ${p.id}" } },
+                    color = Text1, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                Text("${counts[p.id] ?: 0} videos" + if (p.verified) " • you named this" else "",
+                    color = Text2, fontSize = 11.5.sp)
+            }
+        }
+    }
+    Row(Modifier.fillMaxWidth()
+        .clip(RoundedCornerShape(14.dp))
+        .clickable { onPick(-1) }
+        .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Icon(Icons.Default.PersonAdd, null, tint = Green, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.width(12.dp))
+        Text("Someone new", color = Green, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun SheetHeader(icon: ImageVector, title: String, onBack: () -> Unit) {
+    Row(Modifier.fillMaxWidth()
+        .clip(RoundedCornerShape(14.dp))
+        .clickable { onBack() }
+        .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Icon(icon, null, tint = Text1, modifier = Modifier.size(22.dp))
+        Spacer(Modifier.width(12.dp))
+        Text(title, color = Text1, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
     }
 }
