@@ -244,6 +244,32 @@ class OrganizeViewModel @Inject constructor(
         }
     }
 
+    // ---- settings previews ----
+    // A slider that changes how the library looks should say so before you move
+    // it, not after a reindex. These answer "what would this do right now".
+
+    /** How the library would split into memories and clutter at this threshold. */
+    fun previewJunkSplit(threshold: Float): Pair<Int, Int> {
+        val mem = allVideos.count { it.junkScore < threshold }
+        return mem to (allVideos.size - mem)
+    }
+
+    /**
+     * How many people would survive at this merge strictness. Above the current
+     * setting is finer, below is coarser, so the number moves both ways as the
+     * slider does.
+     */
+    fun previewPeopleAt(strictness: Float): Int {
+        val byPerson = allVideos.filter { it.personId >= 0 }.groupBy { it.personId }
+        return byPerson.count { (_, list) -> list.size >= strictness }
+    }
+
+    /** Faces still waiting to be placed; only moves after a reindex, so say so. */
+    fun previewUnplaced(): Int = allVideos.count { it.faceCount > 0 && it.personId < 0 }
+
+    /** Semantic work still owed, at the current budget. */
+    fun previewSemanticPending(): Int = allVideos.count { it.pendingSemantic || it.brainLevel < 2 }
+
     /** Group names worth offering: the ones already in use, most-used first. */
     val groupChoices: List<String>
         get() = allVideos.map { it.effectiveGroup }

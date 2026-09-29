@@ -106,19 +106,47 @@ fun BrainScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
                 vm.updateSettings(cfg.copy(duplicatesEnabled = it))
             }
             SliderRow("Semantic budget per run", cfg.semanticBudget.toString(), 25f, 600f, 24,
-                cfg.semanticBudget.toFloat()) { vm.updateSettings(cfg.copy(semanticBudget = it.toInt())) }
+                cfg.semanticBudget.toFloat(),
+                help = "How many clips the slow labeler may look at in one pass.",
+                preview = { "${vm.previewSemanticPending()} clips still to learn" }) {
+                vm.updateSettings(cfg.copy(semanticBudget = it.toInt()))
+            }
             SliderRow("Run time budget", "${cfg.runBudgetSeconds}s", 30f, 420f, 14,
-                cfg.runBudgetSeconds.toFloat()) { vm.updateSettings(cfg.copy(runBudgetSeconds = it.toInt())) }
+                cfg.runBudgetSeconds.toFloat(),
+                help = "How long a pass may run before it yields to the battery.",
+                preview = { "Raising this finishes sooner but uses more battery" }) {
+                vm.updateSettings(cfg.copy(runBudgetSeconds = it.toInt()))
+            }
             SliderRow("Match strictness (similarity)", "%.2f".format(cfg.matchSim), 0.30f, 0.70f, 40,
-                cfg.matchSim) { vm.updateSettings(cfg.copy(matchSim = it)) }
+                cfg.matchSim,
+                help = "How alike two faces must be to count as the same person.",
+                preview = {
+                    val n = vm.previewPeopleAt(it)
+                    "$n clusters hold at least this many clips"
+                }) {
+                vm.updateSettings(cfg.copy(matchSim = it))
+            }
             SliderRow("Cluster merge threshold", "%.2f".format(cfg.mergeSim), 0.35f, 0.75f, 40,
-                cfg.mergeSim) { vm.updateSettings(cfg.copy(mergeSim = it)) }
+                cfg.mergeSim,
+                help = "How alike two existing clusters must be before they become one. Use this to undo an over-merge.",
+                preview = { "${vm.previewUnplaced()} faces still waiting to be placed" }) {
+                vm.updateSettings(cfg.copy(mergeSim = it))
+            }
             SliderRow("Split sensitivity", "%.2f".format(cfg.splitSensitivity), 0.10f, 0.50f, 40,
-                cfg.splitSensitivity) { vm.updateSettings(cfg.copy(splitSensitivity = it)) }
+                cfg.splitSensitivity,
+                help = "How different two faces inside one person have to look before the brain suspects two people.",
+                preview = { "A warning is only a suggestion; merging is always your call" }) {
+                vm.updateSettings(cfg.copy(splitSensitivity = it))
+            }
             SliderRow("Clutter threshold", "%.2f".format(cfg.junkSensitivity), 0.20f, 0.90f, 14,
-                cfg.junkSensitivity) { vm.updateSettings(cfg.copy(junkSensitivity = it)) }
-            Text("Lower match strictness pulls more clips into a person; a lower merge " +
-                "threshold repairs fragmentation. Clutter threshold decides what counts as junk.",
+                cfg.junkSensitivity,
+                help = "How sure a clip has to look like junk before it leaves your memories.",
+                preview = { val (m, j) = vm.previewJunkSplit(it)
+                    "Right now that is $m memories and $j clutter" }) {
+                vm.updateSettings(cfg.copy(junkSensitivity = it))
+            }
+            Text("Nothing here deletes anything. Clutter only means the brain sets a clip aside; " +
+                "the file stays on your phone until you delete it yourself.",
                 color = Text2, fontSize = 11.5.sp, modifier = Modifier.padding(top = 6.dp))
 
             // ---------------- Index ----------------
@@ -298,21 +326,57 @@ private fun SwitchRow(title: String, sub: String, checked: Boolean, onChange: (B
     HorizontalDivider(color = Color(0xFF1A2231))
 }
 
+/**
+ * A slider that explains itself.
+ *
+ * The name alone does not tell you what a number like 0.45 does to your library,
+ * so each one carries a plain sentence and a live consequence. The preview is
+ * computed for the value under the thumb, which means the reader can drag and
+ * watch the effect before letting go, instead of committing and re-indexing to
+ * find out.
+ */
 @Composable
 private fun SliderRow(
     title: String, value: String, min: Float, max: Float, steps: Int, current: Float,
+    help: String = "",
+    preview: ((Float) -> String)? = null,
     onChange: (Float) -> Unit
 ) {
-    Column(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 2.dp)) {
+    // Local drag state: the preview follows the thumb immediately, while the
+    // committed value only updates when the gesture ends.
+    var dragging by androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(current) }
+    var isDragging by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    val shown = if (isDragging) dragging else current
+
+    Column(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 2.dp)) {
         Row(Modifier.fillMaxWidth()) {
             Text(title, color = Text1, fontSize = 13.sp, modifier = Modifier.weight(1f))
             Text(value, color = Accent, fontSize = 13.sp, fontWeight = FontWeight.Bold)
         }
-        Slider(value = current, onValueChange = onChange, valueRange = min..max,
+        if (help.isNotBlank()) {
+            Text(help, color = Text2, fontSize = 11.5.sp,
+                modifier = Modifier.padding(top = 2.dp, end = 4.dp))
+        }
+        Slider(
+            value = shown,
+            onValueChange = { dragging = it; isDragging = true },
+            onValueChangeFinished = { isDragging = false; onChange(dragging) },
+            valueRange = min..max,
             steps = (steps - 1).coerceAtLeast(0),
             colors = androidx.compose.material3.SliderDefaults.colors(
                 thumbColor = Accent, activeTrackColor = Accent, inactiveTrackColor = Color(0xFF2A3446)
             ))
+        val note = preview?.invoke(shown)
+        if (!note.isNullOrBlank()) {
+            Row(Modifier.fillMaxWidth().padding(top = 1.dp),
+                verticalAlignment = Alignment.CenterVertically) {
+                Text(note, color = Cyan, fontSize = 11.5.sp, fontWeight = FontWeight.Medium,
+                    modifier = Modifier.weight(1f))
+                if (isDragging) {
+                    Text("let go to apply", color = Text2, fontSize = 10.5.sp)
+                }
+            }
+        }
     }
 }
 
