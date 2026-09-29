@@ -59,6 +59,7 @@ import com.brain.gallery.domain.organize.fmtSize
 import com.brain.gallery.ui.components.VideoActionsSheet
 import com.brain.gallery.ui.components.VideoDetailsDialog
 import com.brain.gallery.ui.components.VideoThumb
+import com.brain.gallery.ui.components.MoveToGroupSheet
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.CardShape
@@ -219,17 +220,18 @@ fun GroupDetail(
             onPick = { menuFor = null; onTogglePick?.let { it(mv.id) } },
             picked = mv.id in pickedIds)
     }
-    moveGroupIds?.let { ids ->
+    val movingIds = moveGroupIds
+    if (movingIds != null) {
         MoveToGroupSheet(
-            current = group.videos.firstOrNull { it.id == ids.firstOrNull() }?.effectiveGroup
-                ?.takeIf { ids.size == 1 } ?: "",
+            current = if (movingIds.size == 1) {
+                group.videos.firstOrNull { it.id == movingIds.first() }?.effectiveGroup.orEmpty()
+            } else "",
             choices = groupChoices,
-            selectedCount = ids.size,
+            selectedCount = movingIds.size,
             onDismiss = { moveGroupIds = null },
             onPick = { g ->
                 moveGroupIds = null
-                if (g.isNotBlank()) onMoveGroup?.let { it(ids, g) }
-                else onMoveGroup?.let { it(ids, "") }
+                onMoveGroup?.invoke(movingIds, g)
             })
     }
     moveTarget?.let { vid ->

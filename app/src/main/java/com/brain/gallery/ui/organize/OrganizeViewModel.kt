@@ -232,6 +232,11 @@ class OrganizeViewModel @Inject constructor(
     /** Move the current selection into [group]; empty string hands them back. */
     fun moveSelectionToGroup(group: String) {
         val ids = _selection.value.toList()
+        moveIdsToGroup(ids, group)
+    }
+
+    /** Move an explicit set of clips, then clear anything that was ticked. */
+    fun moveIdsToGroup(ids: List<Long>, group: String) {
         if (ids.isEmpty()) return
         viewModelScope.launch(Dispatchers.IO) {
             db.videoDao().setManualGroup(ids, group.trim())

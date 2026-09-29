@@ -149,8 +149,9 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
             onTogglePick = { vm.togglePick(it) },
             groupChoices = vm.groupChoices,
             onMoveGroup = { ids, g ->
-                ids.forEach { vm.togglePick(it) }
-                vm.moveSelectionToGroup(g)
+                // A single clip may not have been ticked, so make the move
+                // explicit rather than depending on what the selection holds.
+                vm.moveIdsToGroup(ids, g)
                 if (g.isNotBlank()) vm.rememberGroupName(g)
             },
             onSwipeNotInterested = { vid -> vm.markNotInterested(vid) },
