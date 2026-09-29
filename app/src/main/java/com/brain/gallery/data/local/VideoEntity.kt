@@ -60,9 +60,18 @@ data class VideoEntity(
     val skipCount: Int = 0,
     val isFavorite: Boolean = false,
 
+    /**
+     * A group the user put this clip in by hand. Empty means "wherever the engine
+     * thinks it belongs". Kept apart from [category] on purpose: a reindex
+     * recomputes category, and a hand-made decision has to outlast that.
+     */
+    val manualGroup: String = "",
+
     // Mark-and-sweep bookkeeping
     val lastSeenScan: Long = 0
 ) {
+    /** The group this clip actually belongs to, hand-placed or inferred. */
+    val effectiveGroup: String get() = manualGroup.ifBlank { category }
     val avgCompletion: Float get() = if (watchCount == 0) 0f else completionSum / watchCount
     val tagList: List<String> get() = tags.split(",").map { it.trim() }.filter { it.isNotEmpty() }
 }

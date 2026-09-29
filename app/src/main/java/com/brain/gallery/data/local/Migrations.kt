@@ -28,3 +28,25 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         )
     }
 }
+
+/**
+ * v5 -> v6: hand-placed groups and multi-select.
+ *
+ * Adds a nullable-by-default column and one scratch table, so no existing row is
+ * touched. Every video starts with manualGroup = '', which reads as "no manual
+ * decision" and keeps engine grouping exactly as it was.
+ */
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE videos ADD COLUMN manualGroup TEXT NOT NULL DEFAULT ''")
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `selection` (
+                `videoId` INTEGER NOT NULL,
+                `pickedAt` INTEGER NOT NULL DEFAULT 0,
+                PRIMARY KEY(`videoId`)
+            )
+            """.trimIndent()
+        )
+    }
+}

@@ -89,6 +89,14 @@ interface VideoDao {
     @Query("UPDATE videos SET personId = :person WHERE id = :id")
     suspend fun setPerson(id: Long, person: Int)
 
+    /**
+     * Put clips in a group by hand. An empty [group] hands the decision back to
+     * the engine. Deliberately separate from applyPerceptual/applySemantic, which
+     * rewrite category on every reindex: a manual placement has to outlive that.
+     */
+    @Query("UPDATE videos SET manualGroup = :group WHERE id IN (:ids)")
+    suspend fun setManualGroup(ids: List<Long>, group: String)
+
     @Query("UPDATE videos SET personId = :to WHERE personId = :from")
     suspend fun mergePersons(from: Int, to: Int)
 

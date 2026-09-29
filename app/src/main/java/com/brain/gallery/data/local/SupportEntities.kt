@@ -45,6 +45,13 @@ data class GroupOverrideEntity(
     val updatedAt: Long = 0
 )
 
+/** Set while the user is picking several clips at once. */
+@Entity(tableName = "selection")
+data class SelectionEntity(
+    @PrimaryKey val videoId: Long,
+    val pickedAt: Long = 0
+)
+
 @Dao
 interface SupportDao {
     @Query("SELECT * FROM not_interested")
@@ -88,4 +95,17 @@ interface SupportDao {
 
     @Query("DELETE FROM group_overrides WHERE groupId = :groupId")
     suspend fun clearGroupName(groupId: String)
+
+    // ---- multi-select ----
+    @Query("SELECT videoId FROM selection")
+    fun observeSelection(): Flow<List<Long>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun pick(e: SelectionEntity)
+
+    @Query("DELETE FROM selection")
+    suspend fun clearSelection()
+
+    @Query("DELETE FROM selection WHERE videoId = :id")
+    suspend fun unpick(id: Long)
 }

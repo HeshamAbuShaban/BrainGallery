@@ -118,12 +118,20 @@ class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
         // A category is only offered when the clips agree, the brain is confident
         // in them, and the bucket is big enough to be a real theme. Everything
         // else stays in the library, unlabelled and unhurried, until it does.
-        val library = memories.size.coerceAtLeast(1)
-        all.groupBy { it.category }
+        all.groupBy { it.effectiveGroup }
             .filter { (cat, list) -> cat != "unknown" && list.size >= MIN_CATEGORY_VIDEOS }
             .mapNotNull { (cat, list) ->
+                // Anything the user placed by hand is their decision already, so
+                // it is offered as-is; only engine-inferred buckets face the gate.
+                if (list.any { it.manualGroup.isNotBlank() }) {
+                    return@mapNotNull Triple(cat, list, 1f)
+                }
                 val confident = list.count { it.confidence >= CATEGORY_MIN_CONFIDENCE }
-                val tagAgree = list.count { cat in it.tagList }.toFloat() / list.size
+                // A hand-placed clip counts as agreement with its own group; there
+                // is no label to agree with and the user already decided.
+                val tagAgree = list.count {
+                    cat in it.tagList || it.manualGroup.isNotBlank()
+                }.toFloat() / list.size
                 // Share of the library this bucket claims, and how it is spread.
                 val spread = list.map { it.folderName.lowercase() }.distinct().size
                 if (confident.toFloat() / list.size < CATEGORY_MIN_CONFIDENT_SHARE) null
