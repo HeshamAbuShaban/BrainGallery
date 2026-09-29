@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -78,7 +79,9 @@ import com.brain.gallery.domain.organize.SmartGroup
 import com.brain.gallery.ui.components.SpotlightPlayer
 import com.brain.gallery.ui.components.ShimmerBar
 import com.brain.gallery.ui.components.VideoThumb
-import com.brain.gallery.ui.GlassNavReserve
+import com.brain.gallery.ui.glass.Glass
+import com.brain.gallery.ui.glass.glass
+import com.brain.gallery.ui.glass.glassReserve
 import com.brain.gallery.ui.components.MoveToGroupSheet
 import com.brain.gallery.ui.spotlight.SpotlightController
 import com.brain.gallery.ui.theme.Accent
@@ -160,7 +163,7 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
     } else {
     Column(Modifier.fillMaxSize().background(Bg)
         .windowInsetsPadding(WindowInsets.navigationBars)
-        .padding(bottom = GlassNavReserve)) {
+        .padding(bottom = glassReserve())) {
         // Header
         Row(Modifier.fillMaxWidth().padding(20.dp, 20.dp, 20.dp, 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
@@ -416,17 +419,16 @@ private fun SelectionBar(
     onClear: () -> Unit
 ) {
     var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
-    val shape = RoundedCornerShape(22.dp)
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
         Row(
             Modifier
-                .padding(bottom = GlassNavReserve - 8.dp)
+                .padding(bottom = glassReserve() - 8.dp)
                 .padding(horizontal = 16.dp)
                 .fillMaxWidth()
-                .clip(shape)
-                .background(Color(0xFF1B2333))
-                .border(1.dp, Accent.copy(alpha = 0.45f), shape)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
+                .height(52.dp)
+                // Same material as the nav, so the two read as one system.
+                .glass(RoundedCornerShape(22.dp), Glass.raised(Accent))
+                .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("$count selected", color = Text1, fontSize = 13.5.sp,

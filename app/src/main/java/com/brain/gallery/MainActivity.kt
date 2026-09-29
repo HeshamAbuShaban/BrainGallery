@@ -54,9 +54,9 @@ import com.brain.gallery.ui.feed.FeedScreen
 import com.brain.gallery.ui.organize.OrganizeScreen
 import com.brain.gallery.ui.organize.SearchScreen
 import com.brain.gallery.ui.organize.OrganizeViewModel
-import com.brain.gallery.ui.GlassNav
-import com.brain.gallery.ui.GlassNavReserve
-import com.brain.gallery.ui.GlassTab
+import com.brain.gallery.ui.glass.GlassNav
+import com.brain.gallery.ui.glass.glassReserve
+import com.brain.gallery.ui.glass.GlassTab
 import com.brain.gallery.ui.spotlight.SpotlightController
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
@@ -153,7 +153,7 @@ private fun Root(spotlight: SpotlightController) {
                         spotlight = spotlight,
                         onLeaveFeed = { go(1) },
                         onChrome = { reelChrome = it },
-                        bottomOverlay = GlassNavReserve
+                        bottomOverlay = glassReserve()
                     )
                 }
                 1 -> Box(Modifier.fillMaxSize()) { OrganizeScreen(spotlight) }
