@@ -71,9 +71,33 @@ only app-specific values are passed in at the call site: `selectedColor`,
 another Compose project, hand it that project's colours, and the material comes
 with it.
 
-## Files
+## What is in the kit
+
+**Material**
 
 - `GlassStyle.kt` — the values that make the material read as glass
 - `Glass.kt` — `Modifier.glass(shape, style)`, the paint itself
 - `GlassSurface.kt` — generic edge-anchored floating pane, plus `glassReserve()`
-- `GlassNav.kt` — the nav expressed purely in terms of the material
+
+**Navigation and menus**
+
+- `GlassNav.kt` / `GlassNavMotion.kt` — the tab bar, and the motion that drives it:
+  one glass pill that travels between slots, stretching into the wider selected tab
+  rather than sliding as a rigid block, with the icon scaling and the label
+  crossfading underneath it
+- `GlassMenu.kt` — an overflow/overflow menu pane with a scrim overlay, per-item
+  tint for destructive rows, disabled states and dividers
+
+**Widgets**
+
+- `GlassWidgets.kt` — `GlassCard`, `GlassChip`, `GlassSegmented` (moving indicator),
+  `GlassStatTile`
+
+## Notes for reuse
+
+- `GlassMenu` is a pane in the caller's overlay, not a real `Popup`. A Popup cannot
+  read what is behind it, so there would be nothing for the glass to tint.
+- `GlassChip` builds its own wash from the style's tint rather than using the full
+  `glass` modifier. A row of chips each casting a 20dp shadow stops being chips.
+- `GlassSegmented` moves one animated float across the track, so there is no
+  per-segment measurement to keep in sync.
