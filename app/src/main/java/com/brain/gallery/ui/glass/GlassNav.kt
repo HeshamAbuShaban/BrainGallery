@@ -1,7 +1,8 @@
 package com.brain.gallery.ui.glass
 
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
@@ -27,8 +28,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -39,6 +47,7 @@ data class GlassTab(val label: String, val icon: ImageVector)
 
 /** Breathing room between the pill and the edge of its tab. */
 private val PillInset = 5.dp
+
 
 /**
  * The nav, expressed purely in terms of the glass material.
@@ -71,6 +80,14 @@ fun GlassNav(
     val alpha = rememberGlassNavAlpha(visible)
     val trackWidth = remember { mutableStateOf(0f) }
     val tabWidths = remember { mutableStateMapOf<Int, Int>() }
+    // Non-null only while a finger is actually down and moving. It is the pill's
+    // live position in track pixels, and null is what hands control back to the
+    // spring.
+    val dragX = remember { mutableStateOf<Float?>(null) }
+    // Fingers are sampled far more coarsely than a spring runs, so this is
+    // smoothed rather than differenced raw — a single jittery frame would
+    // otherwise snap the pill out to full stretch and back.
+    val dragVelocity = remember { mutableStateOf(0f) }
     val pillShape = RoundedCornerShape(percent = 50)
     val pillStyle = rememberGlassNavIndicatorStyle(style)
     val motion = rememberGlassNavIndicatorMotion(
@@ -78,7 +95,9 @@ fun GlassNav(
         count = tabs.size,
         trackWidthPx = { trackWidth.value },
         selectedWidthPx = { (tabWidths[index] ?: 0).toFloat() },
-        insetPx = with(LocalDensity.current) { PillInset.toPx() }
+        insetPx = with(LocalDensity.current) { PillInset.toPx() },
+        dragTargetPx = { dragX.value },
+        dragVelocityPx = { dragVelocity.value }
     )
 
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
@@ -89,11 +108,75 @@ fun GlassNav(
                 .height(height)
                 .glass(RoundedCornerShape(style.corner), style)
                 .padding(horizontal = 5.dp)
+                .pointerInput(tabs.size, onSelect) {
+                    val slop = viewConfiguration.touchSlop
+                    awaitEachGesture {
+                        val down = awaitFirstDown(requireUnconsumed = false)
+                        dragX.value = null
+                        dragVelocity.value = 0f
+                        var dragging = false
+                        var lastIndex = -1
+                        var lastT = down.uptimeMillis
+                        var lastX = down.position.x
+                        var smoothed = 0f
+                        while (true) {
+                            val event = awaitPointerEvent(PointerEventPass.Main)
+                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!change.pressed) break
+                            if (!dragging &&
+                                (change.position - down.position).getDistance() > slop
+                            ) {
+                                dragging = true
+                            }
+                            if (dragging) {
+                                dragX.value = change.position.x
+                                val w = trackWidth.value
+                                if (w > 0f && tabs.isNotEmpty()) {
+                                    val slot = w / tabs.size
+                                    // Slots per second, the unit the pill's
+                                    // deformation is expressed in.
+                                    if (slot > 0f) {
+                                        val dt = change.uptimeMillis - lastT
+                                        if (dt >= 16L) {
+                                            val perSec =
+                                                (change.position.x - lastX) / dt * 1000f / slot
+                                            smoothed = smoothed * 0.55f + perSec * 0.45f
+                                            dragVelocity.value = smoothed
+                                            lastT = change.uptimeMillis
+                                            lastX = change.position.x
+                                        }
+                                        val i = (change.position.x / slot).toInt()
+                                            .coerceIn(0, tabs.lastIndex)
+                                        if (i != lastIndex) {
+                                            lastIndex = i
+                                            onSelect(i)
+                                        }
+                                    }
+                                }
+                                change.consume()
+                            }
+                        }
+                        dragX.value = null
+                        dragVelocity.value = 0f
+                        if (!dragging) {
+                            val w = trackWidth.value
+                            if (w > 0f && tabs.isNotEmpty()) {
+                                val slot = w / tabs.size
+                                if (slot > 0f) {
+                                    val i = (down.position.x / slot).toInt()
+                                        .coerceIn(0, tabs.lastIndex)
+                                    onSelect(i)
+                                }
+                            }
+                        }
+                    }
+                }
         ) {
             GlassNavIndicatorLayer(
                 motion = motion,
                 shape = pillShape,
-                style = pillStyle
+                style = pillStyle,
+                verticalInset = glassNavIndicatorVerticalInset(height)
             )
             Row(
                 Modifier
@@ -106,7 +189,7 @@ fun GlassNav(
                     GlassNavItem(
                         label = tab.label,
                         icon = tab.icon,
-                        selected = i == index,
+                        isSelected = i == index,
                         onClick = { onSelect(i) },
                         onWidth = { tabWidths[i] = it },
                         idleColor = idleColor,
@@ -124,27 +207,32 @@ fun GlassNav(
  * behind it carries the selection, so switching tabs moves one thing instead of
  * two, and the label never changes width as it gains weight — a re-measured label
  * would drag the pill's target around mid-flight.
+ *
+ * It deliberately has no `clickable`. Pointer input lives on the bar as a whole
+ * so a finger can drag the pill between tabs, and a child that consumed the
+ * down event first would take that away. What is left here is the semantics, so
+ * TalkBack still announces the tab, its state, and its action.
  */
 @Composable
 private fun RowScope.GlassNavItem(
     label: String,
     icon: ImageVector,
-    selected: Boolean,
+    isSelected: Boolean,
     onClick: () -> Unit,
     onWidth: (Int) -> Unit,
     idleColor: Color,
     selectedColor: Color,
     selectedLabelColor: Color
 ) {
-    val iconScale = rememberGlassNavIconScale(selected)
-    val labelAlpha = rememberGlassNavLabelAlpha(selected)
+    val iconScale = rememberGlassNavIconScale(isSelected)
+    val labelAlpha = rememberGlassNavLabelAlpha(isSelected)
     val iconInk by animateColorAsState(
-        targetValue = if (selected) selectedColor else idleColor,
+        targetValue = if (isSelected) selectedColor else idleColor,
         animationSpec = GlassMotion.enter(),
         label = "navIconInk"
     )
     val labelInk by animateColorAsState(
-        targetValue = if (selected) selectedLabelColor else idleColor,
+        targetValue = if (isSelected) selectedLabelColor else idleColor,
         animationSpec = GlassMotion.enter(),
         label = "navLabelInk"
     )
@@ -153,8 +241,14 @@ private fun RowScope.GlassNavItem(
         Modifier
             .weight(1f)
             .fillMaxHeight()
-            .clip(RoundedCornerShape(percent = 50))
-            .clickable(onClick = onClick),
+            .semantics {
+                role = Role.Tab
+                selected = isSelected
+                onClick(label) {
+                    onClick()
+                    true
+                }
+            },
         contentAlignment = Alignment.Center
     ) {
         Row(

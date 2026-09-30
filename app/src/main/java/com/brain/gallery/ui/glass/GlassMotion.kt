@@ -34,4 +34,13 @@ object GlassMotion {
 
     /** Standard tween of [mediumMs] using the emphasized curve. */
     fun <T> enter(): FiniteAnimationSpec<T> = tween(mediumMs, easing = emphasized)
+
+    /**
+     * Underdamped on purpose: the value overshoots and wobbles once or twice
+     * before settling. A tween lands flat, and a pill that lands flat reads as a
+     * highlight being switched on. This is the droplet arriving, splashing a
+     * little past its mark, and coming to rest — the feel the nav needs.
+     */
+    fun <T> liquid(): FiniteAnimationSpec<T> =
+        spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow)
 }
