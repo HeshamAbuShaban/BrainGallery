@@ -98,9 +98,12 @@ import com.brain.gallery.ui.components.VideoActionsSheet
 import com.brain.gallery.ui.components.VideoDetailsDialog
 import com.brain.gallery.ui.components.fmtDur
 import com.brain.gallery.ui.components.thumbAtMs
+import com.brain.gallery.ui.glass.Glass
+import com.brain.gallery.ui.glass.glass
 import com.brain.gallery.ui.player.PlayerManager
 import com.brain.gallery.ui.player.ShareHelper
 import com.brain.gallery.ui.spotlight.SpotlightController
+import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.Cyan
 import com.brain.gallery.ui.theme.Motion
@@ -148,7 +151,7 @@ fun FeedScreen(
                     color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
                 Spacer(Modifier.height(12.dp))
                 IconButton(onClick = { vm.refresh() },
-                    modifier = Modifier.background(Color(0xFF1D2534), CircleShape)) {
+                    modifier = Modifier.glass(CircleShape, Glass.onDark(Accent))) {
                     Icon(Icons.Default.Refresh, null, tint = Color.White)
                 }
             }

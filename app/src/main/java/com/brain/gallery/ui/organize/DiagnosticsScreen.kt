@@ -30,6 +30,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brain.gallery.domain.organize.fmtSize
+import com.brain.gallery.ui.glass.Glass
+import com.brain.gallery.ui.glass.glass
+import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.CardShape
 import com.brain.gallery.ui.theme.Cyan
@@ -51,7 +54,7 @@ fun DiagnosticsScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
         Row(Modifier.fillMaxWidth().padding(8.dp, 16.dp, 16.dp, 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack,
-                modifier = Modifier.background(Color(0xFF1D2534), CircleShape).size(38.dp)) {
+                modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(38.dp)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Text1,
                     modifier = Modifier.size(18.dp))
             }
@@ -88,7 +91,7 @@ fun DiagnosticsScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
                 Stat("Battery optimisation", "exempt", Green)
             } else {
                 Row(Modifier.fillMaxWidth().padding(vertical = 6.dp)
-                    .background(Color(0x33243B1B), CardShape)
+                    .glass(CardShape, Glass.onDark(Accent))
                     .clickable {
                         runCatching { ctx.startActivity(vm.batteryRequestIntent()) }
                     }

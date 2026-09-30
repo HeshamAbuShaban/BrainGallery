@@ -8,10 +8,11 @@ import androidx.compose.ui.unit.dp
  * The look of the glass, in one place.
  *
  * The values are the ones that make the material read as frosted on a dark UI:
- * a low-opacity white wash, a hairline edge to catch the boundary, and a soft
- * shadow to lift it off whatever is behind. Nothing here is tied to the app's
- * palette, so the material can be dropped into another project and given that
- * project's colours.
+ * a dark base that holds the pane together when it floats over bright content,
+ * a low-opacity white wash, a lit top rim, a hairline edge to catch the
+ * boundary, and a soft shadow to lift it off whatever is behind. Nothing here is
+ * tied to the app's palette, so the material can be dropped into another project
+ * and given that project's colours.
  */
 data class GlassStyle(
     /** Tint of the pane. White works on dark surfaces; on light, pass a dark tint. */
@@ -28,7 +29,24 @@ data class GlassStyle(
     /** Colour of the shadow underneath. Accent for a glow, black for depth. */
     val shadowColor: Color = Color.Black,
     /** How much of [shadowColor] the shadow carries, 0f..1f. */
-    val shadowAlpha: Float = 1f
+    val shadowAlpha: Float = 1f,
+    /**
+     * Black laid under the wash, 0f..1f. The contrast guarantee.
+     *
+     * A white wash alone can only ever lighten its backdrop, and a pane that
+     * makes a bright video frame brighter is a pane whose labels stop being
+     * readable on it. This layer is nearly invisible over dark content and does
+     * its work exactly where contrast fails; raise it for text over video.
+     */
+    val scrimAlpha: Float = 0.6f,
+    /**
+     * Lit top edge, 0f..1f, drawn in [tint].
+     *
+     * The static half of the glass read: every pane catches light along its top
+     * rim without paying for a moving reflection. The moving half is the opt-in
+     * [glassSheen]. Set to 0f for a flat pane.
+     */
+    val rimAlpha: Float = 0.17f
 ) {
     /** Band alphas, scaled by [alpha] so one knob governs the whole wash. */
     fun scaledBands(): List<Float> = bands.map { it * (alpha / 0.10f) }

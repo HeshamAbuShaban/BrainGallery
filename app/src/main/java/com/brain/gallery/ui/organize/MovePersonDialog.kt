@@ -29,10 +29,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.brain.gallery.data.local.PersonEntity
 import com.brain.gallery.ui.components.VideoThumb
+import com.brain.gallery.ui.glass.Glass
+import com.brain.gallery.ui.glass.glass
+import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.CardShape
 import com.brain.gallery.ui.theme.Cyan
 import com.brain.gallery.ui.theme.Green
-import com.brain.gallery.ui.theme.Surface
 import com.brain.gallery.ui.theme.Text1
 import com.brain.gallery.ui.theme.Text2
 
@@ -45,7 +47,7 @@ fun MovePersonDialog(
     onPick: (Int) -> Unit
 ) {
     Dialog(onDismissRequest = onDismiss) {
-        Column(Modifier.clip(CardShape).background(Surface)
+        Column(Modifier.glass(CardShape, Glass.raised(Accent))
             .padding(20.dp).verticalScroll(rememberScrollState())) {
             Text("Move to which person?", color = Text1, fontSize = 16.sp,
                 fontWeight = FontWeight.Bold)

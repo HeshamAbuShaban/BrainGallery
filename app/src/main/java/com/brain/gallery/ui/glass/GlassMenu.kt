@@ -27,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -35,6 +36,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -123,6 +125,16 @@ fun glassMenuItems(block: GlassMenuScope.() -> Unit): List<GlassMenuItem> =
  *
  * The pane holds a fixed [anchorWidth] rather than hugging its content, so opening
  * a menu whose labels are longer does not move the rows as it measures them.
+ *
+ * Arrival and exit are deliberately different springs. The pane growing in is a
+ * droplet landing — [GlassMotion.liquid] lets it overshoot a little, which reads
+ * as the menu arriving rather than being switched on. The fade and the whole
+ * exit stay on tweens: opacity that overshoots flashes brighter than fully
+ * visible, and a pane that bounces on its way out reads as coming back.
+ *
+ * No reduced-motion signal is consulted: this Compose version exposes none to a
+ * library, and reading platform settings from a component would be a guess. The
+ * durations are kept short instead ([GlassMotion.mediumMs]/[GlassMotion.fastMs]).
  */
 @Composable
 fun GlassMenu(
@@ -140,7 +152,7 @@ fun GlassMenu(
         visible = visible,
         modifier = modifier.width(anchorWidth),
         enter = fadeIn(tween(GlassMotion.mediumMs, easing = GlassMotion.emphasized)) +
-            scaleIn(initialScale = EnterScale, animationSpec = tween(GlassMotion.mediumMs, easing = GlassMotion.emphasized)),
+            scaleIn(initialScale = EnterScale, animationSpec = GlassMotion.liquid()),
         exit = fadeOut(tween(GlassMotion.fastMs, easing = GlassMotion.exit)) +
             scaleOut(targetScale = EnterScale, animationSpec = tween(GlassMotion.fastMs, easing = GlassMotion.exit))
     ) {
@@ -169,6 +181,13 @@ fun GlassMenu(
  * pane draws its own circle over the wash and the two disagree on the edges. The
  * indicator is nulled out for that reason — [collectIsPressedAsState] already
  * knows about the press, and letting the ripple run as well would double it.
+ *
+ * The tappable node and the artwork are deliberately not the same box: the wash
+ * keeps its 40.dp, and the hit node grows to the 48.dp floor around it
+ * ([minimumInteractiveComponentSize] enlarges the node without touching what it
+ * measures). The interactive modifier comes first in the chain so the semantics
+ * node owns the grown bounds — TalkBack and the accessibility scanner then see
+ * the target, not the artwork.
  */
 @Composable
 private fun GlassMenuRow(
@@ -193,37 +212,47 @@ private fun GlassMenuRow(
         Row(
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(percent = 50))
-                .background(wash)
                 .clickable(
                     enabled = item.enabled,
                     interactionSource = interactionSource,
-                    indication = null
+                    indication = null,
+                    role = Role.Button
                 ) {
                     item.onClick()
                     onDismiss()
                 }
-                .heightIn(min = 40.dp)
-                .padding(horizontal = 14.dp, vertical = 9.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .minimumInteractiveComponentSize()
         ) {
-            if (item.icon != null) {
-                Icon(
-                    imageVector = item.icon,
-                    contentDescription = null,
-                    tint = ink,
-                    modifier = Modifier.size(18.dp)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 40.dp)
+                    .clip(RoundedCornerShape(percent = 50))
+                    .background(wash)
+                    .padding(horizontal = 14.dp, vertical = 9.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                if (item.icon != null) {
+                    Icon(
+                        imageVector = item.icon,
+                        // Beside a label, so it is decoration: the row already
+                        // announces its text, and a second description would
+                        // read the icon twice.
+                        contentDescription = null,
+                        tint = ink,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(Modifier.width(11.dp))
+                }
+                Text(
+                    text = item.label,
+                    color = ink,
+                    fontSize = 13.5.sp,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    fontWeight = if (item.tint != null) FontWeight.SemiBold else FontWeight.Normal
                 )
-                Spacer(Modifier.width(11.dp))
             }
-            Text(
-                text = item.label,
-                color = ink,
-                fontSize = 13.5.sp,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-                fontWeight = if (item.tint != null) FontWeight.SemiBold else FontWeight.Normal
-            )
         }
         if (item.dividerAfter) {
             Box(
@@ -245,6 +274,10 @@ private fun GlassMenuRow(
  * presses would make the screen behind it feel dead for a fifth of a second. A
  * disabled `clickable` installs no pointer input at all, so those taps fall
  * through to the content underneath instead.
+ *
+ * The scrim fades on a tween in both directions. A scrim is pure opacity: an
+ * underdamped spring would carry it past its target and flash the screen
+ * brighter than fully covered, which reads as a glitch rather than as motion.
  */
 @Composable
 fun GlassMenuOverlay(
@@ -272,7 +305,9 @@ fun GlassMenuOverlay(
         modifier
             .fillMaxSize()
             // The pane is a child, so it wins the hit test and the scrim only
-            // catches the taps that land beside it.
+            // catches the taps that land beside it. Menu rows are merging nodes
+            // of their own, so they stay separate TalkBack targets rather than
+            // being flattened into the scrim's node.
             .clickable(
                 interactionSource = null,
                 indication = null,

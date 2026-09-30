@@ -44,7 +44,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -60,6 +59,8 @@ import com.brain.gallery.ui.components.VideoActionsSheet
 import com.brain.gallery.ui.components.VideoDetailsDialog
 import com.brain.gallery.ui.components.VideoThumb
 import com.brain.gallery.ui.components.SheetMode
+import com.brain.gallery.ui.glass.Glass
+import com.brain.gallery.ui.glass.glass
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.CardShape
@@ -105,7 +106,7 @@ fun GroupDetail(
         Row(Modifier.fillMaxWidth().padding(8.dp, 16.dp, 16.dp, 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack,
-                modifier = Modifier.background(Color(0xFF1D2534), CircleShape).size(38.dp)) {
+                modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(38.dp)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Text1,
                     modifier = Modifier.size(18.dp))
             }
@@ -116,14 +117,14 @@ fun GroupDetail(
             }
             if (person != null) {
                 IconButton(onClick = { renameOpen = true },
-                    modifier = Modifier.background(Color(0xFF1D2534), CircleShape).size(34.dp)) {
+                    modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(34.dp)) {
                     Icon(Icons.Default.Edit, null, tint = Text1, modifier = Modifier.size(15.dp))
                 }
             }
         }
         if (group.splitSuggested) {
-            Row(Modifier.fillMaxWidth().padding(20.dp, 0.dp).background(
-                Color(0x33243B1B), CardShape).padding(12.dp),
+            Row(Modifier.fillMaxWidth().padding(20.dp, 0.dp)
+                .glass(CardShape, Glass.onDark(Accent)).padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 Text("This may be two different people. Tap one that looks wrong to split it out.",
                     color = Text1, fontSize = 12.sp, modifier = Modifier.weight(1f))
@@ -267,7 +268,7 @@ private fun RenameDialog(
 ) {
     var text by remember { mutableStateOf(initial) }
     Dialog(onDismissRequest = onDismiss) {
-        Column(Modifier.clip(CardShape).background(Color(0xFF151B26)).padding(20.dp)) {
+        Column(Modifier.glass(CardShape, Glass.raised(Accent)).padding(20.dp)) {
             Text(heading, color = Text1, fontSize = 15.sp, fontWeight = FontWeight.Bold)
             if (hint.isNotBlank()) {
                 Spacer(Modifier.height(4.dp))

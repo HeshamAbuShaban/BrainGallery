@@ -34,7 +34,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +41,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brain.gallery.domain.EngineSettings
 import com.brain.gallery.domain.organize.fmtSize
+import com.brain.gallery.ui.glass.Glass
+import com.brain.gallery.ui.glass.glass
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.CardShape
@@ -78,7 +79,7 @@ fun BrainScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
         Row(Modifier.fillMaxWidth().padding(8.dp, 16.dp, 16.dp, 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack,
-                modifier = Modifier.background(Color(0xFF1D2534), CircleShape).size(38.dp)) {
+                modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(38.dp)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Text1,
                     modifier = Modifier.size(18.dp))
             }
@@ -285,7 +286,7 @@ fun BrainScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
 
     if (confirmReset) {
         androidx.compose.ui.window.Dialog(onDismissRequest = { confirmReset = false }) {
-            Column(Modifier.clip(CardShape).background(Color(0xFF151B26)).padding(20.dp)) {
+            Column(Modifier.glass(CardShape, Glass.raised(Accent)).padding(20.dp)) {
                 Text("Rebuild the index?", color = Text1, fontSize = 16.sp,
                     fontWeight = FontWeight.Bold)
                 Spacer(Modifier.height(8.dp))
@@ -324,7 +325,7 @@ private fun Stat(k: String, v: String, vc: Color = Text1) {
 @Composable
 private fun Card(accent: Color, content: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)
-        .background(accent.copy(alpha = 0.10f), CardShape).padding(14.dp)) { content() }
+        .glass(CardShape, Glass.onDark(accent)).padding(14.dp)) { content() }
 }
 
 @Composable

@@ -44,10 +44,12 @@ import com.brain.gallery.ui.components.SpotlightPlayer
 import com.brain.gallery.ui.components.VideoActionsSheet
 import com.brain.gallery.ui.components.VideoDetailsDialog
 import com.brain.gallery.ui.components.VideoThumb
+import com.brain.gallery.ui.glass.Glass
+import com.brain.gallery.ui.glass.glass
 import com.brain.gallery.ui.glass.glassReserve
 import com.brain.gallery.ui.spotlight.SpotlightController
+import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
-import com.brain.gallery.ui.theme.Surface
 import com.brain.gallery.ui.theme.Text1
 import com.brain.gallery.ui.theme.Text2
 
@@ -82,10 +84,12 @@ fun SearchScreen(spotlight: SpotlightController, vm: SearchViewModel = hiltViewM
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = Text2) },
                 singleLine = true, shape = RoundedCornerShape(16.dp),
                 colors = TextFieldDefaults.colors(
-                    focusedContainerColor = Surface, unfocusedContainerColor = Surface,
+                    focusedContainerColor = Color.Transparent,
+                    unfocusedContainerColor = Color.Transparent,
                     focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
                     focusedTextColor = Text1, unfocusedTextColor = Text1),
-                modifier = Modifier.fillMaxWidth().padding(20.dp, 14.dp, 20.dp, 4.dp))
+                modifier = Modifier.fillMaxWidth().padding(20.dp, 14.dp, 20.dp, 4.dp)
+                    .glass(RoundedCornerShape(16.dp), Glass.onDark(Accent)))
             if (q.length >= 2 && results.isEmpty()) {
                 Text("No matches for \"$q\"", color = Text2, fontSize = 13.sp,
                     modifier = Modifier.padding(20.dp))

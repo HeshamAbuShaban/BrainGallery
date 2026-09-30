@@ -11,16 +11,19 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -29,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -37,12 +41,19 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 
+/** Floor for every tappable node in this file, per platform accessibility guidance. */
+private val MinTouchTarget = 48.dp
+
 /**
  * A content card in the same material as everything else on screen: a title, an
  * optional subtitle, and optional trailing content on the right.
  *
  * Pass [onClick] and the card takes a press. The ripple is clipped to the same
  * corner radius as the pane, otherwise it spills past the rounded corners.
+ *
+ * Interactive modifier first, size floor second: [minimumInteractiveComponentSize]
+ * grows the node it wraps, so the semantics node has to sit outside it for the
+ * announced bounds to be the 48.dp target rather than the card's own height.
  */
 @Composable
 fun GlassCard(
@@ -60,7 +71,14 @@ fun GlassCard(
     val shape = RoundedCornerShape(corner)
     val pane = modifier.glass(shape, style)
     Row(
-        modifier = (if (onClick != null) pane.clip(shape).clickable { onClick() } else pane)
+        modifier = (if (onClick != null) {
+            pane
+                .clip(shape)
+                .clickable(role = Role.Button) { onClick() }
+                .minimumInteractiveComponentSize()
+        } else {
+            pane
+        })
             .padding(contentPadding),
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -95,10 +113,19 @@ fun GlassCard(
  * A pill for tags and filters.
  *
  * The fill, the hairline and the label all cross-fade on [GlassMotion]'s
- * standard curve, so a chip reads as lighting up rather than switching. The wash
- * is built
- * from [style] instead of the full [glass] modifier because a row of chips, each
- * casting a 20dp shadow, is not a row of chips any more — it is a row of plates.
+ * standard curve, so a chip reads as lighting up rather than switching. Colour
+ * stays on a tween deliberately: an underdamped colour animation extrapolates
+ * past its endpoints, and a label that flickers through an out-of-range hue
+ * reads as broken rather than as liquid.
+ *
+ * The wash is built from [style] instead of the full [glass] modifier because a
+ * row of chips, each casting a 20dp shadow, is not a row of chips any more — it
+ * is a row of plates. The one layer kept back from [glass] is the scrim, since
+ * a chip is often the only thing between its label and a bright frame.
+ *
+ * Toggled via [toggleable] so the state is announced as checked, not just
+ * clicked, and the pill itself stays 34.dp while the tappable node grows to the
+ * 48.dp floor around it.
  */
 @Composable
 fun GlassChip(
@@ -134,28 +161,42 @@ fun GlassChip(
         animationSpec = spec,
         label = "chipInk"
     )
+    val scrimAlpha = style.scrimAlpha
 
     Row(
         modifier
-            .clip(pill)
-            .background(fill)
-            .border(style.borderWidth, edge, pill)
-            .clickable(enabled = enabled) { onClick() }
-            .heightIn(min = height)
-            .padding(horizontal = 13.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically
+            .toggleable(
+                value = selected,
+                enabled = enabled,
+                role = Role.Checkbox
+            ) { onClick() }
+            .minimumInteractiveComponentSize()
     ) {
-        if (icon != null) {
-            Icon(icon, null, tint = ink, modifier = Modifier.size(15.dp))
-            Spacer(Modifier.width(6.dp))
+        Row(
+            Modifier
+                .heightIn(min = height)
+                .clip(pill)
+                .then(
+                    if (scrimAlpha > 0f) Modifier.background(Color.Black.copy(alpha = scrimAlpha))
+                    else Modifier
+                )
+                .background(fill)
+                .border(style.borderWidth, edge, pill)
+                .padding(horizontal = 13.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            if (icon != null) {
+                Icon(icon, null, tint = ink, modifier = Modifier.size(15.dp))
+                Spacer(Modifier.width(6.dp))
+            }
+            Text(
+                text = label,
+                color = ink,
+                fontSize = 12.5.sp,
+                maxLines = 1,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+            )
         }
-        Text(
-            text = label,
-            color = ink,
-            fontSize = 12.5.sp,
-            maxLines = 1,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
-        )
     }
 }
 
@@ -164,6 +205,20 @@ fun GlassChip(
  * the segments. The segments share the track equally, so the indicator's travel
  * is a single animated fraction of the track width — no per-segment measurement
  * to keep in sync.
+ *
+ * Track and hit area are two boxes. The track keeps the caller's [height]; the
+ * segments live in a second row that is never shorter than 48.dp, which is what
+ * makes the control tappable without making the artwork taller. Both share the
+ * same horizontal inset, so a segment's label stays centred on the indicator
+ * that lands under it.
+ *
+ * The indicator arrives on [GlassMotion.liquid] — it is the same droplet as the
+ * nav pill and it should splash a little past its mark. The labels' colour
+ * crossfades stay on a tween for the same reason as [GlassChip]'s: colour has
+ * no meaningful overshoot.
+ *
+ * No reduced-motion signal is consulted: this Compose version exposes none to a
+ * library, so the moves stay short instead of guessing at a platform setting.
  */
 @Composable
 fun GlassSegmented(
@@ -183,36 +238,46 @@ fun GlassSegmented(
     val cell = RoundedCornerShape(percent = 50)
     val travel by animateFloatAsState(
         targetValue = index.toFloat(),
-        animationSpec = GlassMotion.enter(),
+        animationSpec = GlassMotion.liquid(),
         label = "segmentedTravel"
     )
+    val targetHeight = maxOf(height, MinTouchTarget)
 
-    Box(
-        modifier
-            .height(height)
-            .glass(RoundedCornerShape(corner), style)
-            .padding(3.dp)
-    ) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
         Box(
             Modifier
-                .layout { measurable, constraints ->
-                    val placeable = measurable.measure(constraints)
-                    val segment = if (constraints.hasBoundedWidth) {
-                        constraints.maxWidth.toFloat() / count
-                    } else {
-                        placeable.width.toFloat()
+                .fillMaxWidth()
+                .height(height)
+                .glass(RoundedCornerShape(corner), style)
+                .padding(3.dp)
+        ) {
+            Box(
+                Modifier
+                    .layout { measurable, constraints ->
+                        val placeable = measurable.measure(constraints)
+                        val segment = if (constraints.hasBoundedWidth) {
+                            constraints.maxWidth.toFloat() / count
+                        } else {
+                            placeable.width.toFloat()
+                        }
+                        layout(placeable.width, placeable.height) {
+                            placeable.placeRelative((segment * travel).roundToInt(), 0)
+                        }
                     }
-                    layout(placeable.width, placeable.height) {
-                        placeable.placeRelative((segment * travel).roundToInt(), 0)
-                    }
-                }
-                .fillMaxHeight()
-                .fillMaxWidth(1f / count)
-                .clip(cell)
-                .background(selectedColor.copy(alpha = 0.30f))
-                .border(1.dp, selectedColor.copy(alpha = 0.45f), cell)
-        )
-        Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+                    .fillMaxHeight()
+                    .fillMaxWidth(1f / count)
+                    .clip(cell)
+                    .background(selectedColor.copy(alpha = 0.30f))
+                    .border(1.dp, selectedColor.copy(alpha = 0.45f), cell)
+            )
+        }
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .height(targetHeight)
+                .padding(horizontal = 3.dp)
+                .selectableGroup()
+        ) {
             labels.forEachIndexed { i, label ->
                 val isSelected = i == index
                 val ink by animateColorAsState(
@@ -224,7 +289,8 @@ fun GlassSegmented(
                     Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .clickable { onSelect(i) },
+                        .selectable(selected = isSelected, role = Role.Tab) { onSelect(i) }
+                        .minimumInteractiveComponentSize(),
                     contentAlignment = Alignment.Center
                 ) {
                     Text(

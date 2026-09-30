@@ -25,7 +25,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -40,6 +39,9 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.videoFrameMillis
 import com.brain.gallery.data.local.VideoEntity
+import com.brain.gallery.ui.glass.Glass
+import com.brain.gallery.ui.glass.glass
+import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.CardShape
 import com.brain.gallery.ui.theme.Pink
 
@@ -58,8 +60,7 @@ fun VideoThumb(
     var dragX by androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     Box(modifier
         .offset { androidx.compose.ui.unit.IntOffset(dragX.roundToInt(), 0) }
-        .clip(CardShape)
-        .background(Color(0xFF151B26))
+        .glass(CardShape, Glass.onDark(Accent))
         .then(
             if (onClick != null || onLongClick != null)
                 Modifier.combinedClickable(onClick = { onClick?.invoke() },

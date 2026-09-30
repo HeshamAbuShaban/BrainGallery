@@ -172,17 +172,17 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
                 Text("Organized by your on-device brain", color = Text2, fontSize = 12.5.sp)
             }
             IconButton(onClick = { vm.exportMemory() },
-                modifier = Modifier.background(Color(0xFF1D2534), CircleShape).size(40.dp)) {
+                modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(40.dp)) {
                 Icon(Icons.Default.Save, null, tint = Text1, modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.width(8.dp))
             IconButton(onClick = { showDiag = true },
-                modifier = Modifier.background(Color(0xFF1D2534), CircleShape).size(40.dp)) {
+                modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(40.dp)) {
                 Icon(Icons.Default.BugReport, null, tint = Text1, modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.width(8.dp))
             IconButton(onClick = { vm.rescan() },
-                modifier = Modifier.background(Color(0xFF1D2534), CircleShape).size(40.dp)) {
+                modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(40.dp)) {
                 Icon(Icons.Default.Refresh, null, tint = Text1, modifier = Modifier.size(18.dp))
             }
         }
@@ -276,7 +276,7 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
 
 @Composable
 private fun StatCard(value: String, label: String, color: Color, modifier: Modifier = Modifier) {
-    Column(modifier.background(Color(0xFF151B26), CardShape).padding(12.dp)) {
+    Column(modifier.glass(CardShape, Glass.onDark(Accent)).padding(12.dp)) {
         Text(value, color = color, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
         Text(label, color = Text2, fontSize = 11.sp)
     }
@@ -302,8 +302,7 @@ fun GroupCardFull(
     Box(Modifier
         .fillMaxWidth()
         .aspectRatio(0.86f)
-        .clip(CardShape)
-        .background(Color(0xFF151B26))
+        .glass(CardShape, Glass.onDark(Accent))
         .combinedClickable(
             onClick = onOpen,
             onLongClick = {
@@ -383,7 +382,7 @@ private fun MergePersonDialog(
     onDismiss: () -> Unit, onPick: (SmartGroup) -> Unit
 ) {
     androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
-        Column(Modifier.clip(CardShape).background(Color(0xFF151B26)).padding(20.dp)) {
+        Column(Modifier.glass(CardShape, Glass.raised(Accent)).padding(20.dp)) {
             Text("Merge \"${group.title}\" into…", color = Text1, fontSize = 15.sp,
                 fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(4.dp))
