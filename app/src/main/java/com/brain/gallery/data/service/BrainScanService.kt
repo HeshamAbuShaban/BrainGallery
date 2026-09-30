@@ -277,7 +277,11 @@ class BrainScanService : LifecycleService() {
         db.supportDao().pruneEvents(20000)
 
         phase("done")
-        val remaining = dao.perceptualPendingCount() + dao.semanticPendingCount()
+        // The voice queue has to count here as well, or an otherwise-indexed
+        // library cancels the alarm and the voice pass stops the moment the
+        // app is closed — it only ever advanced while someone was watching.
+        val remaining = dao.perceptualPendingCount() + dao.semanticPendingCount() +
+            if (cfg.prosodyEnabled) dao.prosodyPendingCount() else 0
         if (remaining > 0) {
             // Something is still queued: vendor cleaners kill long runs, so come back.
             RescheduleReceiver.schedule(this)
