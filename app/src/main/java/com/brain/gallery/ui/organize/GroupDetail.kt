@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
@@ -64,6 +65,7 @@ import com.brain.gallery.ui.glass.glass
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.CardShape
+import com.brain.gallery.ui.theme.ChipShape
 import com.brain.gallery.ui.theme.Green
 import com.brain.gallery.ui.theme.Pink
 import com.brain.gallery.ui.theme.Text1
@@ -99,6 +101,10 @@ fun GroupDetail(
     var detailsFor by remember { mutableStateOf<VideoEntity?>(null) }
     var renameOpen by remember { mutableStateOf(false) }
     var sheetMode by remember { mutableStateOf(SheetMode.ROOT) }
+    // Big groups page: 60 thumbs at a time, so opening a 700-clip person
+    // does not compose the whole library at once.
+    var shown by remember(group.id) { mutableStateOf(60) }
+    val visible = group.videos.take(shown)
 
     Column(Modifier.fillMaxSize().background(Bg)
         .windowInsetsPadding(WindowInsets.navigationBars)
@@ -147,7 +153,7 @@ fun GroupDetail(
             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(group.videos, key = { it.id }) { v ->
+            items(visible, key = { it.id }) { v ->
                 val keeper = v.id in group.keeperIds
                 val redund = v.id in group.redundantIds
                 Box(Modifier.aspectRatio(0.7f).alpha(if (redund) 0.55f else 1f)) {
@@ -195,6 +201,19 @@ fun GroupDetail(
                         Icon(if (v.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                             null, tint = if (v.isFavorite) Pink else Color.White.copy(alpha = 0.8f),
                             modifier = Modifier.size(15.dp))
+                    }
+                }
+            }
+            if (shown < group.videos.size) {
+                item(span = { GridItemSpan(3) }) {
+                    Box(Modifier.fillMaxWidth().padding(vertical = 10.dp),
+                        contentAlignment = Alignment.Center) {
+                        Text("Show 60 more (${group.videos.size - shown} left)",
+                            color = Accent, fontSize = 13.5.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .glass(ChipShape, Glass.onDark(Accent))
+                                .clickable { shown += 60 }
+                                .padding(horizontal = 18.dp, vertical = 10.dp))
                     }
                 }
             }

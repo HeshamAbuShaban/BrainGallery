@@ -7,7 +7,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.random.Random
 
-data class FeedItem(val video: VideoEntity, val score: Float, val why: String)
+data class FeedItem(val video: VideoEntity, val score: Float)
 
 /**
  * Builds the For You reel.
@@ -27,7 +27,9 @@ class FeedComposer @Inject constructor() {
         videos: List<VideoEntity>,
         events: List<WatchEventEntity>,
         suppressed: Set<Long> = emptySet(),
-        limit: Int = 60
+        limit: Int = 60,
+        /** Taught by the viewer in settings. "Open" ranks exactly as before. */
+        mood: String = "Open"
     ): List<FeedItem> {
         if (videos.isEmpty()) return emptyList()
         val pool = if (suppressed.isEmpty()) videos else videos.filter { it.id !in suppressed }
@@ -38,7 +40,7 @@ class FeedComposer @Inject constructor() {
 
         val ranked = pool.asSequence()
             .filter { it.junkScore < 0.85f }
-            .map { v -> score(v, recentIds, hour) }
+            .map { v -> score(v, recentIds, hour, mood) }
             .sortedByDescending { it.score }
             .take(limit * 2)
             .toList()
@@ -66,38 +68,55 @@ class FeedComposer @Inject constructor() {
         return out
     }
 
-    private fun score(v: VideoEntity, recentIds: Set<Long>, hour: Int): FeedItem {
+    private fun score(v: VideoEntity, recentIds: Set<Long>, hour: Int, mood: String): FeedItem {
         var s = 0.3f // base exploration
-        var why = "Fresh pick"
         // Behavior: completion is king
         if (v.watchCount > 0) {
             s += v.avgCompletion * 0.35f
-            if (v.avgCompletion > 0.7f) { s += 0.15f; why = "You finished this before" }
+            if (v.avgCompletion > 0.7f) s += 0.15f
             if (v.skipCount > 2) s -= 0.2f
         } else {
-            s += 0.12f; why = "Unwatched"
+            s += 0.12f
         }
-        if (v.isFavorite) { s += 0.2f; why = "One of your favorites" }
+        if (v.isFavorite) s += 0.2f
         // People matter: faces, especially smiles, earn a lift.
-        if (v.faceCount > 0) {
-            s += 0.08f
-            if (why == "Fresh pick" || why == "Unwatched") why = "People you film"
-        }
-        if (v.smileCount > 0) { s += 0.05f; if (why == "People you film") why = "Happy moment" }
+        if (v.faceCount > 0) s += 0.08f
+        if (v.smileCount > 0) s += 0.05f
         // Nostalgia: buried gem
         val ageDays = (System.currentTimeMillis() / 1000 - v.dateAddedSec) / 86400
-        if (ageDays > 180 && v.watchCount == 0 && v.junkScore < 0.4f) {
-            s += 0.25f; why = "Buried gem • ${ageDays / 30}mo ago"
-        }
-        if (isOnThisDay(v.dateAddedSec)) { s += 0.2f; why = "On this day • ${ageDays / 365}y ago" }
+        val buried = ageDays > 180 && v.watchCount == 0 && v.junkScore < 0.4f
+        if (buried) s += 0.25f
+        val today = isOnThisDay(v.dateAddedSec)
+        if (today) s += 0.2f
         // Time-of-day fit
         val short = v.durationMs < 25_000
         if ((hour < 11 && short) || (hour >= 20 && v.durationMs > 60_000)) s += 0.1f
+        // Monthly mood: the viewer's taught tilt, applied before the confidence
+        // multiplier so a mood never outranks what the brain actually knows.
+        when (mood) {
+            "Nostalgic" -> {
+                if (buried) s += 0.2f
+                if (today) s += 0.15f
+            }
+            "Hype" -> {
+                if (v.category == "music" || v.category == "sport" || v.category == "gaming") s += 0.2f
+                if (short) s += 0.1f
+            }
+            "Calm" -> {
+                if (short) s += 0.1f
+                if (v.smileCount > 0) s += 0.1f
+                if (v.junkScore > 0.5f) s *= 0.8f
+            }
+            "Funny" -> {
+                if (v.smileCount > 0) s += 0.2f
+                else if (v.faceCount > 0) s += 0.05f
+            }
+        }
         // Confidence penalty: uncertain brain ranks lower until L1/L2 done
         s *= (0.7f + v.confidence * 0.3f)
         // Anti-repeat-session: watched recently sinks
         if (v.id in recentIds) s *= 0.35f
-        return FeedItem(v, s.coerceIn(0f, 1f), why)
+        return FeedItem(v, s.coerceIn(0f, 1f))
     }
 
     private fun isOnThisDay(dateAddedSec: Long): Boolean {

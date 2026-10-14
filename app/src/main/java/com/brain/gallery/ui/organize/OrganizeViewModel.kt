@@ -17,6 +17,7 @@ import com.brain.gallery.domain.SettingsStore
 import com.brain.gallery.domain.organize.GroupBuilder
 import com.brain.gallery.domain.organize.SmartGroup
 import com.brain.gallery.engine.MemoryDocBuilder
+import com.brain.gallery.ui.theme.AccentHolder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -76,7 +77,10 @@ class OrganizeViewModel @Inject constructor(
     private var allVideos: List<VideoEntity> = emptyList()
 
     init {
-        viewModelScope.launch { _settings.value = store.load() }
+        viewModelScope.launch {
+            _settings.value = store.load()
+            AccentHolder.argb = _settings.value.accentArgb
+        }
         viewModelScope.launch {
             // conflate: collapse bursts of writes into one rebuild, and skip the
             // rebuild entirely when nothing structural actually changed.
@@ -366,6 +370,8 @@ class OrganizeViewModel @Inject constructor(
 
     fun updateSettings(s: EngineSettings) {
         _settings.value = s
+        // The holder is the live accent; the save below only persists it.
+        AccentHolder.argb = s.accentArgb
         viewModelScope.launch(Dispatchers.IO) { store.save(s) }
     }
     fun resetDerived() {

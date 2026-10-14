@@ -5,6 +5,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -20,8 +24,15 @@ val Line = Color(0xFF2A3446)
 val Text1 = Color(0xFFF2F5FA)
 val Text2 = Color(0xFF9AA6B8)
 val Text3 = Color(0xFF5F6B7E)
-val Accent = Color(0xFF8B5CF6)
-val AccentSoft = Color(0x338B5CF6)
+/**
+ * The one accent everything reads. It is a getter over observable state, not
+ * a constant, so picking a color in settings repaints the whole app without
+ * touching a single call site — and non-composable readers just get the
+ * current value.
+ */
+object AccentHolder { var argb by mutableLongStateOf(0xFF8B5CF6L) }
+val Accent: Color get() = Color(AccentHolder.argb)
+val AccentSoft: Color get() = Accent.copy(alpha = 0.2f)
 val Pink = Color(0xFFEC4899)
 val Green = Color(0xFF10B981)
 val Cyan = Color(0xFF06B6D4)
@@ -32,12 +43,12 @@ val CardShape = RoundedCornerShape(20.dp)
 val ChipShape = RoundedCornerShape(50.dp)
 val SheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
 
-private val Scheme = darkColorScheme(
+private fun scheme(accent: Color) = darkColorScheme(
     background = Bg,
     surface = Surface,
     surfaceVariant = Surface2,
     surfaceContainerHigh = Elevated,
-    primary = Accent,
+    primary = accent,
     secondary = Cyan,
     tertiary = Pink,
     error = Danger,
@@ -75,5 +86,7 @@ private val Type = Typography(
 
 @Composable
 fun BrainTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = Scheme, typography = Type, content = content)
+    // Reading the holder subscribes: a new accent rebuilds the scheme once.
+    val scheme = remember(AccentHolder.argb) { scheme(Accent) }
+    MaterialTheme(colorScheme = scheme, typography = Type, content = content)
 }
