@@ -81,6 +81,7 @@ import com.brain.gallery.ui.components.ShimmerBar
 import com.brain.gallery.ui.components.VideoThumb
 import com.brain.gallery.ui.glass.Glass
 import com.brain.gallery.ui.glass.glass
+import com.brain.gallery.ui.glass.GlassStyle
 import com.brain.gallery.ui.glass.glassReserve
 import com.brain.gallery.ui.components.MoveToGroupSheet
 import com.brain.gallery.ui.spotlight.SpotlightController
@@ -340,7 +341,10 @@ fun GroupCardFull(
             Text(g.subtitle, color = Color.White.copy(alpha = 0.7f), fontSize = 11.sp, maxLines = 2)
         }
         DropdownMenu(expanded = menu, onDismissRequest = { menu = false },
-            modifier = Modifier.background(Color(0xFF1D2534))) {
+            modifier = Modifier
+                .width(220.dp)
+                .glass(RoundedCornerShape(20.dp), GlassStyle()) // ENH: liquid glass on context menu
+        ) {
             DropdownMenuItem(text = { Text("Open", color = Text1) },
                 leadingIcon = { Icon(Icons.Default.FolderOpen, null, tint = Text1, modifier = Modifier.size(18.dp)) },
                 onClick = { menu = false; onOpen() })

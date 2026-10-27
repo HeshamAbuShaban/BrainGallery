@@ -75,6 +75,9 @@ interface SupportDao {
     @Query("SELECT v FROM app_kv WHERE k = :k")
     suspend fun get(k: String): String?
 
+    @Query("SELECT v FROM app_kv WHERE k = :k")
+    fun observeValue(k: String): Flow<String?>
+
     @Query("INSERT OR REPLACE INTO app_kv (k, v) VALUES (:k, :v)")
     suspend fun put(k: String, v: String)
 

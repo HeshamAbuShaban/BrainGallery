@@ -43,8 +43,18 @@ class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
         val favs = all.filter { it.isFavorite }
         val byId = persons.associateBy { it.id }
 
-        out += SmartGroup("memories", "Memories", "${memories.size} videos worth keeping",
-            GroupKind.MEMORIES, memories.sortedByDescending { it.dateAddedSec }.take(30), 0xFF8B5CF6)
+        // Memories is a shelf of picks, not the whole library: favorites first,
+        // then recent months, then clips with smiles in them. Everything else
+        // still lives in its own group below. A shelf that holds everything
+        // holds nothing — that is what "1312 videos worth keeping" was.
+        val memPool = memories
+        val curated = (memPool.filter { it.isFavorite } +
+            memPool.filter { !it.isFavorite && ageDays(it) <= 120 } +
+            memPool.filter { it.smileCount > 0 })
+            .distinctBy { it.id }
+            .sortedByDescending { it.dateAddedSec }
+        out += SmartGroup("memories", "Memories", "${curated.size} favorites, recent and smiles",
+            GroupKind.MEMORIES, curated, 0xFF8B5CF6)
 
         // Identity: real names when known, split warnings when bimodality detected.
         // How many distinct clusters independently claim each name? More than one
@@ -69,7 +79,7 @@ class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
             val collision = if (p?.name.isNullOrBlank() && (nameHits[key] ?: 0) > 1)
                 p?.suggestedName else null
             out += SmartGroup("person_$pid", label, note, GroupKind.PEOPLE,
-                list.sortedByDescending { it.dateAddedSec }.take(30), 0xFFEC4899,
+                list.sortedByDescending { it.dateAddedSec }, 0xFFEC4899,
                 personId = pid, splitSuggested = p?.splitSuggested == true,
                 nameCollision = collision)
         }
@@ -80,7 +90,7 @@ class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
                 out += SmartGroup("people", "People",
                     "${people.size} videos • $smiles smiles", GroupKind.PEOPLE,
                     people.sortedWith(compareByDescending<VideoEntity> { it.smileCount }
-                        .thenByDescending { it.faceCount }).take(30), 0xFFEC4899)
+                        .thenByDescending { it.faceCount }), 0xFFEC4899)
             }
         }
 
@@ -91,7 +101,7 @@ class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
             val savings = dupSets.sumOf { it.savingsBytes }
             out += SmartGroup("dups", "Duplicates",
                 "${dupSets.size} sets • free ${fmtSize(savings)}", GroupKind.DUPLICATES,
-                dupSets.flatMap { it.all }.take(30),
+                dupSets.flatMap { it.all },
                 0xFFF59E0B,
                 keeperIds = dupSets.map { it.keeper.id }.toSet(),
                 redundantIds = dupSets.flatMap { it.redundant }.map { it.id }.toSet(),
@@ -100,7 +110,7 @@ class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
         val gems = memories.filter { it.watchCount == 0 && ageDays(it) > 180 }
         if (gems.isNotEmpty()) out += SmartGroup("gems", "Buried gems",
             "${gems.size} unseen for 6+ months", GroupKind.GEMS,
-            gems.sortedBy { it.dateAddedSec }.take(30), 0xFF06B6D4)
+            gems.sortedBy { it.dateAddedSec }, 0xFF06B6D4)
         val otd = memories.filter { isOnThisDay(it.dateAddedSec) }
         if (otd.isNotEmpty()) out += SmartGroup("otd", "On this day",
             "From years past, today", GroupKind.ON_THIS_DAY, otd, 0xFFF59E0B)
@@ -145,16 +155,16 @@ class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
                     "cat_$cat", cat.replaceFirstChar { it.uppercase() },
                     "${list.size} videos" + if (solid) "" else " • still learning",
                     GroupKind.CATEGORY,
-                    list.sortedByDescending { it.dateAddedSec }.take(30), accentFor(cat)
+                    list.sortedByDescending { it.dateAddedSec }, accentFor(cat)
                 )
             }
 
-        val unreviewed = all.filter { it.brainLevel < 1 }.take(30)
+        val unreviewed = all.filter { it.brainLevel < 1 }
         if (unreviewed.isNotEmpty()) out += SmartGroup("unreviewed", "Needs a look",
             "${unreviewed.size} not understood yet", GroupKind.UNREVIEWED, unreviewed, 0xFF6E7681)
         if (junk.isNotEmpty()) out += SmartGroup("junk", "Clutter drawer",
             "${junk.size} memes, screenshots, downloads", GroupKind.JUNK,
-            junk.sortedByDescending { it.dateAddedSec }.take(30), 0xFF30363D)
+            junk.sortedByDescending { it.dateAddedSec }, 0xFF30363D)
 
         // A name the user chose beats any engine label, for every kind of group.
         if (customNames.isEmpty()) return out
@@ -187,7 +197,7 @@ class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
             ?: folder.replaceFirstChar { it.uppercase() }
         return SmartGroup("event_${folder}_${first().dateAddedSec}", label,
             "$size clips • ${folder}", GroupKind.EVENT,
-            sortedByDescending { it.dateAddedSec }.take(30), 0xFF10B981)
+            sortedByDescending { it.dateAddedSec }, 0xFF10B981)
     }
 
     private fun ageDays(v: VideoEntity) =
