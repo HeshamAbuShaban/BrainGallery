@@ -31,7 +31,8 @@ become one query.
 | **Events** | Same-folder bursts within 3-day gaps auto-cluster into trips, parties, weekends. |
 | **Nostalgia** | Buried gems (unseen 6+ months) and On-this-day surfacing. |
 | **Search** | Who/what/where/when-aware; a real name routes straight to that person's library. |
-| **For You feed** | Completion-weighted, people-aware, 80/20 explore, never repeats a category twice. Every card explains *why*. |
+| **For You feed** | Completion-weighted, people-aware, 80/20 explore, never repeats a category twice. Every card explains *why* it ranked. |
+| **Tune tab** | The ranking is yours: presets (Nostalgic, Hype, Calm, Funny) plus the raw weights behind them — finish rate, fresh finds, people, memories, energy, reel length, replay demotion, variety, surprise. No hidden constants. |
 | **Watch anywhere** | Any thumbnail opens a spotlight player with a More-like-this rail. |
 | **Not interested** | Actually works — suppresses that clip *and its duplicates*, and travels with your data. |
 | **Portability** | Your human layer (names, favourites, history) exports as one file. Wiping the app costs you nothing that matters. |
@@ -93,9 +94,15 @@ app/src/main/java/com/brain/gallery/
 └── ui/
     ├── organize/  Library, groups, search, spotlight, Brain screen
     ├── feed/      Vertical reels (single shared ExoPlayer)
+    ├── tune/      For You presets + the ranking weights, as sliders
+    ├── glass/     The design system: layered-translucency chrome & widgets
     ├── components/Thumbnails, action sheets, hero transitions
     └── theme/     Colour, type, motion tokens
 ```
+
+Working docs: [`docs/DESIGN-RESEARCH.md`](docs/DESIGN-RESEARCH.md) (the UI
+direction) and [`docs/ROADMAP.md`](docs/ROADMAP.md) (the restructuring plan —
+navigation, feature completion, file-type expansion).
 
 ## Build
 
