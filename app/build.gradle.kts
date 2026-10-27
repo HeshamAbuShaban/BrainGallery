@@ -120,4 +120,9 @@ dependencies {
     implementation(libs.tensorflow.lite)
 
     debugImplementation(libs.androidx.ui.tooling)
+
+    // First tests in the repo: they guard the ranking the Tune tab exposes.
+    testImplementation("junit:junit:4.13.2")
+    // EngineSettings serializes through org.json, which is a stub on the JVM.
+    testImplementation("org.json:json:20240303")
 }

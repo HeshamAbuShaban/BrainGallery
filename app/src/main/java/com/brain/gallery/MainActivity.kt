@@ -28,6 +28,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -54,6 +55,7 @@ import com.brain.gallery.ui.feed.FeedScreen
 import com.brain.gallery.ui.organize.OrganizeScreen
 import com.brain.gallery.ui.organize.SearchScreen
 import com.brain.gallery.ui.organize.OrganizeViewModel
+import com.brain.gallery.ui.tune.TuneScreen
 import com.brain.gallery.ui.glass.GlassNav
 import com.brain.gallery.ui.glass.glassReserve
 import com.brain.gallery.ui.glass.GlassTab
@@ -109,7 +111,8 @@ private fun Root(spotlight: SpotlightController) {
     val tabs = listOf(
         GlassTab("For You", Icons.Default.PlayArrow),
         GlassTab("Organize", Icons.Default.GridView),
-        GlassTab("Search", Icons.Default.Search)
+        GlassTab("Search", Icons.Default.Search),
+        GlassTab("Tune", Icons.Default.Tune)
     )
 
     fun go(i: Int) {
@@ -157,7 +160,8 @@ private fun Root(spotlight: SpotlightController) {
                     )
                 }
                 1 -> Box(Modifier.fillMaxSize()) { OrganizeScreen(spotlight) }
-                else -> Box(Modifier.fillMaxSize()) { SearchScreen(spotlight) }
+                2 -> Box(Modifier.fillMaxSize()) { SearchScreen(spotlight) }
+                else -> Box(Modifier.fillMaxSize()) { TuneScreen() }
             }
         }
 

@@ -127,6 +127,8 @@ fun FeedScreen(
 ) {
     val feed by vm.feed.collectAsState()
     val loading by vm.loading.collectAsState()
+    // Declared up here because the loading/empty gates below already read it.
+    var shown by remember { mutableStateOf(feed) }
     val ctx = LocalContext.current
     val haptics = LocalHapticFeedback.current
 
@@ -137,11 +139,11 @@ fun FeedScreen(
 
     if (loading) {
         Box(Modifier.fillMaxSize().background(Bg), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = Color(0xFF8B5CF6))
+            CircularProgressIndicator(color = Accent)
         }
         return
     }
-    if (feed.isEmpty()) {
+    if (shown.isEmpty()) {
         Box(Modifier.fillMaxSize().background(Bg), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text("Nothing to show", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
@@ -160,7 +162,12 @@ fun FeedScreen(
     }
 
     val spotlightOpen by spotlight.isOpen.collectAsState()
-    val pagerState = rememberPagerState(pageCount = { feed.size })
+    // The list reorders on every watch event (banded shuffle), which used to
+    // swap the clip under a finger mid-swipe. Hold the visible order until
+    // the pager settles; keying pages by clip keeps the current one in place
+    // when the order changes underneath.
+    val pagerState = rememberPagerState(pageCount = { shown.size })
+    if (!pagerState.isScrollInProgress && shown !== feed) shown = feed
     val scope = rememberCoroutineScope()
     val deleteAsk by vm.deleteAsk.collectAsState()
     var menuFor by remember { mutableStateOf<VideoEntity?>(null) }
@@ -180,7 +187,7 @@ fun FeedScreen(
     fun advance() {
         val next = pagerState.currentPage + 1
         scope.launch {
-            if (next < feed.size) pagerState.animateScrollToPage(next)
+            if (next < shown.size) pagerState.animateScrollToPage(next)
             else {
                 // Feed exhausted: reshuffle a fresh batch rather than stopping dead.
                 vm.reshuffle()
@@ -271,8 +278,12 @@ fun FeedScreen(
                 }
             }
     ) {
-        VerticalPager(state = pagerState, modifier = Modifier.fillMaxSize()) { page ->
-            val item = feed[page]
+        VerticalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+            key = { i -> shown.getOrNull(i)?.video?.id ?: i }
+        ) { page ->
+            val item = shown[page]
             ReelPage(
                 item = item,
                 isActive = pagerState.currentPage == page,
@@ -284,7 +295,7 @@ fun FeedScreen(
                 onMenu = { menuFor = item.video },
                 onEnded = { advance() },
                 onSimilar = {
-                    spotlight.openPlaylist(feed.map { it.video }, page)
+                    spotlight.openPlaylist(shown.map { it.video }, page)
                 },
                 onDismiss = onLeaveFeed,
                 onChrome = { c -> if (pagerState.currentPage == page) onChrome(c) },
@@ -293,7 +304,7 @@ fun FeedScreen(
         }
 
         menuFor?.let { mv ->
-            val live = feed.firstOrNull { it.video.id == mv.id }?.video ?: mv
+            val live = shown.firstOrNull { it.video.id == mv.id }?.video ?: mv
             VideoActionsSheet(video = live,
                 onDismiss = { menuFor = null },
                 onPlay = { menuFor = null },
@@ -302,7 +313,7 @@ fun FeedScreen(
                     vm.toggleFav(live.id, !live.isFavorite)
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 },
-                onSimilar = { menuFor = null; spotlight.open(live, feed.map { it.video }) },
+                onSimilar = { menuFor = null; spotlight.open(live, shown.map { it.video }) },
                 onDetails = { detailsFor = live; menuFor = null },
                 onDelete = { menuFor = null; vm.requestDelete(listOf(live.id)) },
                 onNotInterested = {
@@ -524,7 +535,7 @@ private fun ReelPage(
                     RailButton(
                         icon = if (v.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
                         tint = if (v.isFavorite) Pink else Color.White,
-                        count = if (v.watchCount > 0) "${v.watchCount}" else null
+                        count = null
                     ) { onFav(); tick++ }
                     RailButton(Icons.Default.AutoAwesome, Cyan, null) { onSimilar() }
                     RailButton(Icons.Default.Speed, if (speed != 1f) Color(0xFFF59E0B) else Color.White,
@@ -551,9 +562,6 @@ private fun ReelPage(
                         1f to Color.Black.copy(alpha = 0.80f)))
                     .padding(start = 14.dp, end = 86.dp, top = 108.dp,
                         bottom = 26.dp + bottomOverlay)) {
-                    Text(item.why, color = Cyan, fontSize = 11.5.sp, fontWeight = FontWeight.Bold,
-                        maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Spacer(Modifier.height(4.dp))
                     Text(v.about.ifEmpty { v.displayName }, color = Color.White,
                         fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold,
                         maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -565,6 +573,15 @@ private fun ReelPage(
                     Spacer(Modifier.height(3.dp))
                     Text("${v.folderName} • ${fmtDur(v.durationMs)}", color = Color.White.copy(alpha = 0.45f),
                         fontSize = 10.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    // The ranking, out loud. The composer assembles this from the
+                    // same signals that scored the clip, so the card never claims
+                    // something the ordering doesn't do.
+                    if (item.reason.isNotBlank()) {
+                        Spacer(Modifier.height(4.dp))
+                        Text("✦ ${item.reason}", color = Accent, fontSize = 10.5.sp,
+                            fontWeight = FontWeight.Medium, maxLines = 1,
+                            overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
         }

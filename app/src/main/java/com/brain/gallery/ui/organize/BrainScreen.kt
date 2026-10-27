@@ -2,6 +2,7 @@ package com.brain.gallery.ui.organize
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -18,6 +19,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,12 +36,13 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.brain.gallery.domain.EngineSettings
+import com.brain.gallery.domain.ACCENT_CHOICES
 import com.brain.gallery.domain.organize.fmtSize
 import com.brain.gallery.ui.glass.Glass
 import com.brain.gallery.ui.glass.glass
@@ -113,6 +116,10 @@ fun BrainScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
                 cfg.prosodyEnabled) {
                 vm.updateSettings(cfg.copy(prosodyEnabled = it))
             }
+            Head("Appearance")
+            AccentRow(cfg.accentArgb) { vm.updateSettings(cfg.copy(accentArgb = it)) }
+            Text("Feed presets and ranking weights live in the Tune tab, where they belong.",
+                color = Text2, fontSize = 11.5.sp, modifier = Modifier.padding(top = 2.dp))
             SliderRow("Semantic budget per run", cfg.semanticBudget.toString(), 25f, 600f, 24,
                 cfg.semanticBudget.toFloat(),
                 help = "How many clips the slow labeler may look at in one pass.",
@@ -405,4 +412,31 @@ private fun ActionRow(label: String, tint: Color, onClick: () -> Unit) {
             modifier = Modifier.weight(1f))
         Text("→", color = tint, fontSize = 15.sp)
     }
+}
+
+@Composable
+private fun AccentRow(current: Long, onPick: (Long) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 10.dp)) {
+        Text("Accent color", color = Text1, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text("Tints the glass and the highlights across the whole app.",
+            color = Text2, fontSize = 11.5.sp,
+            modifier = Modifier.padding(top = 2.dp, bottom = 2.dp))
+        Row(Modifier.fillMaxWidth().padding(top = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            ACCENT_CHOICES.forEach { argb ->
+                val sel = argb == current
+                Box(Modifier.size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color(argb))
+                    .then(if (sel) Modifier.border(2.dp, Color.White, CircleShape) else Modifier)
+                    .clickable { onPick(argb) },
+                    contentAlignment = Alignment.Center) {
+                    if (sel) Icon(Icons.Default.Check, null, tint = Color.White,
+                        modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+    }
+    HorizontalDivider(color = Color(0xFF1A2231))
 }

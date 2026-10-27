@@ -6,6 +6,7 @@ import com.brain.gallery.data.local.BrainDatabase
 import com.brain.gallery.data.local.NotInterestedEntity
 import com.brain.gallery.data.local.WatchEventEntity
 import com.brain.gallery.data.service.BrainScanService
+import com.brain.gallery.domain.SettingsStore
 import com.brain.gallery.domain.engine.FeedComposer
 import com.brain.gallery.domain.engine.FeedItem
 import com.brain.gallery.engine.ClusterMath
@@ -24,6 +25,7 @@ import javax.inject.Inject
 class FeedViewModel @Inject constructor(
     private val db: BrainDatabase,
     private val composer: FeedComposer,
+    private val settings: SettingsStore,
     @ApplicationContext private val ctx: android.content.Context
 ) : ViewModel() {
     private val _feed = MutableStateFlow<List<FeedItem>>(emptyList())
@@ -40,12 +42,13 @@ class FeedViewModel @Inject constructor(
             combine(
                 db.videoDao().observeAll().conflate(),
                 db.supportDao().observeNotInterested().conflate(),
+                settings.observe().conflate(),
                 _nonce
-            ) { videos, notInterested, _ -> videos to notInterested }
-                .collect { (videos, notInterested) ->
+            ) { videos, notInterested, cfg, _ -> Triple(videos, notInterested, cfg) }
+                .collect { (videos, notInterested, cfg) ->
                     val suppressed = suppressionSet(videos, notInterested)
                     val events = db.watchDao().recent()
-                    _feed.value = composer.compose(videos, events, suppressed)
+                    _feed.value = composer.compose(videos, events, suppressed, tuning = cfg.tuning)
                     _loading.value = false
                 }
         }
