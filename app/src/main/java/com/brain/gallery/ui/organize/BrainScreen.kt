@@ -67,8 +67,13 @@ fun BrainScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
     val cfg by vm.settings.collectAsState()
     val persons by vm.persons.collectAsState()
     val exempt by vm.batteryExempt.collectAsState()
+    val exportMsg by vm.exportMsg.collectAsState()
+    val importMsg by vm.importMsg.collectAsState()
     val ctx = LocalContext.current
     var confirmReset by remember { mutableStateOf(false) }
+    val importPick = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri -> uri?.let { vm.importMemory(it) } }
 
     BackHandler(enabled = true) { onBack() }
     LaunchedEffect(Unit) { vm.refreshDiagnostics(); vm.refreshBattery() }
@@ -250,8 +255,21 @@ fun BrainScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
             Stat("Database", fmtSize(d.dbBytes))
             Stat("Library on device", "${stats.total} videos")
             ActionRow("Export memory bundle", Accent) { vm.exportMemory() }
-            Text("Saves names, favourites and watch history to a file you control. " +
-                "If the app is wiped, import it back and the brain rebuilds itself.",
+            ActionRow("Import memory bundle", Green) {
+                importPick.launch(arrayOf("application/json", "text/plain", "*/*"))
+            }
+            val portMsg = exportMsg ?: importMsg
+            if (portMsg != null) {
+                Text(portMsg, color = Cyan, fontSize = 12.sp, fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(top = 4.dp))
+                LaunchedEffect(portMsg) {
+                    kotlinx.coroutines.delay(6000)
+                    vm.consumeExportMsg(); vm.consumeImportMsg()
+                }
+            }
+            Text("Saves names, favourites, watch history, settings and group names to a " +
+                "file you control. If the app is wiped, import it back and the brain " +
+                "rebuilds itself.",
                 color = Text2, fontSize = 11.5.sp, modifier = Modifier.padding(top = 4.dp))
 
             // ---------------- Reliability ----------------

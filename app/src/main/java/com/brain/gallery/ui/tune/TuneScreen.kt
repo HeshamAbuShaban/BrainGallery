@@ -160,6 +160,11 @@ fun TuneScreen() {
                 help = "Music, sport, gaming and other quick hits.") {
                 vm.update(cfg.copy(mood = "Custom", tuning = cfg.tuning.copy(energyWeight = it)))
             }
+            WeightSlider("Voices", cfg.tuning.voiceWeight, cfg,
+                help = "Clips where the voice layer heard someone talking. " +
+                    "Switch voice reading on in the Brain screen first.") {
+                vm.update(cfg.copy(mood = "Custom", tuning = cfg.tuning.copy(voiceWeight = it)))
+            }
             WeightSlider("Trust the brain", cfg.tuning.qualityWeight, cfg,
                 help = "How hard clips the brain is still unsure about are held back. " +
                     "Zero ignores certainty completely.") {

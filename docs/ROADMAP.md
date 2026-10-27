@@ -74,19 +74,22 @@ tune/brain        BrainScreen (today: overlay inside Tune/Organize)
 
 ## Phase 2 — Finish the half-built features (one definition of done each)
 
-1. **Bundle import.** Settings row + file picker + restore summary
-   ("123 names, 45 favorites, 312 watch events restored"); include
-   `EngineSettings` + `group_overrides` in the bundle (the docstring already
-   claims they travel). Done when a wiped device reconstructs itself.
+1. **Bundle import.** ✅ Shipped (Oct 27): settings row + document picker +
+   result feedback in BrainScreen; bundles v2 now carry `EngineSettings` (feed
+   weights included) and `group_overrides`; import restores both (older v1
+   bundles still load). Done when a wiped device reconstructs itself — the
+   restore side is now reachable; a wipe-and-restore test on a real device
+   remains.
 2. **Adopt the glass widgets.** OrganizeScreen's hand-painted menu →
    `GlassMenuOverlay`; stats strips → `GlassStatTile` with big numerals
    (design research: oversized numerals). Done when `ui/glass` has no
    unused exports.
 3. **Delete the dead code.** `DiagnosticsScreen.kt`, `MovePersonDialog.kt`,
    orphan glass stubs, `.bad` file (needs `sudo rm` — it is root-locked).
-4. **Prosody earns its keep.** Add a `voiceWeight` to `FeedTuning`:
-   "speaking"/"expressive" tags lift talking clips; wire into `score()` with
-   reason phrase "someone talking". Done when voice search/filter works too.
+4. **Prosody earns its keep.** ✅ Shipped (Oct 27): `voiceWeight` in
+   `FeedTuning` + a Voices slider in Tune; clips the voice layer heard
+   speaking get a lift with reason "someone talking"; "mostly music or
+   ambience" never earns it. Remaining: voice tag search/filter.
 5. **User albums.** `albums` table (id, name, kind, order); "New album" flow
    in Organize; multi-select → add-to-album; albums appear as groups.
    Replaces the `manual_<name>` override hack.

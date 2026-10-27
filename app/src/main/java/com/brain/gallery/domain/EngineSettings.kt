@@ -42,6 +42,8 @@ data class FeedTuning(
     val timeOfDayWeight: Float = 1f,
     /** Music, sport, gaming and other quick hits. */
     val energyWeight: Float = 1f,
+    /** Clips where someone is talking, from the voice layer's audio read. */
+    val voiceWeight: Float = 1f,
     /** How hard clips the brain is unsure about are held back. 0 ignores confidence. */
     val qualityWeight: Float = 1f,
     /** 0 = replays rank as usual, 1 = anything seen this session sinks hard. */
@@ -65,6 +67,7 @@ data class FeedTuning(
         put("nostalgiaWeight", nostalgiaWeight.toDouble())
         put("timeOfDayWeight", timeOfDayWeight.toDouble())
         put("energyWeight", energyWeight.toDouble())
+        put("voiceWeight", voiceWeight.toDouble())
         put("qualityWeight", qualityWeight.toDouble())
         put("replayPenalty", replayPenalty.toDouble())
         put("junkCut", junkCut.toDouble())
@@ -86,6 +89,7 @@ data class FeedTuning(
                     nostalgiaWeight = o.optDouble("nostalgiaWeight", 1.0).toFloat(),
                     timeOfDayWeight = o.optDouble("timeOfDayWeight", 1.0).toFloat(),
                     energyWeight = o.optDouble("energyWeight", 1.0).toFloat(),
+                    voiceWeight = o.optDouble("voiceWeight", 1.0).toFloat(),
                     qualityWeight = o.optDouble("qualityWeight", 1.0).toFloat(),
                     replayPenalty = o.optDouble("replayPenalty", 0.65).toFloat(),
                     junkCut = o.optDouble("junkCut", 0.85).toFloat(),

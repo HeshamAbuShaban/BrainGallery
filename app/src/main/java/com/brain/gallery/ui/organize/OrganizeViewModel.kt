@@ -435,6 +435,23 @@ class OrganizeViewModel @Inject constructor(
     }
     fun consumeExportMsg() { _exportMsg.value = null }
 
+    private val _importMsg = MutableStateFlow<String?>(null)
+    val importMsg: StateFlow<String?> = _importMsg
+
+    /** Restore the human layer from a picked memory-bundle file. */
+    fun importMemory(uri: android.net.Uri) {
+        viewModelScope.launch(Dispatchers.IO) {
+            runCatching {
+                val text = ctx.contentResolver.openInputStream(uri)
+                    ?.bufferedReader()?.use { it.readText() }
+                    ?: error("Could not read the picked file")
+                bundle.importJson(text)
+            }.onSuccess { _importMsg.value = it }
+                .onFailure { _importMsg.value = "Import failed: ${it.message}" }
+        }
+    }
+    fun consumeImportMsg() { _importMsg.value = null }
+
     // ---- Delete with system consent ----
     private val _deleteAsk = MutableStateFlow<IntentSender?>(null)
     val deleteAsk: StateFlow<IntentSender?> = _deleteAsk

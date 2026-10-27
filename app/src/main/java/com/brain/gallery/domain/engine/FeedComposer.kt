@@ -131,6 +131,12 @@ class FeedComposer @Inject constructor() {
         } else if (short && t.energyWeight > 1f) {
             s += 0.1f * (t.energyWeight - 1f)
         }
+        // Voice: the prosody pass heard someone talking. Only clips that were
+        // actually heard carry the tag, so silence never earns a lift.
+        if (v.prosodyTags.contains("speaking")) {
+            s += 0.12f * t.voiceWeight
+            why += "someone talking"
+        }
         // Confidence: uncertain brain ranks lower until L1/L2 done. At quality 0
         // the brain's certainty stops mattering entirely.
         s *= lerp(1f, 0.7f + v.confidence * 0.3f, t.qualityWeight)

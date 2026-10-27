@@ -34,14 +34,16 @@ class FeedComposerTest {
         category: String = "family",
         faces: Int = 0,
         smiles: Int = 0,
-        confidence: Float = 1f
+        confidence: Float = 1f,
+        prosody: String = ""
     ) = VideoEntity(
         id = id, uri = "uri://$id", displayName = "v$id", durationMs = 30_000,
         sizeBytes = 1, dateAddedSec = System.currentTimeMillis() / 1000 - ageDays * 86_400,
         folderName = "f", junkScore = junk, isFavorite = fav,
         watchCount = if (watched) 10 else 0,
         completionSum = if (watched) completion * 10 else 0f,
-        category = category, faceCount = faces, smileCount = smiles, confidence = confidence
+        category = category, faceCount = faces, smileCount = smiles, confidence = confidence,
+        prosodyTags = prosody
     )
 
     // ---- pool rules ---------------------------------------------------------
@@ -153,17 +155,34 @@ class FeedComposerTest {
         assertNotEquals("", out.first().reason)
     }
 
-    // ---- settings round-trip -------------------------------------------------
+    @Test
+    fun `a talking clip rises with the voices weight and says so`() {
+        val talky = video(1, prosody = "speaking, expressive")
+        val on = composer.score(talky, emptySet(), 12, FeedTuning(voiceWeight = 1f))
+        val off = composer.score(talky, emptySet(), 12, FeedTuning(voiceWeight = 0f))
+        assertTrue("voice weight should move the score", on.score > off.score)
+        assertTrue(on.reason.contains("talking"))
+    }
+
+    @Test
+    fun `music or ambience never earns the talking lift`() {
+        val music = video(1, prosody = "mostly music or ambience")
+        val off = composer.score(music, emptySet(), 12, FeedTuning(voiceWeight = 0f))
+        val on = composer.score(music, emptySet(), 12, FeedTuning(voiceWeight = 2f))
+        assertEquals(off.score, on.score, 0.0001f)
+    }
 
     @Test
     fun `engine settings carry their tuning through a save`() {
         val cfg = EngineSettings(
             mood = "Custom",
-            tuning = FeedTuning(energyWeight = 1.7f, feedLength = 99, replayPenalty = 0.1f)
+            tuning = FeedTuning(energyWeight = 1.7f, voiceWeight = 0.3f,
+                feedLength = 99, replayPenalty = 0.1f)
         )
         val back = EngineSettings.fromJson(cfg.toJson())
         assertEquals("Custom", back.mood)
         assertEquals(1.7f, back.tuning.energyWeight, 0.0001f)
+        assertEquals(0.3f, back.tuning.voiceWeight, 0.0001f)
         assertEquals(99, back.tuning.feedLength)
         assertEquals(0.1f, back.tuning.replayPenalty, 0.0001f)
     }
