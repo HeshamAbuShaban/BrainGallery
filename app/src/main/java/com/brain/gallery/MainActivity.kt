@@ -45,6 +45,9 @@ import com.brain.gallery.ui.Routes
 import com.brain.gallery.ui.components.SpotlightPlayer
 import com.brain.gallery.ui.feed.FeedScreen
 import com.brain.gallery.ui.organize.BrainScreen
+import com.brain.gallery.ui.organize.BrainDiagnosticsScreen
+import com.brain.gallery.ui.organize.BrainLearningScreen
+import com.brain.gallery.ui.organize.BrainStorageScreen
 import com.brain.gallery.ui.organize.GroupDetailRoute
 import com.brain.gallery.ui.organize.OrganizeScreen
 import com.brain.gallery.ui.organize.OrganizeViewModel
@@ -147,7 +150,10 @@ private fun Root(spotlight: SpotlightController) {
     Box(Modifier.fillMaxSize().background(Bg)) {
         NavHost(
             navController = navController,
-            startDestination = Routes.ORGANIZE,
+            // The opening beat is the reel: the app's whole bet is that your
+            // memories surface before you finish wanting them, so the first
+            // thing on screen is them playing — not a card wall.
+            startDestination = Routes.FEED,
             enterTransition = {
                 val fwd = Routes.rank(targetState.destination.route) >= Routes.rank(initialState.destination.route)
                 slideInHorizontally(tween(Motion.mediumMs, easing = Motion.emphasized)) {
@@ -198,7 +204,22 @@ private fun Root(spotlight: SpotlightController) {
                 TuneScreen(onOpenBrain = { navController.navigate(Routes.BRAIN) })
             }
             composable(Routes.BRAIN) {
-                BrainScreen(vm = orgVm, onBack = { navController.popBackStack() })
+                BrainScreen(
+                    vm = orgVm,
+                    onBack = { navController.popBackStack() },
+                    onOpenLearning = { navController.navigate(Routes.BRAIN_LEARNING) },
+                    onOpenDiagnostics = { navController.navigate(Routes.BRAIN_DIAGNOSTICS) },
+                    onOpenStorage = { navController.navigate(Routes.BRAIN_STORAGE) }
+                )
+            }
+            composable(Routes.BRAIN_LEARNING) {
+                BrainLearningScreen(vm = orgVm, onBack = { navController.popBackStack() })
+            }
+            composable(Routes.BRAIN_DIAGNOSTICS) {
+                BrainDiagnosticsScreen(vm = orgVm, onBack = { navController.popBackStack() })
+            }
+            composable(Routes.BRAIN_STORAGE) {
+                BrainStorageScreen(vm = orgVm, onBack = { navController.popBackStack() })
             }
         }
 

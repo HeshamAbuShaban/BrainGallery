@@ -202,10 +202,12 @@ fun OrganizeScreen(
         } else {
             Row(Modifier.fillMaxWidth().padding(20.dp, 10.dp),
                 horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StatCard("${stats.total}", "videos", Accent, Modifier.weight(1f))
-                StatCard("${stats.memories}", "memories", Green, Modifier.weight(1f))
-                StatCard("${stats.clutter}", "clutter", Yellow, Modifier.weight(1f))
-                StatCard("${stats.people}", "people", Pink, Modifier.weight(1f))
+                // Big numerals read abbreviated once they grow — 1.3k, not
+                // 1328 fighting its own tile.
+                StatCard(fmtCount(stats.total), "videos", Accent, Modifier.weight(1f))
+                StatCard(fmtCount(stats.memories), "memories", Green, Modifier.weight(1f))
+                StatCard(fmtCount(stats.clutter), "clutter", Yellow, Modifier.weight(1f))
+                StatCard(fmtCount(stats.people), "people", Pink, Modifier.weight(1f))
             }
             if (stats.pending > 0) {
                 Row(Modifier.fillMaxWidth().padding(20.dp, 0.dp, 20.dp, 6.dp),
@@ -351,6 +353,17 @@ fun OrganizeScreen(
     }
 }
 
+/** 1328 -> "1.3k": stat numerals stay oversized and never fight their tile. */
+internal fun fmtCount(n: Int): String = when {
+    n >= 10_000 -> (n / 1000).toString() + "k"
+    n >= 1_000 -> {
+        val tenths = n / 100
+        if (tenths % 10 == 0) (tenths / 10).toString() + "k"
+        else (tenths / 10).toString() + "." + (tenths % 10) + "k"
+    }
+    else -> n.toString()
+}
+
 /**
  * One number of the library, told big. Delegates to the design system's
  * stat tile — oversized numerals per the design research — with the hub's
@@ -363,7 +376,8 @@ private fun StatCard(value: String, label: String, color: Color, modifier: Modif
         label = label,
         modifier = modifier,
         accentColor = color,
-        valueSize = 21.sp
+        valueSize = 24.sp,
+        contentPadding = PaddingValues(vertical = 12.dp, horizontal = 10.dp)
     )
 }
 
