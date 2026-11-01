@@ -133,7 +133,8 @@ fun PhotoViewer(
                     fontSize = 10.5.sp, maxLines = 1)
             }
         }
-        Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp),
+        // Above the glass nav pill, which stays visible over the viewer.
+        Row(Modifier.align(Alignment.BottomCenter).padding(bottom = 24.dp + com.brain.gallery.ui.glass.glassReserve()),
             horizontalArrangement = Arrangement.spacedBy(28.dp),
             verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = {

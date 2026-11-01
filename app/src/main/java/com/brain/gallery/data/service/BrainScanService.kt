@@ -286,11 +286,11 @@ class BrainScanService : LifecycleService() {
             val pbyId = pdao.all().associateBy { it.id }
             val pfresh = pscanned.filter { it.id !in pbyId }
             if (pfresh.isNotEmpty()) pdao.upsertAll(pfresh.map { it.toEntity() })
-            val pseen = pscanned.map { it.id }
-            if (deltaIds == null && pbyId.isNotEmpty() && pseen.size < pbyId.size / 2) {
-                Log.w(TAG, "photo scan returned ${pseen.size} of ${pbyId.size}; skipping sweep")
+            val pseenSet = pscanned.map { it.id }.toSet()
+            if (deltaIds == null && pbyId.isNotEmpty() && pseenSet.size < pbyId.size / 2) {
+                Log.w(TAG, "photo scan returned ${pseenSet.size} of ${pbyId.size}; skipping sweep")
             } else if (deltaIds == null) {
-                val gone = pbyId.keys.filter { it !in pseen.toSet() }
+                val gone = pbyId.keys.filter { it !in pseenSet }
                 gone.chunked(400).forEach { pdao.deleteByIds(it) }
             }
             val budget = 40

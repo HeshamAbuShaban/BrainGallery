@@ -363,7 +363,7 @@ private fun StatCard(value: String, label: String, color: Color, modifier: Modif
         label = label,
         modifier = modifier,
         accentColor = color,
-        valueSize = 26.sp
+        valueSize = 21.sp
     )
 }
 

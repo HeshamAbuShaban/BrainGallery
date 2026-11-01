@@ -80,9 +80,11 @@ class PhotoAnalyzer @Inject constructor(
         val target = 512
         val parsed = android.net.Uri.parse(uri)
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        ctx.contentResolver.openInputStream(parsed)?.use {
-            BitmapFactory.decodeStream(it, null, bounds)
-        } ?: return@runCatching null
+        // A bounds-only decode always returns a null bitmap — that is the API,
+        // not a failure. Guard the stream, never the result.
+        val boundsStream = ctx.contentResolver.openInputStream(parsed)
+            ?: return@runCatching null
+        boundsStream.use { BitmapFactory.decodeStream(it, null, bounds) }
         var sample = 1
         var longest = maxOf(bounds.outWidth, bounds.outHeight)
         while (longest / 2 >= target) { sample *= 2; longest /= 2 }

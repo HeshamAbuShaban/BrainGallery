@@ -162,7 +162,9 @@ fun ShelfCarousel(
     val liveOpen by rememberUpdatedState(onOpen)
     Box(modifier
         .fillMaxWidth()
-        .height(cardHeight)
+        // Headroom for the center-line rise: cards lift by up to 14dp as
+        // they near the edges, and the strip label sits right above.
+        .height(cardHeight + 16.dp)
         .onSizeChanged { stripWidthPx = it.width }
         .pointerInput(items.size) {
             // Tap maps a position to a card: the cards themselves carry no
