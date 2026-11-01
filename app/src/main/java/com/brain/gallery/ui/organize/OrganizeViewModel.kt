@@ -25,7 +25,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -552,6 +554,9 @@ class OrganizeViewModel @Inject constructor(
     }
 }
 
+/** The chip row over search results. A lens, not a query. */
+enum class VoiceFilter { ALL, PEOPLE, FAVORITES, TALKING }
+
 @OptIn(FlowPreview::class)
 @HiltViewModel
 class SearchViewModel @Inject constructor(
@@ -567,7 +572,22 @@ class SearchViewModel @Inject constructor(
     private val _q = MutableStateFlow(savedState.get<String>("q") ?: "")
     val query: StateFlow<String> = _q
     private val _results = MutableStateFlow<List<VideoEntity>>(emptyList())
-    val results: StateFlow<List<VideoEntity>> = _results
+    private val _filter = MutableStateFlow(VoiceFilter.ALL)
+    val filter: StateFlow<VoiceFilter> = _filter
+    fun filter(f: VoiceFilter) { _filter.value = f }
+
+    /**
+     * The visible grid: raw matches narrowed by the chip row. Client-side on
+     * purpose — the filter is a lens on what was found, not a new query.
+     */
+    val results: StateFlow<List<VideoEntity>> = combine(_results, _filter) { r, f ->
+        when (f) {
+            VoiceFilter.ALL -> r
+            VoiceFilter.PEOPLE -> r.filter { it.faceCount > 0 }
+            VoiceFilter.FAVORITES -> r.filter { it.isFavorite }
+            VoiceFilter.TALKING -> r.filter { it.prosodyTags.contains("speaking") }
+        }
+    }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     init {
         viewModelScope.launch {
@@ -580,6 +600,10 @@ class SearchViewModel @Inject constructor(
         val lower = q.trim().lowercase()
         if (lower in setOf("people", "person", "faces", "face", "smiles", "smiling", "selfie", "selfies")) {
             _results.value = db.videoDao().people(); return
+        }
+        // Voice routes: what the audio pass heard, not what a label guessed.
+        if (lower in setOf("talking", "voice", "speech", "someone talking", "speaking")) {
+            _results.value = db.videoDao().byVoiceTag("speaking"); return
         }
         // Route named-person queries directly to that person's library.
         val named = db.personDao().allPersons()

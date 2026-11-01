@@ -35,6 +35,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -44,6 +46,7 @@ import com.brain.gallery.ui.components.VideoActionsSheet
 import com.brain.gallery.ui.components.VideoDetailsDialog
 import com.brain.gallery.ui.components.VideoThumb
 import com.brain.gallery.ui.glass.Glass
+import com.brain.gallery.ui.glass.GlassSegmented
 import com.brain.gallery.ui.glass.glass
 import com.brain.gallery.ui.glass.glassReserve
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -60,7 +63,9 @@ fun SearchScreen(
 ) {
     val q by vm.query.collectAsState()
     val results by vm.results.collectAsState()
+    val filter by vm.filter.collectAsState()
     val deleteAsk by vm.deleteAsk.collectAsState()
+    val haptics = LocalHapticFeedback.current
     var menuFor by remember { mutableStateOf<VideoEntity?>(null) }
     var detailsFor by remember { mutableStateOf<VideoEntity?>(null) }
 
@@ -80,7 +85,7 @@ fun SearchScreen(
         .windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = 84.dp)) {
             Text("Search", color = Text1, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier.padding(horizontal = 20.dp))
-            Text("Names, tags, categories, folders", color = Text2, fontSize = 12.5.sp,
+            Text("Names, tags, people, voice — try \"talking\"", color = Text2, fontSize = 12.5.sp,
                 modifier = Modifier.padding(horizontal = 20.dp))
             TextField(value = q, onValueChange = { vm.query(it) },
                 placeholder = { Text("birthday, beach, concert…", color = Text2) },
@@ -93,6 +98,17 @@ fun SearchScreen(
                     focusedTextColor = Text1, unfocusedTextColor = Text1),
                 modifier = Modifier.fillMaxWidth().padding(20.dp, 14.dp, 20.dp, 4.dp)
                     .glass(RoundedCornerShape(16.dp), Glass.onDark(Accent)))
+            // The lens row: narrows what was found, never re-queries behind it.
+            GlassSegmented(
+                labels = listOf("All", "People", "Favorites", "Talking"),
+                selectedIndex = VoiceFilter.entries.indexOf(filter).coerceAtLeast(0),
+                onSelect = { i ->
+                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    vm.filter(VoiceFilter.entries[i])
+                },
+                modifier = Modifier.fillMaxWidth().padding(20.dp, 8.dp, 20.dp, 0.dp),
+                selectedColor = Accent
+            )
             if (q.length >= 2 && results.isEmpty()) {
                 Text("No matches for \"$q\"", color = Text2, fontSize = 13.sp,
                     modifier = Modifier.padding(20.dp))

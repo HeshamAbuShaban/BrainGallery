@@ -86,6 +86,10 @@ interface VideoDao {
     @Query("SELECT * FROM videos WHERE faceCount > 0 ORDER BY smileCount DESC, faceCount DESC")
     suspend fun people(): List<VideoEntity>
 
+    /** Clips the voice layer actually heard, by prosody tag ("speaking", …). */
+    @Query("SELECT * FROM videos WHERE prosodyTags LIKE '%' || :tag || '%' ORDER BY dateAddedSec DESC LIMIT 200")
+    suspend fun byVoiceTag(tag: String): List<VideoEntity>
+
     @Query("UPDATE videos SET personId = :person WHERE id = :id")
     suspend fun setPerson(id: Long, person: Int)
 
