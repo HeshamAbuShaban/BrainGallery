@@ -537,9 +537,9 @@ private fun ReelPage(
                 // right action rail
                 Column(
                     Modifier.align(Alignment.BottomEnd)
-                        .padding(end = 10.dp, bottom = 150.dp + bottomOverlay),
+                        .padding(end = 8.dp, bottom = 132.dp + bottomOverlay),
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(18.dp)
+                    verticalArrangement = Arrangement.spacedBy(13.dp)
                 ) {
                     RailButton(
                         icon = if (v.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
@@ -571,26 +571,28 @@ private fun ReelPage(
                         1f to Color.Black.copy(alpha = 0.80f)))
                     .padding(start = 14.dp, end = 86.dp, top = 108.dp,
                         bottom = 26.dp + bottomOverlay)) {
+                    // Caption hierarchy: what it is, why it's here, what
+                    // it carries, where it lives. One glance, four lines.
                     Text(v.about.ifEmpty { v.displayName }, color = Color.White,
-                        fontSize = 14.5.sp, fontWeight = FontWeight.SemiBold,
+                        fontSize = 15.5.sp, fontWeight = FontWeight.Bold,
                         maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    if (v.tagList.isNotEmpty()) {
-                        Spacer(Modifier.height(3.dp))
-                        Text(v.tagList.take(4).joinToString("  •  "), color = Color.White.copy(alpha = 0.62f),
-                            fontSize = 11.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    }
-                    Spacer(Modifier.height(3.dp))
-                    Text("${v.folderName} • ${fmtDur(v.durationMs)}", color = Color.White.copy(alpha = 0.45f),
-                        fontSize = 10.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     // The ranking, out loud — unless the viewer turned the
                     // line off in Tune. The composer assembles it from the
                     // same signals that scored the clip.
                     if (showWhy && item.reason.isNotBlank()) {
-                        Spacer(Modifier.height(4.dp))
-                        Text("✦ ${item.reason}", color = Accent, fontSize = 10.5.sp,
+                        Spacer(Modifier.height(3.dp))
+                        Text("✦ ${item.reason}", color = Accent, fontSize = 11.sp,
                             fontWeight = FontWeight.Medium, maxLines = 1,
                             overflow = TextOverflow.Ellipsis)
                     }
+                    if (v.tagList.isNotEmpty()) {
+                        Spacer(Modifier.height(3.dp))
+                        Text(v.tagList.take(3).joinToString("  ·  "), color = Color.White.copy(alpha = 0.62f),
+                            fontSize = 10.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    Spacer(Modifier.height(2.dp))
+                    Text("${v.folderName} • ${fmtDur(v.durationMs)}", color = Color.White.copy(alpha = 0.45f),
+                        fontSize = 10.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -653,8 +655,8 @@ private fun RailButton(
     onClick: () -> Unit
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        IconButton(onClick = onClick, modifier = Modifier.size(44.dp)) {
-            Icon(icon, null, tint = tint, modifier = Modifier.size(31.dp))
+        IconButton(onClick = onClick, modifier = Modifier.size(42.dp)) {
+            Icon(icon, null, tint = tint, modifier = Modifier.size(27.dp))
         }
         if (count != null) {
             Text(count, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)

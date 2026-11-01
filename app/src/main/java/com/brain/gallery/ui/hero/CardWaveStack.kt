@@ -93,6 +93,21 @@ fun CardWaveStack(
     val liftMaxPx = with(density) { liftMax.toPx() }
     val spreadPx = with(density) { maxOf(cardW, cardH).toPx() * 0.12f }
     val count = clips.size.coerceAtMost(5)
+    // The pile is not a still: the window rotates through the group every
+    // few seconds, so revisiting shows different covers, never a stuck fan.
+    var start by remember(clips) {
+        mutableStateOf(if (clips.isEmpty()) 0 else (clips.first().id.toInt() + clips.size) % clips.size)
+    }
+    LaunchedEffect(reduced, clips.size) {
+        if (reduced || clips.size < 2) return@LaunchedEffect
+        while (true) {
+            delay(8000)
+            start = (start + 1) % clips.size
+        }
+    }
+    val window = remember(start, clips) {
+        List(count) { i -> clips[(start + i) % clips.size] }
+    }
     // The front card's left edge, anchored so the deepest card still clears
     // the 20dp margin: front sits count-1 steps in from there.
     val frontXpx = with(density) { (20.dp + stepX * (count - 1)).toPx() }
@@ -129,7 +144,7 @@ fun CardWaveStack(
         .height(158.dp)
         .clipToBounds()
         .onSizeChanged { stackSize = it }
-        .pointerInput(count, clips) {
+        .pointerInput(count, window) {
             detectTapGestures(
                 onPress = { off ->
                     lastTouch = System.currentTimeMillis()
@@ -139,14 +154,14 @@ fun CardWaveStack(
                 },
                 onTap = {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onPlay(clips[0])
+                    onPlay(window.first())
                 })
         }
     ) {
         // Back to front: card 0 is the one you see.
         for (i in count - 1 downTo 0) {
             WaveCard(
-                video = clips[i],
+                video = window[i],
                 index = i,
                 pointer = pointer,
                 stackSize = stackSize,

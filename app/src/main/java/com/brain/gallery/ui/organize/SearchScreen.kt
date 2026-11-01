@@ -5,8 +5,16 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
@@ -56,6 +64,7 @@ import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.Text1
 import com.brain.gallery.ui.theme.Text2
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SearchScreen(
     spotlight: SpotlightController,
@@ -88,6 +97,10 @@ fun SearchScreen(
             Text("Names, tags, people, voice — try \"talking\"", color = Text2, fontSize = 12.5.sp,
                 modifier = Modifier.padding(horizontal = 20.dp))
             TextField(value = q, onValueChange = { vm.query(it) },
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                    imeAction = androidx.compose.ui.text.input.ImeAction.Search),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(
+                    onSearch = { vm.rememberSearch(q) }),
                 placeholder = { Text("birthday, beach, concert…", color = Text2) },
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = Text2) },
                 singleLine = true, shape = RoundedCornerShape(16.dp),
@@ -109,6 +122,44 @@ fun SearchScreen(
                 modifier = Modifier.fillMaxWidth().padding(20.dp, 8.dp, 20.dp, 0.dp),
                 selectedColor = Accent
             )
+            if (q.length < 2) {
+                // The landing: what you looked for, and where to start. An
+                // empty field should invite, not blankly wait.
+                val recents by vm.recents.collectAsState()
+                if (recents.isNotEmpty()) {
+                    Row(Modifier.fillMaxWidth().padding(20.dp, 14.dp, 20.dp, 0.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Text("Recent", color = Text1, fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        Text("Clear", color = Text2, fontSize = 12.sp,
+                            modifier = Modifier.clickable { vm.clearRecents() }.padding(6.dp))
+                    }
+                    recents.forEach { r ->
+                        Text(r, color = Text1, fontSize = 14.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { vm.query(r); vm.rememberSearch(r) }
+                                .padding(20.dp, 10.dp))
+                    }
+                }
+                Text(if (recents.isEmpty()) "Try searching for" else "Or try",
+                    color = Text1, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                    modifier = Modifier.padding(20.dp, 14.dp, 20.dp, 4.dp))
+                FlowRow(
+                    Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    vm.suggestions.forEach { sg ->
+                        Text(sg, color = Accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(50))
+                                .background(Color.White.copy(alpha = 0.06f))
+                                .clickable { vm.query(sg); vm.rememberSearch(sg) }
+                                .padding(horizontal = 14.dp, vertical = 8.dp))
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+            }
             if (q.length >= 2 && results.isEmpty()) {
                 Text("No matches for \"$q\"", color = Text2, fontSize = 13.sp,
                     modifier = Modifier.padding(20.dp))

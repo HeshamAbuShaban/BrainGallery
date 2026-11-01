@@ -111,6 +111,9 @@ fun ShelfCarousel(
     var dragging by remember { mutableStateOf(false) }
     var driftDir by remember { mutableFloatStateOf(-1f) }
     var stripWidthPx by remember { mutableIntStateOf(0) }
+    // A moving target is beautiful and impractical: the drift greets you,
+    // then gets out of the way the moment the strip is touched.
+    var interacted by remember { mutableStateOf(false) }
     // Release velocity, tracked as an exponential average over drag deltas —
     // foundation's drag detector hands back no velocity, so the gesture
     // carries its own.
@@ -127,7 +130,7 @@ fun ShelfCarousel(
 
     // Momentum decay, then ambient drift (~30dp/s) bouncing at the bounds.
     // Runs only while hands are off; frozen under reduced motion.
-    LaunchedEffect(dragging, reduced) {
+    LaunchedEffect(dragging, reduced, interacted) {
         if (dragging || reduced) return@LaunchedEffect
         var v = 0f
         var last = -1L
@@ -147,8 +150,10 @@ fun ShelfCarousel(
                     scroll.floatValue += v * dt
                     v = HeroMath.decayVelocity(v, dt)
                     if (abs(v) < stopPx) v = 0f
-                } else {
-                    scroll.floatValue -= with(density) { 30.dp.toPx() } * dt * driftDir
+                } else if (!interacted) {
+                    // Slower than the first draft: it should read as breathing,
+                    // not as a ride you have to catch.
+                    scroll.floatValue -= with(density) { 14.dp.toPx() } * dt * driftDir
                 }
                 if (scroll.floatValue <= 0f) { scroll.floatValue = 0f; driftDir = 1f }
                 if (scroll.floatValue >= scrollMax()) {
@@ -180,6 +185,7 @@ fun ShelfCarousel(
             detectDragGestures(
                 onDragStart = {
                     dragging = true
+                    interacted = true
                     lastDragMs = -1L
                     emaV = 0f
                     haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)

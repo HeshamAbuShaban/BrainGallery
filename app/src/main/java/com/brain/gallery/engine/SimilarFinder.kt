@@ -11,7 +11,12 @@ import javax.inject.Singleton
 @Singleton
 class SimilarFinder @Inject constructor() {
 
-    fun find(target: VideoEntity, all: List<VideoEntity>, limit: Int = 12): List<VideoEntity> {
+    fun find(
+        target: VideoEntity,
+        all: List<VideoEntity>,
+        limit: Int = 12,
+        random: kotlin.random.Random = kotlin.random.Random.Default
+    ): List<VideoEntity> {
         val targetTags = target.tagList.toSet()
         return all
             .filter { it.id != target.id }
@@ -31,6 +36,15 @@ class SimilarFinder @Inject constructor() {
             }
             .filter { it.second > 0f }
             .sortedByDescending { it.second }
+            // Same clip, same scores — but never the same rail twice in a
+            // row: equals swap inside their tier, so every open breathes.
+            .fold(mutableListOf<MutableList<Pair<VideoEntity, Float>>>()) { tiers, item ->
+                val last = tiers.lastOrNull()
+                if (last != null && (last.first().second - item.second) < 0.25f) last += item
+                else tiers += mutableListOf(item)
+                tiers
+            }
+            .flatMap { tier -> if (tier.size == 1) tier else tier.shuffled(random) }
             .take(limit)
             .map { it.first }
     }

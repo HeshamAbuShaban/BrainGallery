@@ -633,6 +633,41 @@ class SearchViewModel @Inject constructor(
     val query: StateFlow<String> = _q
     private val _results = MutableStateFlow<List<VideoEntity>>(emptyList())
     private val _filter = MutableStateFlow(VoiceFilter.ALL)
+
+    // The search landing: what you looked for before, and where to start.
+    private val _recents = MutableStateFlow<List<String>>(emptyList())
+    val recents: StateFlow<List<String>> = _recents
+    val suggestions: List<String> = listOf(
+        "talking", "people", "birthday", "beach", "wedding", "pets", "gym")
+
+    init {
+        viewModelScope.launch {
+            _recents.value = parseRecents(db.supportDao().get("search.recents"))
+        }
+    }
+
+    private fun parseRecents(raw: String?): List<String> =
+        runCatching {
+            val arr = org.json.JSONArray(raw ?: "[]")
+            (0 until arr.length()).map { arr.getString(it) }
+        }.getOrDefault(emptyList())
+
+    /** Recorded on a committed search (the keyboard's search action), not per keystroke. */
+    fun rememberSearch(q: String) {
+        val clean = q.trim()
+        if (clean.length < 2) return
+        val next = (listOf(clean) + _recents.value).distinct().take(6)
+        _recents.value = next
+        viewModelScope.launch {
+            db.supportDao().put("search.recents",
+                org.json.JSONArray().apply { next.forEach { put(it) } }.toString())
+        }
+    }
+
+    fun clearRecents() {
+        _recents.value = emptyList()
+        viewModelScope.launch { db.supportDao().put("search.recents", "[]") }
+    }
     val filter: StateFlow<VoiceFilter> = _filter
     fun filter(f: VoiceFilter) { _filter.value = f }
 

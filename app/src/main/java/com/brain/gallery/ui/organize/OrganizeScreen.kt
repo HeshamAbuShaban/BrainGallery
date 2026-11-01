@@ -113,6 +113,7 @@ fun OrganizeScreen(
     val stats by vm.stats.collectAsState()
     val loading by vm.loading.collectAsState()
     val customNames by vm.customNames.collectAsState()
+    val cfg by vm.settings.collectAsState()
     val albums by vm.albums.collectAsState()
     val photos by vm.photos.collectAsState()
     val photoPending by vm.photoPending.collectAsState()
@@ -223,6 +224,9 @@ fun OrganizeScreen(
                 }
             }
         }
+        Text("Every clip on this device is in a group below — \"Everything\" is the proof.",
+            color = Text2, fontSize = 11.sp,
+            modifier = Modifier.padding(20.dp, 4.dp, 20.dp, 0.dp))
         // One switch, two media. The glass segmented control is the hub's
         // only chrome here; both views below stay mechanical.
         GlassSegmented(
@@ -257,14 +261,34 @@ fun OrganizeScreen(
                 groups.lastOrNull { it.kind == GroupKind.ALBUM }?.let { add(it) }
             }.distinctBy { it.id }.take(8)
             if (shelf.isNotEmpty()) {
-                Text("The shelf", color = Cyan, fontSize = 11.sp,
-                    fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp,
-                    modifier = Modifier.padding(20.dp, 14.dp, 20.dp, 0.dp))
-                ShelfCarousel(
-                    items = shelf,
-                    onOpen = { onOpenGroup(it.id) },
-                    modifier = Modifier.padding(top = 6.dp)
-                )
+                if (!cfg.shelfHidden) {
+                    Row(Modifier.fillMaxWidth().padding(20.dp, 14.dp, 20.dp, 0.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Text("The shelf", color = Cyan, fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp,
+                            modifier = Modifier.weight(1f))
+                        Text("Hide", color = Text2, fontSize = 12.sp,
+                            modifier = Modifier.clickable {
+                                vm.updateSettings(cfg.copy(shelfHidden = true))
+                            }.padding(6.dp))
+                    }
+                    ShelfCarousel(
+                        items = shelf,
+                        onOpen = { onOpenGroup(it.id) },
+                        modifier = Modifier.padding(top = 6.dp)
+                    )
+                } else {
+                    // Folded, not gone: one calm line where the shelf was.
+                    Row(Modifier.fillMaxWidth().padding(20.dp, 14.dp, 20.dp, 0.dp)
+                        .clickable { vm.updateSettings(cfg.copy(shelfHidden = false)) },
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Text("The shelf", color = Text2, fontSize = 11.sp,
+                            fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp,
+                            modifier = Modifier.weight(1f))
+                        Text("Show", color = Accent, fontSize = 12.sp,
+                            modifier = Modifier.padding(6.dp))
+                    }
+                }
             }
         }
         // Groups grid
@@ -291,8 +315,9 @@ fun OrganizeScreen(
                             }) else null,
                             onPlayAll = { spotlight.openPlaylist(g.videos) },
                             onSimilar = { g.videos.firstOrNull()?.let { spotlight.open(it, g.videos) } },
-                            onRename = { renameTarget = g },
-                            onHide = if (g.kind == GroupKind.ALBUM) null else ({ vm.hideGroup(g) }),
+                            onRename = if (g.kind == GroupKind.ALL) null else ({ renameTarget = g }),
+                            onHide = if (g.kind == GroupKind.ALBUM || g.kind == GroupKind.ALL) null
+                                     else ({ vm.hideGroup(g) }),
                             onMerge = { from, to ->
                                 val f = from.id.removePrefix("person_").toIntOrNull()
                                 val t = to.id.removePrefix("person_").toIntOrNull()

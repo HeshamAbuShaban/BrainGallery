@@ -1,6 +1,12 @@
 package com.brain.gallery.ui.tune
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.ui.draw.clip
+import com.brain.gallery.ui.glass.Glass
+import com.brain.gallery.ui.glass.glass
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -41,6 +47,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.BugReport
 import androidx.compose.material3.Icon
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.draw.clip
@@ -99,6 +106,11 @@ fun TuneScreen(onOpenBrain: () -> Unit, vm: TuneViewModel = hiltViewModel()) {
                 Text("Teach For You. Every slider is the real ranking.",
                     color = Text2, fontSize = 12.sp)
             }
+            androidx.compose.material3.IconButton(onClick = onOpenBrain,
+                modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(38.dp)) {
+                androidx.compose.material3.Icon(Icons.Default.BugReport, "Engine & diagnostics",
+                    tint = Text1, modifier = Modifier.size(18.dp))
+            }
         }
 
         Column(Modifier.padding(horizontal = 20.dp).verticalScroll(rememberScrollState())) {
@@ -131,6 +143,15 @@ fun TuneScreen(onOpenBrain: () -> Unit, vm: TuneViewModel = hiltViewModel()) {
                     modifier = Modifier.padding(top = 8.dp, bottom = 2.dp)
                 )
             }
+
+            Row(Modifier.fillMaxWidth().padding(vertical = 10.dp).clickable {
+                vm.update(cfg.copy(mood = "Open", tuning = FeedTuning()))
+            }, verticalAlignment = Alignment.CenterVertically) {
+                Text("Reset to balanced", color = Cyan, fontSize = 13.5.sp,
+                    fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                Text("↺", color = Cyan, fontSize = 15.sp)
+            }
+            HorizontalDivider(color = Color(0xFF1A2231))
 
             // ---------------- Weights ----------------
             Head("What matters")
@@ -212,22 +233,14 @@ fun TuneScreen(onOpenBrain: () -> Unit, vm: TuneViewModel = hiltViewModel()) {
                 vm.update(cfg.copy(showWhy = it))
             }
 
-            Row(Modifier.fillMaxWidth().padding(vertical = 10.dp).clickable {
-                vm.update(cfg.copy(mood = "Open", tuning = FeedTuning()))
-            }, verticalAlignment = Alignment.CenterVertically) {
-                Text("Reset to balanced", color = Cyan, fontSize = 13.5.sp,
-                    fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                Text("↺", color = Cyan, fontSize = 15.sp)
-            }
-
             // ---------------- Appearance ----------------
             Head("Appearance")
             AccentRow(cfg.accentArgb) { vm.update(cfg.copy(accentArgb = it)) }
-
-            // ---------------- Elsewhere ----------------
-            Head("Elsewhere")
-            ActionRow("Engine, repairs & data", "Everything the brain does, what it " +
-                "found, and what it needs from you.") { onOpenBrain() }
+            SwitchRow("The animated shelf",
+                "The leaning card strip at the top of Organize. Folded away, it leaves a one-line door.",
+                !cfg.shelfHidden) {
+                vm.update(cfg.copy(shelfHidden = !it))
+            }
 
             Spacer(Modifier.height(120.dp))
         }

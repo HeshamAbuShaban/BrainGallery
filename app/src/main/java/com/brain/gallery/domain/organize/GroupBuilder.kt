@@ -23,7 +23,7 @@ data class SmartGroup(
     val nameCollision: String? = null
 )
 
-enum class GroupKind { MEMORIES, PEOPLE, DUPLICATES, JUNK, FAVORITES, CATEGORY, EVENT, GEMS, ON_THIS_DAY, UNREVIEWED, ALBUM }
+enum class GroupKind { ALL, MEMORIES, PEOPLE, DUPLICATES, JUNK, FAVORITES, CATEGORY, EVENT, GEMS, ON_THIS_DAY, UNREVIEWED, ALBUM }
 
 /**
  * A user album, as the builder sees it: the pure facts, no Room. The engine
@@ -46,7 +46,16 @@ class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
         albums: List<Album> = emptyList()
     ): List<SmartGroup> {
         if (all.isEmpty()) return emptyList()
+
         val out = mutableListOf<SmartGroup>()
+        // The door to everything. The shelves below are the brain's opinions;
+        // this one is the ground truth — every video on the device, so the
+        // answer to "is this really all of them?" is always yes, one tap away.
+        out += SmartGroup(
+            "all", "Everything",
+            "all ${all.size} videos on this device · nothing hidden",
+            GroupKind.ALL, all.sortedByDescending { it.dateAddedSec }, 0xFF94A3B8
+        )
         val memories = all.filter { it.junkScore < junkThreshold }
         val junk = all.filter { it.junkScore >= junkThreshold }
         val favs = all.filter { it.isFavorite }

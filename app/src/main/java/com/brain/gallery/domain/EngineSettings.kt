@@ -153,7 +153,9 @@ data class EngineSettings(
     /** Accent color for glass and highlights, as ARGB. */
     val accentArgb: Long = 0xFF8B5CF6L,
     /** The ✦ "why ranked" line on reel cards. Yours to turn off. */
-    val showWhy: Boolean = true
+    val showWhy: Boolean = true,
+    /** The animated shelf on Organize: beautiful, and yours to fold away. */
+    val shelfHidden: Boolean = false
 ) {
     fun toJson(): String = JSONObject().apply {
         put("identityEnabled", identityEnabled)
@@ -170,6 +172,7 @@ data class EngineSettings(
         put("tuning", org.json.JSONObject(tuning.toJson()))
         put("accentArgb", accentArgb)
         put("showWhy", showWhy)
+        put("shelfHidden", shelfHidden)
     }.toString()
 
     companion object {
@@ -193,7 +196,8 @@ data class EngineSettings(
                     mood = o.optString("mood", d.mood).takeIf { it in FEED_MOODS } ?: d.mood,
                     tuning = tuning,
                     accentArgb = o.optLong("accentArgb", d.accentArgb),
-                    showWhy = o.optBoolean("showWhy", d.showWhy)
+                    showWhy = o.optBoolean("showWhy", d.showWhy),
+                    shelfHidden = o.optBoolean("shelfHidden", d.shelfHidden)
                 )
             }.getOrDefault(EngineSettings())
         }
