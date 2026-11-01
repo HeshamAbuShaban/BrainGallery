@@ -88,6 +88,7 @@ import com.brain.gallery.ui.glass.glass
 import com.brain.gallery.ui.glass.GlassStyle
 import com.brain.gallery.ui.glass.glassReserve
 import com.brain.gallery.ui.hero.ShelfCarousel
+import com.brain.gallery.ui.glass.GlassSegmented
 import com.brain.gallery.ui.components.MoveToGroupSheet
 import com.brain.gallery.ui.spotlight.SpotlightController
 import com.brain.gallery.ui.theme.Accent
@@ -113,13 +114,30 @@ fun OrganizeScreen(
     val loading by vm.loading.collectAsState()
     val customNames by vm.customNames.collectAsState()
     val albums by vm.albums.collectAsState()
+    val photos by vm.photos.collectAsState()
+    val photoPending by vm.photoPending.collectAsState()
     val picked by vm.selection.collectAsState()
     var newAlbumOpen by remember { mutableStateOf(false) }
+    // Videos or photos: the hub's one switch between the two media.
+    var mediaView by remember { mutableStateOf(0) }
+    var viewingPhoto by remember { mutableStateOf<com.brain.gallery.data.local.PhotoEntity?>(null) }
+    val photoDelLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()) { res ->
+        if (res.resultCode == Activity.RESULT_OK) vm.confirmPhotoDelete()
+    }
+    val photoDeleteAsk by vm.photoDeleteAsk.collectAsState()
+    LaunchedEffect(photoDeleteAsk) {
+        photoDeleteAsk?.let {
+            photoDelLauncher.launch(IntentSenderRequest.Builder(it).build())
+            vm.consumePhotoDeleteAsk()
+        }
+    }
     // While anything is ticked, the screen becomes a workbench: tap a clip to
     // add or drop it instead of opening it, and one bar moves the whole lot.
     val selecting = picked.isNotEmpty()
     var renameTarget by remember { mutableStateOf<SmartGroup?>(null) }
     val deleteAsk by vm.deleteAsk.collectAsState()
+    val haptics = LocalHapticFeedback.current
 
     val delLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()) { res ->
@@ -203,6 +221,28 @@ fun OrganizeScreen(
                 }
             }
         }
+        // One switch, two media. The glass segmented control is the hub's
+        // only chrome here; both views below stay mechanical.
+        GlassSegmented(
+            labels = listOf("Videos", "Photos"),
+            selectedIndex = mediaView,
+            onSelect = { i ->
+                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                mediaView = i
+            },
+            modifier = Modifier.fillMaxWidth().padding(20.dp, 14.dp, 20.dp, 0.dp),
+            selectedColor = Accent
+        )
+        if (mediaView == 1) {
+            PhotoLibrary(
+                photos = photos,
+                pending = photoPending,
+                onOpen = { viewingPhoto = it },
+                modifier = Modifier.weight(1f, fill = false)
+            )
+            // The video sections below do not render in the photos view.
+            Spacer(Modifier.height(24.dp))
+        } else {
         // The Shelf — mechanic A, the only mechanic on this screen. Featured
         // groups leaning on the inside of a cylinder; tap opens the group.
         if (!loading) {
@@ -260,6 +300,7 @@ fun OrganizeScreen(
                 }
             }
         }
+        }
     }
     }
     if (selecting) {
@@ -282,6 +323,16 @@ fun OrganizeScreen(
             onSave = { name ->
                 newAlbumOpen = false
                 vm.createAlbum(name)
+            })
+    }
+    viewingPhoto?.let { p ->
+        PhotoViewer(
+            photo = p,
+            onClose = { viewingPhoto = null },
+            onFav = { vm.togglePhotoFav(p.id, it) },
+            onDelete = {
+                viewingPhoto = null
+                vm.requestPhotoDelete(listOf(p.id))
             })
     }
     renameTarget?.let { g ->

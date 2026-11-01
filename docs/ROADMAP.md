@@ -104,13 +104,17 @@ Two deliberate deviations (upgrade paths, not oversights):
 Design direction: **one more entity per medium, one scanner cascade per
 medium, shared brain.** Do NOT shoehorn photos into `VideoEntity`.
 
-- **3a. Photos** (biggest win): `READ_MEDIA_IMAGES`, `MediaStore.Images`
-  scanner (cheap: no frame extraction — EXIF + ML Kit labels + face detection
-  directly on the bitmap), `PhotoEntity` + `photo DAO`, migration v7→v8.
-  UI: Organize/Search gain a media-type filter ("All · Videos · Photos");
-  spotlight gains an image mode (Coil, pinch-zoom, same similar-rail);
-  FeedComposer pools videos only by default (a reel is motion), with a
-  "memories mix" toggle in Tune that lets photos into the reel as stills.
+- **3a. Photos** ✅ Shipped (Nov 1): `photos` table + `PhotoDao` (migration
+  v8→v9, own table — a photo is not a degenerate video); `PhotoScanner`
+  (MediaStore.Images, L0 tokens in the scanner itself); `PhotoAnalyzer`
+  (one 512px decode, FaceAnalyzer + ML Kit labels, 40/run budget) wired into
+  the service after identity, with its own sweep and reschedule accounting;
+  permissions incl. 34+ partial access; the hub gains a Videos/Photos switch
+  with a plain photo grid and a mechanical full-screen viewer (favorite +
+  delete-with-consent). Deferred, deliberately: photos in search (needs
+  MemoryDoc for photos), photos in albums (albums are video shelves today),
+  and the "memories mix" reel toggle (a reel is motion; mixing stills means
+  a second page type on the sacred surface — deserves its own sitting).
 - **3b. GIFs**: land in `PhotoEntity` with `animated = true`; Coil handles
   playback.
 - **3c. Audio**: `MediaStore.Audio`; reuse `AudioProbe` (prosody) for music

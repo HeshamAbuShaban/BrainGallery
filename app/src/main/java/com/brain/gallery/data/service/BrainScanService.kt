@@ -19,6 +19,7 @@ import com.brain.gallery.data.brain.PerceptualResult
 import com.brain.gallery.data.local.BrainDatabase
 import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.data.scan.MediaScanner
+import com.brain.gallery.data.scan.toEntity
 import com.brain.gallery.domain.EngineSettings
 import com.brain.gallery.domain.SettingsStore
 import com.brain.gallery.data.vision.FrameCache
@@ -46,6 +47,8 @@ class BrainScanService : LifecycleService() {
     @Inject lateinit var scanner: MediaScanner
     @Inject lateinit var l1a: L1aAnalyzer
     @Inject lateinit var l1b: L1bAnalyzer
+    @Inject lateinit var photoScanner: com.brain.gallery.data.scan.PhotoScanner
+    @Inject lateinit var photoAnalyzer: com.brain.gallery.data.brain.PhotoAnalyzer
     @Inject lateinit var audio: AudioProbe
     @Inject lateinit var matcher: PersonMatcher
     @Inject lateinit var consolidator: PersonConsolidator
@@ -267,8 +270,46 @@ class BrainScanService : LifecycleService() {
         syncDenormalisedPersons()
         val flagged = splitter.scanAll(cfg.splitSensitivity)
         namer.applyAllSuggestions()
+        // ---- Photos: scan, sweep, then a budgeted image pass ----
+        // Photos are their own lighter medium: L0 in the scanner, one
+        // downscaled decode + ML read here, capped per run so a library of
+        // ten thousand stills costs the same slice of battery as videos do.
+        phase("photos")
+        var photosRead = 0
+        runCatching {
+            val pdao = db.photoDao()
+            // Delta ContentObserver events carry video ids; image changes
+            // arrive via the same debounce but are not addressable per-id,
+            // so delta runs refresh the budgeted read pass only and the full
+            // scan does the sweep.
+            val pscanned = if (deltaIds == null) photoScanner.scan() else emptyList()
+            val pbyId = pdao.all().associateBy { it.id }
+            val pfresh = pscanned.filter { it.id !in pbyId }
+            if (pfresh.isNotEmpty()) pdao.upsertAll(pfresh.map { it.toEntity() })
+            val pseen = pscanned.map { it.id }
+            if (deltaIds == null && pbyId.isNotEmpty() && pseen.size < pbyId.size / 2) {
+                Log.w(TAG, "photo scan returned ${pseen.size} of ${pbyId.size}; skipping sweep")
+            } else if (deltaIds == null) {
+                val gone = pbyId.keys.filter { it !in pseen.toSet() }
+                gone.chunked(400).forEach { pdao.deleteByIds(it) }
+            }
+            val budget = 40
+            val pending = pdao.pendingBrain(budget)
+            for (p in pending) {
+                val r = photoAnalyzer.analyze(p.uri) ?: continue
+                val cat = if (p.category != "unknown" && r.category == "unknown") p.category else r.category
+                pdao.markRead(p.id, cat, r.tags, r.about,
+                    maxOf(r.confidence, if (cat != "unknown") 0.6f else 0f), r.faces, r.smiles)
+                photosRead++
+            }
+            if (pfresh.isNotEmpty() || photosRead > 0) {
+                Log.i(TAG, "photos scanned=${pscanned.size} fresh=${pfresh.size} read=$photosRead")
+            }
+        }.onFailure { Log.w(TAG, "photo pass failed", it) }
+
         db.supportDao().put("diag.lastRun",
             "$totalL1a|$totalL1b|${System.currentTimeMillis() - t0}|$flagged|$merged|$adopted|$unreadable|$semStalled")
+        db.supportDao().put("diag.photosRead", "$photosRead")
         db.supportDao().put("diag.tScan", "${tScan - t0}")
         db.supportDao().put("diag.tL1a", "${tL1a - tScan}")
         db.supportDao().put("diag.tL1b", "${tL1b - tL1a}")
@@ -281,6 +322,7 @@ class BrainScanService : LifecycleService() {
         // library cancels the alarm and the voice pass stops the moment the
         // app is closed — it only ever advanced while someone was watching.
         val remaining = dao.perceptualPendingCount() + dao.semanticPendingCount() +
+            db.photoDao().pendingCount() +
             if (cfg.prosodyEnabled) dao.prosodyPendingCount() else 0
         if (remaining > 0) {
             // Something is still queued: vendor cleaners kill long runs, so come back.

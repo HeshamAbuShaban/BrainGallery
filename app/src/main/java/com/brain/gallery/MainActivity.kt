@@ -74,6 +74,12 @@ class MainActivity : ComponentActivity() {
         val perms = buildList {
             if (Build.VERSION.SDK_INT >= 33) {
                 add(Manifest.permission.READ_MEDIA_VIDEO)
+                add(Manifest.permission.READ_MEDIA_IMAGES)
+                // 34+: the user may grant only partial library access; asking
+                // for both lets the system offer that choice honestly.
+                if (Build.VERSION.SDK_INT >= 34) {
+                    add(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
+                }
                 add(Manifest.permission.POST_NOTIFICATIONS)
             } else add(Manifest.permission.READ_EXTERNAL_STORAGE)
         }

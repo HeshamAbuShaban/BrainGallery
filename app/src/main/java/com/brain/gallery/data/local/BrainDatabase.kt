@@ -14,9 +14,10 @@ import androidx.room.RoomDatabase
         AppKvEntity::class,
         GroupOverrideEntity::class,
         SelectionEntity::class,
-        AlbumEntity::class
+        AlbumEntity::class,
+        PhotoEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class BrainDatabase : RoomDatabase() {
@@ -24,4 +25,6 @@ abstract class BrainDatabase : RoomDatabase() {
     abstract fun watchDao(): WatchEventDao
     abstract fun personDao(): PersonDao
     abstract fun supportDao(): SupportDao
+
+    abstract fun photoDao(): PhotoDao
 }

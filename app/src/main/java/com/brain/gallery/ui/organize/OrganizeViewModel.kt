@@ -7,6 +7,7 @@ import android.provider.MediaStore
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.brain.gallery.data.local.BrainDatabase
+import com.brain.gallery.data.local.PhotoEntity
 import com.brain.gallery.data.local.PersonEntity
 import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.data.portability.MemoryBundle
@@ -370,6 +371,65 @@ class OrganizeViewModel @Inject constructor(
             db.supportDao().assignToAlbum(ids, albumId)
             _selection.value = emptySet()
         }
+    }
+
+    // ---- Photos: the still half of the library ----
+
+    private val _photos = MutableStateFlow<List<PhotoEntity>>(emptyList())
+    val photos: StateFlow<List<PhotoEntity>> = _photos
+    private val _photoPending = MutableStateFlow(0)
+    val photoPending: StateFlow<Int> = _photoPending
+
+    init {
+        viewModelScope.launch {
+            db.photoDao().observeAll().conflate().collect { _photos.value = it }
+        }
+        viewModelScope.launch {
+            db.photoDao().observeAll().conflate().collect {
+                _photoPending.value = db.photoDao().pendingCount()
+            }
+        }
+    }
+
+    fun togglePhotoFav(id: Long, fav: Boolean) {
+        viewModelScope.launch { db.photoDao().setFavorite(id, fav) }
+    }
+
+    /** Delete-with-consent for photos, same contract as the video path. */
+    private val _photoDeleteAsk = MutableStateFlow<IntentSender?>(null)
+    val photoDeleteAsk: StateFlow<IntentSender?> = _photoDeleteAsk
+    private var pendingPhotoIds: List<Long> = emptyList()
+
+    fun requestPhotoDelete(ids: List<Long>) {
+        if (ids.isEmpty()) return
+        viewModelScope.launch(Dispatchers.IO) {
+            pendingPhotoIds = ids
+            if (android.os.Build.VERSION.SDK_INT >= 30) {
+                val uris = ids.mapNotNull { id ->
+                    db.photoDao().all().firstOrNull { it.id == id }?.uri
+                        ?.let { runCatching { android.net.Uri.parse(it) }.getOrNull() }
+                }
+                if (uris.isEmpty()) return@launch
+                _photoDeleteAsk.value = android.provider.MediaStore.createDeleteRequest(
+                    ctx.contentResolver, uris).intentSender
+            } else {
+                val all = db.photoDao().all()
+                ids.forEach { id ->
+                    all.firstOrNull { it.id == id }?.let { p ->
+                        runCatching { ctx.contentResolver.delete(android.net.Uri.parse(p.uri), null, null) }
+                    }
+                }
+                db.photoDao().deleteByIds(ids)
+            }
+        }
+    }
+
+    fun consumePhotoDeleteAsk() { _photoDeleteAsk.value = null }
+
+    fun confirmPhotoDelete() {
+        val ids = pendingPhotoIds
+        pendingPhotoIds = emptyList()
+        viewModelScope.launch(Dispatchers.IO) { db.photoDao().deleteByIds(ids) }
     }
 
     /** Group names worth offering: the ones already in use, most-used first. */

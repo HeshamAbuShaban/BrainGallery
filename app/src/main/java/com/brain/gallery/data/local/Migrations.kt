@@ -94,3 +94,37 @@ val MIGRATION_7_8 = object : Migration(7, 8) {
         db.execSQL("ALTER TABLE videos ADD COLUMN albumId INTEGER NOT NULL DEFAULT -1")
     }
 }
+
+/**
+ * v8 -> v9: photos become first-class citizens.
+ *
+ * Their own table, on purpose — a photo is not a degenerate video. Rows are
+ * rebuilt from MediaStore by the same mark-and-sweep the video side uses, so
+ * the table starts empty and fills honestly. Additive, like every migration.
+ */
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE IF NOT EXISTS `photos` (
+                `id` INTEGER NOT NULL PRIMARY KEY,
+                `uri` TEXT NOT NULL,
+                `displayName` TEXT NOT NULL,
+                `folderName` TEXT NOT NULL,
+                `dateAddedSec` INTEGER NOT NULL,
+                `width` INTEGER NOT NULL,
+                `height` INTEGER NOT NULL,
+                `category` TEXT NOT NULL,
+                `tags` TEXT NOT NULL,
+                `about` TEXT NOT NULL,
+                `confidence` REAL NOT NULL,
+                `brainLevel` INTEGER NOT NULL,
+                `junkScore` REAL NOT NULL,
+                `faceCount` INTEGER NOT NULL,
+                `smileCount` INTEGER NOT NULL,
+                `isFavorite` INTEGER NOT NULL
+            )""".trimIndent()
+        )
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_photos_folderName ON photos (folderName)")
+        db.execSQL("CREATE INDEX IF NOT EXISTS index_photos_brainLevel ON photos (brainLevel)")
+    }
+}
