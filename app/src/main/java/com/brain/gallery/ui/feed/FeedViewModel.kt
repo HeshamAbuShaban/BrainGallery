@@ -7,6 +7,7 @@ import com.brain.gallery.data.local.NotInterestedEntity
 import com.brain.gallery.data.local.WatchEventEntity
 import com.brain.gallery.data.service.BrainScanService
 import com.brain.gallery.domain.SettingsStore
+import com.brain.gallery.domain.EngineSettings
 import com.brain.gallery.domain.engine.FeedComposer
 import com.brain.gallery.domain.engine.FeedItem
 import com.brain.gallery.engine.ClusterMath
@@ -38,22 +39,61 @@ class FeedViewModel @Inject constructor(
     private val _nonce = MutableStateFlow(0)
     val nonce: StateFlow<Int> = _nonce
 
+    // Clips this session has already served. The reel walks the library:
+    // a reshuffle serves what is left, and wraps only when the unseen pool
+    // runs thin. Session-scoped on purpose — a fresh app run may revisit.
+    private val servedIds = LinkedHashSet<Long>()
+
     init {
         BrainScanService.start(ctx)
         viewModelScope.launch {
+            var lastSig: String? = null
             combine(
                 db.videoDao().observeAll().conflate(),
                 db.supportDao().observeNotInterested().conflate(),
                 settings.observe().conflate(),
                 _nonce
-            ) { videos, notInterested, cfg, _ -> Triple(videos, notInterested, cfg) }
-                .collect { (videos, notInterested, cfg) ->
+            ) { videos, notInterested, cfg, n -> listOf(videos, notInterested, cfg) to n }
+                .collect { (payload, nonce) ->
+                    @Suppress("UNCHECKED_CAST")
+                    val videos = payload[0] as List<com.brain.gallery.data.local.VideoEntity>
+                    @Suppress("UNCHECKED_CAST")
+                    val notInterested = payload[1] as List<Long>
+                    val cfg = payload[2] as EngineSettings
                     _showWhy.value = cfg.showWhy
                     val suppressed = suppressionSet(videos, notInterested)
+
+                    // The signature covers only what legitimately reshapes a
+                    // running reel: membership (clips added or removed),
+                    // suppression, the taught weights, and an explicit
+                    // reshuffle. Watch events write scores for the NEXT
+                    // composition — the reel under the viewer's thumb is
+                    // never torn down mid-watch. Its entity snapshots still
+                    // refresh in place, so the heart and metadata stay true.
+                    val sig = "${videos.size}:${videos.sumOf { it.id }}:${videos.sumOf { it.dateAddedSec }}" +
+                        "|${suppressed.size}|${cfg.tuning.hashCode()}|${cfg.mood}|$nonce"
+                    if (sig == lastSig) {
+                        refreshInPlace(videos)
+                        return@collect
+                    }
+                    lastSig = sig
+
                     val events = db.watchDao().recent()
-                    _feed.value = composer.compose(videos, events, suppressed, tuning = cfg.tuning)
+                    val composed = composer.compose(
+                        videos, events, suppressed,
+                        tuning = cfg.tuning, exclude = servedIds.toSet())
+                    servedIds.addAll(composed.map { it.video.id })
+                    _feed.value = composed
                     _loading.value = false
                 }
+        }
+    }
+
+    /** Same order, honest snapshots: drops clips that left the library. */
+    private fun refreshInPlace(videos: List<com.brain.gallery.data.local.VideoEntity>) {
+        val byId = videos.associateBy { it.id }
+        _feed.value = _feed.value.mapNotNull { fi ->
+            byId[fi.video.id]?.let { fi.copy(video = it) }
         }
     }
 

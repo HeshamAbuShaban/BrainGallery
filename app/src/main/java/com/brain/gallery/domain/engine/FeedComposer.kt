@@ -32,36 +32,64 @@ class FeedComposer @Inject constructor() {
         events: List<WatchEventEntity>,
         suppressed: Set<Long> = emptySet(),
         tuning: FeedTuning = FeedTuning(),
+        exclude: Set<Long> = emptySet(),
         random: Random = Random.Default
     ): List<FeedItem> {
         if (videos.isEmpty()) return emptyList()
-        val pool = if (suppressed.isEmpty()) videos else videos.filter { it.id !in suppressed }
-        if (pool.isEmpty()) return emptyList()
+        val base = videos.filter { it.id !in suppressed }
+        if (base.isEmpty()) return emptyList()
 
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         val recentIds = events.take(40).map { it.videoId }.toSet()
         val limit = tuning.feedLength.coerceIn(10, 300)
 
+        // The session walk. Served-this-session clips stay out, so the reel
+        // covers the library instead of cycling the same sixty. When the
+        // unseen pool runs thin, the wrap is structural, not accidental:
+        // what is left unseen leads, then the served clips return as a
+        // second pass behind them.
+        val unseen = base.filter { it.id !in exclude }
+        if (unseen.size >= limit / 2) return reel(unseen, recentIds, hour, tuning, limit, random)
+
+        val head = reel(unseen, recentIds, hour, tuning, limit, random)
+        val tailNeed = limit - head.size
+        if (tailNeed <= 0) return head
+        val served = base.filter { it.id in exclude }
+        return head + reel(served, recentIds, hour, tuning, tailNeed, random)
+    }
+
+    /**
+     * One ranked pass over a pool: junk-cut, scored, then walked in bands
+     * with a shuffle inside each band. Adjacent bands never reorder relative
+     * to each other, so quality ordering holds while the order within a tier
+     * differs every run.
+     */
+    private fun reel(
+        pool: List<VideoEntity>,
+        recentIds: Set<Long>,
+        hour: Int,
+        t: FeedTuning,
+        limit: Int,
+        random: Random
+    ): List<FeedItem> {
+        if (pool.isEmpty() || limit <= 0) return emptyList()
         val ranked = pool.asSequence()
-            .filter { it.junkScore < tuning.junkCut }
-            .map { v -> score(v, recentIds, hour, tuning) }
+            .filter { it.junkScore < t.junkCut }
+            .map { v -> score(v, recentIds, hour, t) }
             .sortedByDescending { it.score }
             .take(limit * 2)
             .toList()
 
         val out = mutableListOf<FeedItem>()
         var lastCat = ""
-
-        // Walk the ranked list in bands, shuffling inside each one. Adjacent
-        // bands never reorder relative to each other, so quality ordering holds.
-        for (band in ranked.chunked(tuning.bandSize.coerceIn(4, 60))) {
+        for (band in ranked.chunked(t.bandSize.coerceIn(4, 60))) {
             for (item in band.shuffled(random)) {
                 if (out.size >= limit) break
                 // Palette cleanse: the reel should not feel like one folder on
                 // repeat. At variety 1 the same category never sits twice in a
                 // row; the rule loosens as variety drops.
-                if (item.video.category == lastCat && random.nextFloat() < tuning.variety) continue
-                if (item.score < 0.25f && random.nextFloat() > tuning.exploreChance) continue
+                if (item.video.category == lastCat && random.nextFloat() < t.variety) continue
+                if (item.score < 0.25f && random.nextFloat() > t.exploreChance) continue
                 out += item
                 lastCat = item.video.category
             }

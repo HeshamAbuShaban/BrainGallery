@@ -195,6 +195,41 @@ class FeedComposerTest {
         assertEquals(FeedTuning(), back.tuning)
     }
 
+    // ---- the session walk ----
+
+    @Test
+    fun `served clips stay out while the unseen pool is deep`() {
+        val clips = (1L..100).map { video(it) }
+        val out = composer.compose(clips, emptyList(),
+            tuning = FeedTuning(feedLength = 30), exclude = setOf(1L, 2L, 3L), random = Random(7))
+        assertEquals(30, out.size)
+        assertFalse("excluded clips must not surface while others remain",
+            out.any { it.video.id in setOf(1L, 2L, 3L) })
+    }
+
+    @Test
+    fun `when the unseen pool runs thin the reel wraps around`() {
+        val clips = (1L..20).map { video(it) }
+        val served = (1L..15).toSet()
+        val out = composer.compose(clips, emptyList(),
+            tuning = FeedTuning(feedLength = 30), exclude = served, random = Random(7))
+        // 5 unseen + a wrap into the served 15: the reel never dies, and the
+        // unseen ones still lead the return pass.
+        assertTrue("wrap should serve a full reel, got ${out.size}", out.size >= 15)
+        assertEquals(5, out.count { it.video.id !in served })
+        assertTrue("unseen clips lead the wrap",
+            out.indexOfFirst { it.video.id !in served } < out.indexOfFirst { it.video.id in served })
+    }
+
+    @Test
+    fun `an empty library with everything served composes nothing`() {
+        val clips = listOf(video(1))
+        val out = composer.compose(clips, emptyList(), exclude = setOf(1L),
+            tuning = FeedTuning(feedLength = 30), random = Random(7))
+        // pool of one, all served: wrap returns it (the reel never goes dead)
+        assertEquals(1, out.size)
+    }
+
     @Test
     fun `every preset is a complete weights hand`() {
         assertEquals(5, FeedTuning.PRESETS.size)

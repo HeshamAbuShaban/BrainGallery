@@ -106,6 +106,7 @@ import com.brain.gallery.ui.spotlight.SpotlightController
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.Cyan
+import com.brain.gallery.ui.theme.Text2
 import com.brain.gallery.ui.theme.Motion
 import com.brain.gallery.ui.theme.Pink
 import kotlinx.coroutines.delay
@@ -141,7 +142,11 @@ fun FeedScreen(
 
     if (loading) {
         Box(Modifier.fillMaxSize().background(Bg), contentAlignment = Alignment.Center) {
-            CircularProgressIndicator(color = Accent)
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                CircularProgressIndicator(color = Accent)
+                Spacer(Modifier.height(14.dp))
+                Text("The brain is choosing…", color = Text2, fontSize = 12.5.sp)
+            }
         }
         return
     }
@@ -175,7 +180,16 @@ fun FeedScreen(
     // when the order changes underneath.
     val pagerState = rememberPagerState(pageCount = { shown.size })
     if (!pagerState.isScrollInProgress && shown !== feed) shown = feed
+    // A clip removed from the reel (deleted, not-interested) shrinks the list;
+    // the pager must never stand past its own end when it does.
+    LaunchedEffect(shown.size) {
+        if (shown.isNotEmpty() && pagerState.currentPage >= shown.size) {
+            pagerState.scrollToPage(shown.size - 1)
+        }
+    }
     val scope = rememberCoroutineScope()
+    // Session speed: what you set on clip 1 is what clip 40 plays at.
+    var speed by remember { mutableFloatStateOf(1f) }
     val deleteAsk by vm.deleteAsk.collectAsState()
     var menuFor by remember { mutableStateOf<VideoEntity?>(null) }
     var detailsFor by remember { mutableStateOf<VideoEntity?>(null) }
@@ -297,11 +311,16 @@ fun FeedScreen(
                 isActive = pagerState.currentPage == page,
                 covered = spotlightOpen,
                 page = page,
+                total = shown.size,
+                speed = speed,
+                onCycleSpeed = {
+                    speed = SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.size]
+                },
                 manager = player,
                 onFav = { vm.toggleFav(item.video.id, !item.video.isFavorite) },
                 onReport = { c -> vm.onWatched(item.video.id, c, c < 0.15f) },
                 onMenu = { menuFor = item.video },
-                onEnded = { advance() },
+                onEnded = { if (pagerState.currentPage == page) advance() },
                 onSimilar = {
                     spotlight.openPlaylist(shown.map { it.video }, page)
                 },
@@ -342,6 +361,9 @@ private fun ReelPage(
     isActive: Boolean,
     covered: Boolean,
     page: Int,
+    total: Int,
+    speed: Float,
+    onCycleSpeed: () -> Unit,
     manager: PlayerManager,
     onFav: () -> Unit,
     onReport: (Float) -> Unit,
@@ -367,7 +389,6 @@ private fun ReelPage(
     var scrubbing by remember { mutableFloatStateOf(-1f) }
     var seekMs by remember { mutableStateOf(0L) }
     var stageSize by remember { mutableStateOf(IntSize.Zero) }
-    var speed by remember { mutableFloatStateOf(1f) }
     val heartScale = remember { Animatable(0.4f) }
 
     // Only the active, uncovered page claims the shared player. An adjacent page
@@ -524,6 +545,11 @@ private fun ReelPage(
                     Box(Modifier.size(5.dp).clip(CircleShape).background(Color.White))
                     Spacer(Modifier.width(6.dp))
                     Text("For You", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+                    Spacer(Modifier.width(10.dp))
+                    // Depth in the session: the reel walks the library, and
+                    // this is where you are in the walk.
+                    Text("${page + 1} · $total", color = Color.White.copy(alpha = 0.55f),
+                        fontSize = 12.sp)
                 }
                 Icon(
                     Icons.Default.KeyboardArrowDown, "Back to library",
@@ -547,13 +573,9 @@ private fun ReelPage(
                         count = null
                     ) { onFav(); tick++ }
                     RailButton(Icons.Default.AutoAwesome, Cyan, null) { onSimilar() }
-                    RailButton(Icons.Default.Speed, if (speed != 1f) Color(0xFFF59E0B) else Color.White,
-                        "${speed}x") {
-                        val i = SPEEDS.indexOf(speed)
-                        speed = SPEEDS[(i + 1) % SPEEDS.size]
-                        manager.setSpeed(speed)
-                        tick++
-                    }
+                    RailButton(Icons.Default.Speed,
+                        if (speed != 1f) Color(0xFFF59E0B) else Color.White,
+                        count = "${speed}x", tick = tick, onClick = onCycleSpeed)
                     RailButton(Icons.Default.Share, Color.White, null) { ShareHelper.share(ctx, v) }
                     RailButton(Icons.Default.MoreHoriz, Color.White, null) { onMenu() }
                 }
@@ -652,6 +674,7 @@ private fun RailButton(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     tint: Color,
     count: String?,
+    tick: Int = 0,
     onClick: () -> Unit
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
