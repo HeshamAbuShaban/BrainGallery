@@ -145,11 +145,12 @@ fun SearchScreen(
                 Text(if (recents.isEmpty()) "Try searching for" else "Or try",
                     color = Text1, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(20.dp, 14.dp, 20.dp, 4.dp))
+                val suggestions by vm.suggestions.collectAsState()
                 FlowRow(
                     Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    vm.suggestions.forEach { sg ->
+                    suggestions.forEach { sg ->
                         Text(sg, color = Accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))

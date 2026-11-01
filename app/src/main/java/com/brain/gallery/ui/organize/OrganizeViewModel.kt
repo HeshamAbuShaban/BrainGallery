@@ -637,12 +637,27 @@ class SearchViewModel @Inject constructor(
     // The search landing: what you looked for before, and where to start.
     private val _recents = MutableStateFlow<List<String>>(emptyList())
     val recents: StateFlow<List<String>> = _recents
-    val suggestions: List<String> = listOf(
-        "talking", "people", "music", "sport", "pets", "food")
+
+    // Suggestions never presume a life for the person holding the phone.
+    // Two neutral capability routes, then categories that actually exist in
+    // THIS library — if it isn't in your clips, it isn't offered.
+    private val _suggestions = MutableStateFlow<List<String>>(emptyList())
+    val suggestions: StateFlow<List<String>> = _suggestions
 
     init {
         viewModelScope.launch {
             _recents.value = parseRecents(db.supportDao().get("search.recents"))
+        }
+        viewModelScope.launch(Dispatchers.IO) {
+            val cats = runCatching { db.videoDao().getAllSync() }
+                .getOrDefault(emptyList())
+                .map { it.category }
+                .filter { it != "unknown" }
+                .groupingBy { it }
+                .eachCount()
+                .entries.sortedByDescending { it.value }
+                .take(4).map { it.key }
+            _suggestions.value = (listOf("talking", "people") + cats).distinct().take(6)
         }
     }
 
