@@ -37,6 +37,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
@@ -322,6 +323,8 @@ fun GlassStatTile(
     valueColor: Color = Color(0xFFF2F5FA),
     labelColor: Color = Color(0xFF98A4B8),
     corner: Dp = 20.dp,
+    /** Hero numerals read bigger than labels; callers decide how much. */
+    valueSize: TextUnit = 19.sp,
     contentPadding: PaddingValues = PaddingValues(vertical = 12.dp, horizontal = 14.dp)
 ) {
     Column(
@@ -332,7 +335,7 @@ fun GlassStatTile(
         Text(
             text = value,
             color = accentColor ?: valueColor,
-            fontSize = 19.sp,
+            fontSize = valueSize,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis

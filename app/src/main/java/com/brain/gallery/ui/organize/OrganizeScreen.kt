@@ -81,6 +81,7 @@ import com.brain.gallery.ui.components.SpotlightPlayer
 import com.brain.gallery.ui.components.ShimmerBar
 import com.brain.gallery.ui.components.VideoThumb
 import com.brain.gallery.ui.glass.Glass
+import com.brain.gallery.ui.glass.GlassStatTile
 import com.brain.gallery.ui.glass.glass
 import com.brain.gallery.ui.glass.GlassStyle
 import com.brain.gallery.ui.glass.glassReserve
@@ -248,12 +249,20 @@ fun OrganizeScreen(
     }
 }
 
+/**
+ * One number of the library, told big. Delegates to the design system's
+ * stat tile — oversized numerals per the design research — with the hub's
+ * semantic colors as accents.
+ */
 @Composable
 private fun StatCard(value: String, label: String, color: Color, modifier: Modifier = Modifier) {
-    Column(modifier.glass(CardShape, Glass.onDark(Accent)).padding(12.dp)) {
-        Text(value, color = color, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
-        Text(label, color = Text2, fontSize = 11.sp)
-    }
+    GlassStatTile(
+        value = value,
+        label = label,
+        modifier = modifier,
+        accentColor = color,
+        valueSize = 26.sp
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
