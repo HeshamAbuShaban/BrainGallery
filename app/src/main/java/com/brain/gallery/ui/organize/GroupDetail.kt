@@ -60,6 +60,9 @@ import com.brain.gallery.ui.components.VideoActionsSheet
 import com.brain.gallery.ui.components.VideoDetailsDialog
 import com.brain.gallery.ui.components.VideoThumb
 import com.brain.gallery.ui.hero.CardWaveStack
+import com.brain.gallery.ui.hero.PortalGate
+import com.brain.gallery.ui.hero.PortalOverlay
+import com.brain.gallery.ui.hero.rememberReducedMotion
 import com.brain.gallery.ui.components.SheetMode
 import com.brain.gallery.ui.glass.Glass
 import com.brain.gallery.ui.glass.glass
@@ -106,6 +109,15 @@ fun GroupDetail(
     // does not compose the whole library at once.
     var shown by remember(group.id) { mutableStateOf(60) }
     val visible = group.videos.take(shown)
+
+    // Mechanic C: the session's first grid entry into the player goes
+    // through the portal; everyone after goes straight in. Reduced motion
+    // skips the door entirely — direct navigation, as the constitution says.
+    val reducedMotion = rememberReducedMotion()
+    var portalFor by remember { mutableStateOf<VideoEntity?>(null) }
+    fun enterSacred(v: VideoEntity) {
+        if (PortalGate.canPortal() && !reducedMotion) portalFor = v else onPlay(v)
+    }
 
     Column(Modifier.fillMaxSize().background(Bg)
         .windowInsetsPadding(WindowInsets.navigationBars)
@@ -170,7 +182,7 @@ fun GroupDetail(
                     VideoThumb(v, Modifier.fillMaxSize(),
                         onClick = {
                             if (pickedIds.isNotEmpty() && onTogglePick != null) onTogglePick(v.id)
-                            else onPlay(v)
+                            else enterSacred(v)
                         },
                         onLongClick = { menuFor = v },
                         onSwipeRight = { onFav(v) },
@@ -265,6 +277,14 @@ fun GroupDetail(
             personCounts = personCounts)
     }
     detailsFor?.let { VideoDetailsDialog(video = it, onDismiss = { detailsFor = null }) }
+
+    // The one door with ceremony: the session's first grid opening.
+    portalFor?.let { v ->
+        PortalOverlay(
+            video = v,
+            onOpen = { portalFor = null; onPlay(v) },
+            onDismiss = { portalFor = null })
+    }
     if (renameOpen && person != null) {
         RenameDialog(initial = person.name.ifBlank { person.suggestedName },
             onDismiss = { renameOpen = false },

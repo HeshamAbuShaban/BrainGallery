@@ -6,7 +6,6 @@ import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.pow
 import kotlin.math.sin
-import kotlin.math.sin
 
 /**
  * The hero mechanics' math, in one pure object.

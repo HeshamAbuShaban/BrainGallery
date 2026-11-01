@@ -69,8 +69,9 @@ private val WaveCardShape: Shape = RoundedCornerShape(16.dp)
  * video surface itself, this mechanic fires medium on its one tap; reduced
  * motion freezes lift and sweep, tap still works.
  *
- * One mechanic per screen — nothing else lands on GroupDetail, and the
- * triage grid below stays untouched.
+ * The triage grid below stays untouched. Mechanic C owns this screen's
+ * grid-tap transition into the player — a disjoint trigger (this stack's
+ * tap hands off directly), one mechanic per surface.
  */
 @Composable
 fun CardWaveStack(
