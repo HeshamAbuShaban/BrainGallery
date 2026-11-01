@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.brain.gallery.domain.EngineSettings
@@ -76,7 +77,7 @@ class TuneViewModel @Inject constructor(private val store: SettingsStore) : View
  * nothing on this screen is decorative.
  */
 @Composable
-fun TuneScreen(vm: TuneViewModel, onOpenBrain: () -> Unit) {
+fun TuneScreen(onOpenBrain: () -> Unit, vm: TuneViewModel = hiltViewModel()) {
     val cfg by vm.settings.collectAsState()
 
     Column(Modifier.fillMaxSize().background(Bg)) {

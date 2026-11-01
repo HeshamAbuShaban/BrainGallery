@@ -98,6 +98,7 @@ import com.brain.gallery.ui.components.VideoDetailsDialog
 import com.brain.gallery.ui.components.fmtDur
 import com.brain.gallery.ui.components.thumbAtMs
 import com.brain.gallery.ui.glass.Glass
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.brain.gallery.ui.glass.glass
 import com.brain.gallery.ui.player.PlayerManager
 import com.brain.gallery.ui.player.ShareHelper
@@ -122,7 +123,8 @@ fun FeedScreen(
     onLeaveFeed: () -> Unit,
     onChrome: (Boolean) -> Unit = {},
     bottomOverlay: androidx.compose.ui.unit.Dp = 0.dp,
-    vm: FeedViewModel
+    // Destination-scoped: the reel's model lives and dies with its tab.
+    vm: FeedViewModel = hiltViewModel()
 ) {
     val feed by vm.feed.collectAsState()
     val loading by vm.loading.collectAsState()

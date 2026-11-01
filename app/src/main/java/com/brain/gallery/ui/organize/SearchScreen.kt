@@ -46,6 +46,7 @@ import com.brain.gallery.ui.components.VideoThumb
 import com.brain.gallery.ui.glass.Glass
 import com.brain.gallery.ui.glass.glass
 import com.brain.gallery.ui.glass.glassReserve
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.brain.gallery.ui.spotlight.SpotlightController
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
@@ -53,7 +54,10 @@ import com.brain.gallery.ui.theme.Text1
 import com.brain.gallery.ui.theme.Text2
 
 @Composable
-fun SearchScreen(spotlight: SpotlightController, vm: SearchViewModel) {
+fun SearchScreen(
+    spotlight: SpotlightController,
+    vm: SearchViewModel = hiltViewModel()
+) {
     val q by vm.query.collectAsState()
     val results by vm.results.collectAsState()
     val deleteAsk by vm.deleteAsk.collectAsState()

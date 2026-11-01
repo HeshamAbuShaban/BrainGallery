@@ -501,9 +501,12 @@ class SearchViewModel @Inject constructor(
     private val bundle: MemoryBundle,
     private val battery: BatteryOptims,
     private val store: SettingsStore,
+    private val savedState: androidx.lifecycle.SavedStateHandle,
     @ApplicationContext private val ctx: android.content.Context
 ) : ViewModel() {
-    private val _q = MutableStateFlow("")
+    // The query survives process death: it lives in the destination's
+    // SavedStateHandle, restored when the system rebuilds the back stack.
+    private val _q = MutableStateFlow(savedState.get<String>("q") ?: "")
     val query: StateFlow<String> = _q
     private val _results = MutableStateFlow<List<VideoEntity>>(emptyList())
     val results: StateFlow<List<VideoEntity>> = _results
@@ -539,7 +542,10 @@ class SearchViewModel @Inject constructor(
             .map { it.first }
     }
 
-    fun query(s: String) { _q.value = s }
+    fun query(s: String) {
+        _q.value = s
+        savedState["q"] = s
+    }
     fun toggleFav(v: VideoEntity) {
         viewModelScope.launch { db.videoDao().setFavorite(v.id, !v.isFavorite) }
     }

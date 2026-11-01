@@ -44,13 +44,11 @@ import com.brain.gallery.data.service.BrainScanService
 import com.brain.gallery.ui.Routes
 import com.brain.gallery.ui.components.SpotlightPlayer
 import com.brain.gallery.ui.feed.FeedScreen
-import com.brain.gallery.ui.feed.FeedViewModel
 import com.brain.gallery.ui.organize.BrainScreen
 import com.brain.gallery.ui.organize.GroupDetailRoute
 import com.brain.gallery.ui.organize.OrganizeScreen
 import com.brain.gallery.ui.organize.OrganizeViewModel
 import com.brain.gallery.ui.organize.SearchScreen
-import com.brain.gallery.ui.organize.SearchViewModel
 import com.brain.gallery.ui.glass.GlassNav
 import com.brain.gallery.ui.glass.GlassTab
 import com.brain.gallery.ui.glass.glassReserve
@@ -59,7 +57,6 @@ import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.BrainTheme
 import com.brain.gallery.ui.theme.Motion
 import com.brain.gallery.ui.tune.TuneScreen
-import com.brain.gallery.ui.tune.TuneViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -94,14 +91,12 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 private fun Root(spotlight: SpotlightController) {
-    // Activity-scoped on purpose: one instance of each model for the whole
-    // app, exactly like the pre-NavHost shell. Flipping to per-destination
-    // scoping is a deliberate later step — doing it now would fork the
-    // organize state between the hub and its detail screen.
+    // OrganizeViewModel is the library session: hub, group detail and the
+    // brain screen share one instance, so an edit made in one is visible the
+    // moment back is pressed in another. Feed/Search/Tune scope themselves
+    // to their destinations (Phase 1b) — their state dies with the tab,
+    // search query excepted, which rides SavedStateHandle.
     val orgVm: OrganizeViewModel = hiltViewModel()
-    val feedVm: FeedViewModel = hiltViewModel()
-    val searchVm: SearchViewModel = hiltViewModel()
-    val tuneVm: TuneViewModel = hiltViewModel()
 
     val navController = rememberNavController()
     val backStackEntry by navController.currentBackStackEntryAsState()
@@ -168,7 +163,6 @@ private fun Root(spotlight: SpotlightController) {
                     FeedScreen(
                         player = spotlight.player,
                         spotlight = spotlight,
-                        vm = feedVm,
                         onLeaveFeed = { goTab(1) },
                         onChrome = { reelChrome = it },
                         bottomOverlay = glassReserve()
@@ -192,10 +186,10 @@ private fun Root(spotlight: SpotlightController) {
                 )
             }
             composable(Routes.SEARCH) {
-                SearchScreen(spotlight = spotlight, vm = searchVm)
+                SearchScreen(spotlight = spotlight)
             }
             composable(Routes.TUNE) {
-                TuneScreen(vm = tuneVm, onOpenBrain = { navController.navigate(Routes.BRAIN) })
+                TuneScreen(onOpenBrain = { navController.navigate(Routes.BRAIN) })
             }
             composable(Routes.BRAIN) {
                 BrainScreen(vm = orgVm, onBack = { navController.popBackStack() })
