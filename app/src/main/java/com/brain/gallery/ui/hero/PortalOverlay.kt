@@ -1,8 +1,5 @@
 package com.brain.gallery.ui.hero
 
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -15,6 +12,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -82,8 +80,9 @@ fun PortalOverlay(
     val ctx = LocalContext.current
 
     // Expansion progress, eased where it is consumed. The constitution's
-    // mechanic C names the ease-in-out cubic as this mechanic's curve.
-    val e = remember { Animatable(0f) }
+    // mechanic C names the ease-in-out cubic as this mechanic's curve; the
+    // clock itself is a frame loop like the other mechanics — no tweens.
+    val e = remember { mutableFloatStateOf(0f) }
     // Normalized pointer for the tilt; written by the gesture loop, read in
     // the draw phase only.
     val pointerNX = remember { mutableFloatStateOf(0.5f) }
@@ -98,7 +97,15 @@ fun PortalOverlay(
 
     LaunchedEffect(expanding) {
         if (!expanding) return@LaunchedEffect
-        e.animateTo(1f, tween(durationMillis = 460, easing = LinearEasing))
+        var last = -1L
+        while (e.floatValue < 1f) {
+            withFrameNanos { now ->
+                if (last < 0) { last = now; return@withFrameNanos }
+                val dt = (now - last) / 1_000_000_000f
+                last = now
+                e.floatValue = (e.floatValue + dt / 0.46f).coerceAtMost(1f)
+            }
+        }
         // Consumed on completion, not on attempt: a back-press bailout
         // leaves the door for later in the session. At most one ceremony.
         PortalGate.consumed = true

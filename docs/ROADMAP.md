@@ -123,6 +123,24 @@ medium, shared brain.** Do NOT shoehorn photos into `VideoEntity`.
   (later) text extraction into MemoryDoc; a document browser screen.
 - Estimated order: 3a → 3b in one pass; 3c and 3d independent, any time after.
 
+## The three-mechanic hero system (shipped Nov 1)
+
+`ui/hero/` holds the constitution's three mechanics, each reviewed by a
+separate pass before shipping: **A** the cylindrical shelf (Organize hub,
+ceremonial browse), **B** the spring card wave (GroupDetail hero, review
+handoff), **C** the screen-locked portal (the session's first grid→player
+entry, consumed on completion). All math lives in `HeroMath.kt` (14 tests),
+transforms run in graphicsLayer/frame loops so gestures never recompose,
+haptics fire on every interaction, reduced motion freezes A and B and routes
+C direct, and the sacred screens (reel + spotlight) are byte-identical
+throughout — verified by diff.
+
+Ruling recorded for the reviewer's question: the two-radii rule governs the
+mechanics' own surfaces (they add exactly one, the portal's 44dp). App
+surfaces keep the theme's existing shapes — `CardShape` (20dp) for
+containers, the pill for interactive — and new app code should reach for
+those before inventing a radius.
+
 ## Phase 4 — Presentation & the name
 
 The name question, with options (decision is the owner's; renaming the

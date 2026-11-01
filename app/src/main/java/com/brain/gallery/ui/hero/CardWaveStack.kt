@@ -159,7 +159,13 @@ fun CardWaveStack(
                 reduced = reduced,
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .offset { IntOffset(HeroMath.stackOffsetX(i, stepXpx).toInt(), 0) }
+                    // Rendered left edge = frontXpx + stackOffsetX(i) — the
+                    // same numbers the Gaussian is fed, or the wave lifts
+                    // cards the finger is not near.
+                    .offset {
+                        IntOffset(
+                            (frontXpx + HeroMath.stackOffsetX(i, stepXpx)).toInt(), 0)
+                    }
                     .width(cardW)
                     .height(cardH)
             )
