@@ -145,6 +145,11 @@ fun FeedScreen(
         }
         return
     }
+    // First data arrival: the reel holds its visible order across watch
+    // events, but an order remembered from before the library loaded must
+    // never survive the gate — or a cold start on this tab shows an empty
+    // reel forever.
+    if (shown.isEmpty() && feed.isNotEmpty()) shown = feed
     if (shown.isEmpty()) {
         Box(Modifier.fillMaxSize().background(Bg), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
