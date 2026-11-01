@@ -30,6 +30,8 @@ class FeedViewModel @Inject constructor(
 ) : ViewModel() {
     private val _feed = MutableStateFlow<List<FeedItem>>(emptyList())
     val feed: StateFlow<List<FeedItem>> = _feed
+    private val _showWhy = MutableStateFlow(true)
+    val showWhy: StateFlow<Boolean> = _showWhy
     private val _loading = MutableStateFlow(true)
     val loading: StateFlow<Boolean> = _loading
     /** Bumped when the feed runs dry so the composer can reshuffle a fresh batch. */
@@ -46,6 +48,7 @@ class FeedViewModel @Inject constructor(
                 _nonce
             ) { videos, notInterested, cfg, _ -> Triple(videos, notInterested, cfg) }
                 .collect { (videos, notInterested, cfg) ->
+                    _showWhy.value = cfg.showWhy
                     val suppressed = suppressionSet(videos, notInterested)
                     val events = db.watchDao().recent()
                     _feed.value = composer.compose(videos, events, suppressed, tuning = cfg.tuning)

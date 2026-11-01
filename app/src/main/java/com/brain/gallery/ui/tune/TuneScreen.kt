@@ -34,6 +34,17 @@ import com.brain.gallery.domain.EngineSettings
 import com.brain.gallery.domain.FEED_MOODS
 import com.brain.gallery.domain.FeedTuning
 import com.brain.gallery.domain.SettingsStore
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material3.Icon
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.draw.clip
+import com.brain.gallery.domain.ACCENT_CHOICES
 import com.brain.gallery.ui.glass.GlassSegmented
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
@@ -194,6 +205,13 @@ fun TuneScreen(onOpenBrain: () -> Unit, vm: TuneViewModel = hiltViewModel()) {
                 preview = { "Nothing is deleted — clutter just waits in Organize" }) {
                 vm.update(cfg.copy(mood = "Custom", tuning = cfg.tuning.copy(junkCut = it)))
             }
+            Head("On the cards")
+            SwitchRow("Why this ranked",
+                "The small accent line on each reel card, saying which signals put it there.",
+                cfg.showWhy) {
+                vm.update(cfg.copy(showWhy = it))
+            }
+
             Row(Modifier.fillMaxWidth().padding(vertical = 10.dp).clickable {
                 vm.update(cfg.copy(mood = "Open", tuning = FeedTuning()))
             }, verticalAlignment = Alignment.CenterVertically) {
@@ -201,6 +219,10 @@ fun TuneScreen(onOpenBrain: () -> Unit, vm: TuneViewModel = hiltViewModel()) {
                     fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 Text("↺", color = Cyan, fontSize = 15.sp)
             }
+
+            // ---------------- Appearance ----------------
+            Head("Appearance")
+            AccentRow(cfg.accentArgb) { vm.update(cfg.copy(accentArgb = it)) }
 
             // ---------------- Elsewhere ----------------
             Head("Elsewhere")
@@ -297,4 +319,47 @@ private fun SliderRow(
             }
         }
     }
+}
+
+@Composable
+private fun AccentRow(current: Long, onPick: (Long) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 10.dp)) {
+        Text("Accent color", color = Text1, fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+        Text("Tints the glass and the highlights across the whole app.",
+            color = Text2, fontSize = 11.5.sp,
+            modifier = Modifier.padding(top = 2.dp, bottom = 2.dp))
+        Row(Modifier.fillMaxWidth().padding(top = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            ACCENT_CHOICES.forEach { argb ->
+                val sel = argb == current
+                Box(Modifier.size(36.dp)
+                    .clip(CircleShape)
+                    .background(Color(argb))
+                    .then(if (sel) Modifier.border(2.dp, Color.White, CircleShape) else Modifier)
+                    .clickable { onPick(argb) },
+                    contentAlignment = Alignment.Center) {
+                    if (sel) Icon(Icons.Default.Check, null, tint = Color.White,
+                        modifier = Modifier.size(16.dp))
+                }
+            }
+        }
+    }
+    HorizontalDivider(color = Color(0xFF1A2231))
+}
+
+@Composable
+private fun SwitchRow(title: String, sub: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, color = Text1, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
+            Text(sub, color = Text2, fontSize = 11.5.sp)
+        }
+        androidx.compose.material3.Switch(checked = checked, onCheckedChange = onChange,
+            colors = androidx.compose.material3.SwitchDefaults.colors(
+                checkedThumbColor = Color.White, checkedTrackColor = Accent,
+                uncheckedThumbColor = Text2, uncheckedTrackColor = Color(0xFF2A3446)
+            ))
+    }
+    HorizontalDivider(color = Color(0xFF1A2231))
 }

@@ -16,6 +16,9 @@ object Routes {
     const val SEARCH = "search"
     const val TUNE = "tune"
     const val BRAIN = "brain"
+    const val BRAIN_LEARNING = "brain/learning"
+    const val BRAIN_DIAGNOSTICS = "brain/diagnostics"
+    const val BRAIN_STORAGE = "brain/storage"
 
     fun group(id: String) = "organize/group/$id"
 
@@ -23,7 +26,7 @@ object Routes {
     fun tabIndex(route: String?): Int = when (route) {
         FEED -> 0
         SEARCH -> 2
-        TUNE, BRAIN -> 3
+        TUNE, BRAIN, BRAIN_LEARNING, BRAIN_DIAGNOSTICS, BRAIN_STORAGE -> 3
         else -> 1 // organize, group detail, and the pre-first-emission state
     }
 
@@ -35,6 +38,7 @@ object Routes {
         SEARCH -> 4
         TUNE -> 6
         BRAIN -> 7
+        BRAIN_LEARNING, BRAIN_DIAGNOSTICS, BRAIN_STORAGE -> 8
         else -> 2
     }
 }

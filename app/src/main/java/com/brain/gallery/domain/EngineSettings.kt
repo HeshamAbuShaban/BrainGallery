@@ -151,7 +151,9 @@ data class EngineSettings(
     /** The weights behind the mood. A preset pick copies the preset here. */
     val tuning: FeedTuning = FeedTuning(),
     /** Accent color for glass and highlights, as ARGB. */
-    val accentArgb: Long = 0xFF8B5CF6L
+    val accentArgb: Long = 0xFF8B5CF6L,
+    /** The ✦ "why ranked" line on reel cards. Yours to turn off. */
+    val showWhy: Boolean = true
 ) {
     fun toJson(): String = JSONObject().apply {
         put("identityEnabled", identityEnabled)
@@ -167,6 +169,7 @@ data class EngineSettings(
         put("mood", mood)
         put("tuning", org.json.JSONObject(tuning.toJson()))
         put("accentArgb", accentArgb)
+        put("showWhy", showWhy)
     }.toString()
 
     companion object {
@@ -189,7 +192,8 @@ data class EngineSettings(
                     prosodyEnabled = o.optBoolean("prosodyEnabled", d.prosodyEnabled),
                     mood = o.optString("mood", d.mood).takeIf { it in FEED_MOODS } ?: d.mood,
                     tuning = tuning,
-                    accentArgb = o.optLong("accentArgb", d.accentArgb)
+                    accentArgb = o.optLong("accentArgb", d.accentArgb),
+                    showWhy = o.optBoolean("showWhy", d.showWhy)
                 )
             }.getOrDefault(EngineSettings())
         }

@@ -128,6 +128,7 @@ fun FeedScreen(
 ) {
     val feed by vm.feed.collectAsState()
     val loading by vm.loading.collectAsState()
+    val showWhy by vm.showWhy.collectAsState()
     // Declared up here because the loading/empty gates below already read it.
     var shown by remember { mutableStateOf(feed) }
     val ctx = LocalContext.current
@@ -287,6 +288,7 @@ fun FeedScreen(
             val item = shown[page]
             ReelPage(
                 item = item,
+                showWhy = showWhy,
                 isActive = pagerState.currentPage == page,
                 covered = spotlightOpen,
                 page = page,
@@ -331,6 +333,7 @@ fun FeedScreen(
 @Composable
 private fun ReelPage(
     item: FeedItem,
+    showWhy: Boolean,
     isActive: Boolean,
     covered: Boolean,
     page: Int,
@@ -574,10 +577,10 @@ private fun ReelPage(
                     Spacer(Modifier.height(3.dp))
                     Text("${v.folderName} • ${fmtDur(v.durationMs)}", color = Color.White.copy(alpha = 0.45f),
                         fontSize = 10.5.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    // The ranking, out loud. The composer assembles this from the
-                    // same signals that scored the clip, so the card never claims
-                    // something the ordering doesn't do.
-                    if (item.reason.isNotBlank()) {
+                    // The ranking, out loud — unless the viewer turned the
+                    // line off in Tune. The composer assembles it from the
+                    // same signals that scored the clip.
+                    if (showWhy && item.reason.isNotBlank()) {
                         Spacer(Modifier.height(4.dp))
                         Text("✦ ${item.reason}", color = Accent, fontSize = 10.5.sp,
                             fontWeight = FontWeight.Medium, maxLines = 1,
