@@ -87,6 +87,7 @@ import com.brain.gallery.ui.glass.GlassStatTile
 import com.brain.gallery.ui.glass.glass
 import com.brain.gallery.ui.glass.GlassStyle
 import com.brain.gallery.ui.glass.glassReserve
+import com.brain.gallery.ui.hero.ShelfCarousel
 import com.brain.gallery.ui.components.MoveToGroupSheet
 import com.brain.gallery.ui.spotlight.SpotlightController
 import com.brain.gallery.ui.theme.Accent
@@ -200,6 +201,28 @@ fun OrganizeScreen(
                             color = Cyan, trackColor = Color(0xFF1D2534))
                     }
                 }
+            }
+        }
+        // The Shelf — mechanic A, the only mechanic on this screen. Featured
+        // groups leaning on the inside of a cylinder; tap opens the group.
+        if (!loading) {
+            val shelf = buildList {
+                groups.firstOrNull { it.kind == GroupKind.ON_THIS_DAY }?.let { add(it) }
+                groups.firstOrNull { it.kind == GroupKind.MEMORIES }?.let { add(it) }
+                groups.firstOrNull { it.kind == GroupKind.GEMS }?.let { add(it) }
+                groups.firstOrNull { it.kind == GroupKind.FAVORITES }?.let { add(it) }
+                groups.filter { it.kind == GroupKind.PEOPLE }.take(2).forEach { add(it) }
+                groups.lastOrNull { it.kind == GroupKind.ALBUM }?.let { add(it) }
+            }.distinctBy { it.id }.take(8)
+            if (shelf.isNotEmpty()) {
+                Text("The shelf", color = Cyan, fontSize = 11.sp,
+                    fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp,
+                    modifier = Modifier.padding(20.dp, 14.dp, 20.dp, 0.dp))
+                ShelfCarousel(
+                    items = shelf,
+                    onOpen = { onOpenGroup(it.id) },
+                    modifier = Modifier.padding(top = 6.dp)
+                )
             }
         }
         // Groups grid
