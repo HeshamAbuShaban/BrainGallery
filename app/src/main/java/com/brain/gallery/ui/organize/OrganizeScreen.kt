@@ -74,6 +74,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.IntentSenderRequest
 import android.app.Activity
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.brain.gallery.data.local.PersonEntity
 import com.brain.gallery.domain.organize.GroupKind
 import com.brain.gallery.domain.organize.SmartGroup
 import com.brain.gallery.ui.components.SpotlightPlayer
@@ -97,19 +98,20 @@ import com.brain.gallery.ui.theme.Yellow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltViewModel()) {
+fun OrganizeScreen(
+    spotlight: SpotlightController,
+    onOpenGroup: (String) -> Unit,
+    onOpenBrain: () -> Unit,
+    vm: OrganizeViewModel = hiltViewModel()
+) {
     val groups by vm.groupList.collectAsState()
     val stats by vm.stats.collectAsState()
     val loading by vm.loading.collectAsState()
-    val selected by vm.selected.collectAsState()
-    val persons by vm.persons.collectAsState()
-    val personCounts by vm.personCounts.collectAsState()
     val customNames by vm.customNames.collectAsState()
     val picked by vm.selection.collectAsState()
     // While anything is ticked, the screen becomes a workbench: tap a clip to
     // add or drop it instead of opening it, and one bar moves the whole lot.
     val selecting = picked.isNotEmpty()
-    var showDiag by remember { mutableStateOf(false) }
     var renameTarget by remember { mutableStateOf<SmartGroup?>(null) }
     val deleteAsk by vm.deleteAsk.collectAsState()
 
@@ -137,31 +139,6 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
         onRefresh = { refreshing = true },
         modifier = Modifier.fillMaxSize()
     ) {
-    if (selected != null) {
-        GroupDetail(
-            group = selected!!,
-            person = selected!!.personId.takeIf { it >= 0 }?.let { pid -> persons.firstOrNull { it.id == pid } },
-            onBack = { vm.close() }, onFav = { vm.toggleFav(it) },
-            onDeleteRedundant = { vm.requestDelete(it) }, onPlay = { spotlight.open(it) },
-            onDeleteOne = { vm.requestDelete(listOf(it.id)) },
-            onSimilar = { spotlight.open(it) },
-            onRename = { pid, n -> vm.renameGroup("person_$pid", n) },
-            onSplitOut = { pid, vid -> vm.splitVideoOut(pid, vid) },
-            onDismissSplit = { vm.dismissSplitWarning(it) },
-            onMoveVideo = { vid, target -> vm.moveVideoToPerson(vid, target) },
-            pickedIds = picked,
-            onTogglePick = { vm.togglePick(it) },
-            groupChoices = vm.groupChoices,
-            onMoveGroup = { ids, g ->
-                // A single clip may not have been ticked, so make the move
-                // explicit rather than depending on what the selection holds.
-                vm.moveIdsToGroup(ids, g)
-                if (g.isNotBlank()) vm.rememberGroupName(g)
-            },
-            onSwipeNotInterested = { vid -> vm.markNotInterested(vid) },
-            persons = persons,
-            personCounts = personCounts)
-    } else {
     Column(Modifier.fillMaxSize().background(Bg)
         .windowInsetsPadding(WindowInsets.navigationBars)
         .padding(bottom = glassReserve())) {
@@ -177,7 +154,7 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
                 Icon(Icons.Default.Save, null, tint = Text1, modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.width(8.dp))
-            IconButton(onClick = { showDiag = true },
+            IconButton(onClick = onOpenBrain,
                 modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(40.dp)) {
                 Icon(Icons.Default.BugReport, null, tint = Text1, modifier = Modifier.size(18.dp))
             }
@@ -232,7 +209,7 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
                         GroupCardFull(
                             group = g,
                             persons = groups.filter { it.kind == GroupKind.PEOPLE },
-                            onOpen = { vm.open(g) },
+                            onOpen = { onOpenGroup(g.id) },
                             onPlayAll = { spotlight.openPlaylist(g.videos) },
                             onSimilar = { g.videos.firstOrNull()?.let { spotlight.open(it, g.videos) } },
                             onRename = { renameTarget = g },
@@ -247,10 +224,6 @@ fun OrganizeScreen(spotlight: SpotlightController, vm: OrganizeViewModel = hiltV
             }
         }
     }
-    }
-    }
-    if (showDiag) {
-        BrainScreen(vm = vm, onBack = { showDiag = false })
     }
     if (selecting) {
         SelectionBar(
@@ -459,4 +432,56 @@ private fun SelectionBar(
             onPick = { g -> open = false; if (g.isNotBlank()) onMove(g) }
         )
     }
+}
+
+/**
+ * The group detail as a destination: resolves the group by its route id from
+ * the shared organize state. The library flows emit within the first frames
+ * from Room, so a cold restore into this route shows shimmer, never a dead
+ * end. All actions go through the same activity-scoped [OrganizeViewModel]
+ * the hub uses, so edits here are visible there the moment back is pressed.
+ */
+@Composable
+fun GroupDetailRoute(
+    groupId: String,
+    spotlight: SpotlightController,
+    vm: OrganizeViewModel,
+    onBack: () -> Unit
+) {
+    val groups by vm.groupList.collectAsState()
+    val persons by vm.persons.collectAsState()
+    val personCounts by vm.personCounts.collectAsState()
+    val picked by vm.selection.collectAsState()
+    val group = groups.firstOrNull { it.id == groupId }
+
+    if (group == null) {
+        Column(Modifier.fillMaxSize().background(Bg).padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            repeat(3) { ShimmerBar(Modifier.fillMaxWidth(), 120.dp, 20.dp) }
+        }
+        return
+    }
+    GroupDetail(
+        group = group,
+        person = group.personId.takeIf { it >= 0 }?.let { pid -> persons.firstOrNull { it.id == pid } },
+        onBack = onBack, onFav = { vm.toggleFav(it) },
+        onDeleteRedundant = { vm.requestDelete(it) }, onPlay = { spotlight.open(it) },
+        onDeleteOne = { vm.requestDelete(listOf(it.id)) },
+        onSimilar = { spotlight.open(it) },
+        onRename = { pid, n -> vm.renameGroup("person_$pid", n) },
+        onSplitOut = { pid, vid -> vm.splitVideoOut(pid, vid) },
+        onDismissSplit = { vm.dismissSplitWarning(it) },
+        onMoveVideo = { vid, target -> vm.moveVideoToPerson(vid, target) },
+        pickedIds = picked,
+        onTogglePick = { vm.togglePick(it) },
+        groupChoices = vm.groupChoices,
+        onMoveGroup = { ids, g ->
+            // A single clip may not have been ticked, so make the move
+            // explicit rather than depending on what the selection holds.
+            vm.moveIdsToGroup(ids, g)
+            if (g.isNotBlank()) vm.rememberGroupName(g)
+        },
+        onSwipeNotInterested = { vid -> vm.markNotInterested(vid) },
+        persons = persons,
+        personCounts = personCounts)
 }

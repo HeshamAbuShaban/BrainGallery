@@ -38,7 +38,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.ui.components.SpotlightPlayer
 import com.brain.gallery.ui.components.VideoActionsSheet
@@ -54,7 +53,7 @@ import com.brain.gallery.ui.theme.Text1
 import com.brain.gallery.ui.theme.Text2
 
 @Composable
-fun SearchScreen(spotlight: SpotlightController, vm: SearchViewModel = hiltViewModel()) {
+fun SearchScreen(spotlight: SpotlightController, vm: SearchViewModel) {
     val q by vm.query.collectAsState()
     val results by vm.results.collectAsState()
     val deleteAsk by vm.deleteAsk.collectAsState()

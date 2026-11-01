@@ -8,20 +8,16 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
@@ -29,42 +25,41 @@ import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalDensity
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import com.brain.gallery.data.service.BrainScanService
+import com.brain.gallery.ui.Routes
 import com.brain.gallery.ui.components.SpotlightPlayer
 import com.brain.gallery.ui.feed.FeedScreen
+import com.brain.gallery.ui.feed.FeedViewModel
+import com.brain.gallery.ui.organize.BrainScreen
+import com.brain.gallery.ui.organize.GroupDetailRoute
 import com.brain.gallery.ui.organize.OrganizeScreen
-import com.brain.gallery.ui.organize.SearchScreen
 import com.brain.gallery.ui.organize.OrganizeViewModel
-import com.brain.gallery.ui.tune.TuneScreen
+import com.brain.gallery.ui.organize.SearchScreen
+import com.brain.gallery.ui.organize.SearchViewModel
 import com.brain.gallery.ui.glass.GlassNav
-import com.brain.gallery.ui.glass.glassReserve
 import com.brain.gallery.ui.glass.GlassTab
+import com.brain.gallery.ui.glass.glassReserve
 import com.brain.gallery.ui.spotlight.SpotlightController
-import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.BrainTheme
 import com.brain.gallery.ui.theme.Motion
-import com.brain.gallery.ui.theme.Text2
+import com.brain.gallery.ui.tune.TuneScreen
+import com.brain.gallery.ui.tune.TuneViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 
@@ -97,17 +92,26 @@ class MainActivity : ComponentActivity() {
     override fun onDestroy() { super.onDestroy(); spotlight.player.release() }
 }
 
-private typealias Tab = GlassTab
-
 @Composable
 private fun Root(spotlight: SpotlightController) {
-    val vm: OrganizeViewModel = hiltViewModel()
-    var tab by remember { mutableIntStateOf(1) }
-    var prev by remember { mutableIntStateOf(1) }
+    // Activity-scoped on purpose: one instance of each model for the whole
+    // app, exactly like the pre-NavHost shell. Flipping to per-destination
+    // scoping is a deliberate later step — doing it now would fork the
+    // organize state between the hub and its detail screen.
+    val orgVm: OrganizeViewModel = hiltViewModel()
+    val feedVm: FeedViewModel = hiltViewModel()
+    val searchVm: SearchViewModel = hiltViewModel()
+    val tuneVm: TuneViewModel = hiltViewModel()
+
+    val navController = rememberNavController()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val route = backStackEntry?.destination?.route
     val haptics = LocalHapticFeedback.current
+
     val open by spotlight.current.collectAsState()
-    var reelChrome by remember { mutableStateOf(true) }
     val similar by spotlight.similar.collectAsState()
+    var reelChrome by remember { mutableStateOf(true) }
+
     val tabs = listOf(
         GlassTab("For You", Icons.Default.PlayArrow),
         GlassTab("Organize", Icons.Default.GridView),
@@ -115,11 +119,19 @@ private fun Root(spotlight: SpotlightController) {
         GlassTab("Tune", Icons.Default.Tune)
     )
 
-    fun go(i: Int) {
-        if (i == tab) return
-        prev = tab
-        tab = i
-        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+    // Tab switches keep each tab's stack and state alive: pop to the start
+    // with saveState, restore on the way back. Stacked destinations (group,
+    // brain) ride on top of their tab's stack.
+    fun goTab(i: Int) {
+        if (i == Routes.tabIndex(route)) return
+        haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.LongPress)
+        navController.navigate(
+            when (i) { 0 -> Routes.FEED; 2 -> Routes.SEARCH; 3 -> Routes.TUNE; else -> Routes.ORGANIZE }
+        ) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
     }
 
     // The pill is always reachable except in two situations: a spotlight is
@@ -127,48 +139,73 @@ private fun Root(spotlight: SpotlightController) {
     // Tapping the reel brings its chrome back, which brings this back too.
     val navVisible = when {
         open != null -> 0f
-        tab == 0 && !reelChrome -> 0f
+        route == Routes.FEED && !reelChrome -> 0f
         else -> 1f
     }
 
-    // No Scaffold bottom bar any more: the nav floats over the content so the
-    // reel gets the whole screen and the library keeps its bottom row.
-    val forward = tab >= prev
-    val systemBottom = WindowInsets.navigationBars
     Box(Modifier.fillMaxSize().background(Bg)) {
-        AnimatedContent(
-            targetState = tab,
-            transitionSpec = {
-                val off = if (forward) 1 else -1
-                (slideInHorizontally(tween(Motion.mediumMs, easing = Motion.emphasized)) { it / 6 * off } +
-                        fadeIn(tween(Motion.mediumMs)))
-                    .togetherWith(
-                        slideOutHorizontally(tween(Motion.mediumMs, easing = Motion.emphasized)) { -it / 6 * off } +
-                                fadeOut(tween(Motion.fastMs))
-                    )
+        NavHost(
+            navController = navController,
+            startDestination = Routes.ORGANIZE,
+            enterTransition = {
+                val fwd = Routes.rank(targetState.destination.route) >= Routes.rank(initialState.destination.route)
+                slideInHorizontally(tween(Motion.mediumMs, easing = Motion.emphasized)) {
+                    it / 6 * if (fwd) 1 else -1
+                } + fadeIn(tween(Motion.mediumMs))
             },
-            label = "tab"
-        ) { t ->
-            when (t) {
-                0 -> Box(Modifier.fillMaxSize().windowInsetsPadding(systemBottom)) {
+            exitTransition = { fadeOut(tween(Motion.fastMs)) },
+            popEnterTransition = {
+                slideInHorizontally(tween(Motion.mediumMs, easing = Motion.emphasized)) { -it / 6 } +
+                        fadeIn(tween(Motion.mediumMs))
+            },
+            popExitTransition = {
+                slideOutHorizontally(tween(Motion.mediumMs, easing = Motion.emphasized)) { -it / 6 } +
+                        fadeOut(tween(Motion.fastMs))
+            }
+        ) {
+            composable(Routes.FEED) {
+                Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars)) {
                     FeedScreen(
                         player = spotlight.player,
                         spotlight = spotlight,
-                        onLeaveFeed = { go(1) },
+                        vm = feedVm,
+                        onLeaveFeed = { goTab(1) },
                         onChrome = { reelChrome = it },
                         bottomOverlay = glassReserve()
                     )
                 }
-                1 -> Box(Modifier.fillMaxSize()) { OrganizeScreen(spotlight) }
-                2 -> Box(Modifier.fillMaxSize()) { SearchScreen(spotlight) }
-                else -> Box(Modifier.fillMaxSize()) { TuneScreen() }
+            }
+            composable(Routes.ORGANIZE) {
+                OrganizeScreen(
+                    spotlight = spotlight,
+                    vm = orgVm,
+                    onOpenGroup = { navController.navigate(Routes.group(it)) },
+                    onOpenBrain = { navController.navigate(Routes.BRAIN) }
+                )
+            }
+            composable(Routes.GROUP) { entry ->
+                GroupDetailRoute(
+                    groupId = entry.arguments?.getString("groupId").orEmpty(),
+                    spotlight = spotlight,
+                    vm = orgVm,
+                    onBack = { navController.popBackStack() }
+                )
+            }
+            composable(Routes.SEARCH) {
+                SearchScreen(spotlight = spotlight, vm = searchVm)
+            }
+            composable(Routes.TUNE) {
+                TuneScreen(vm = tuneVm, onOpenBrain = { navController.navigate(Routes.BRAIN) })
+            }
+            composable(Routes.BRAIN) {
+                BrainScreen(vm = orgVm, onBack = { navController.popBackStack() })
             }
         }
 
         GlassNav(
             tabs = tabs,
-            selected = tab,
-            onSelect = { go(it) },
+            selected = Routes.tabIndex(route),
+            onSelect = { goTab(it) },
             visible = navVisible
         )
     }
@@ -182,14 +219,14 @@ private fun Root(spotlight: SpotlightController) {
             manager = spotlight.player,
             onClose = { spotlight.close() },
             onPick = { spotlight.pick(it) },
-            onFav = { vm.toggleFav(it) },
+            onFav = { orgVm.toggleFav(it) },
             hasPrev = spotlight.hasPrev(),
             hasNext = spotlight.hasNext(),
             onPrev = { spotlight.prev() },
             onNext = { spotlight.next() },
             onMoreLikeThis = { spotlight.open(it, similar) },
-            onDelete = { vm.requestDelete(listOf(it.id)) },
-            onNotInterested = { vm.markNotInterested(it.id) }
+            onDelete = { orgVm.requestDelete(listOf(it.id)) },
+            onNotInterested = { orgVm.markNotInterested(it.id) }
         )
     }
 }

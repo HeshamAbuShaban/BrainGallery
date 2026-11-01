@@ -27,7 +27,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.brain.gallery.domain.EngineSettings
@@ -35,7 +34,6 @@ import com.brain.gallery.domain.FEED_MOODS
 import com.brain.gallery.domain.FeedTuning
 import com.brain.gallery.domain.SettingsStore
 import com.brain.gallery.ui.glass.GlassSegmented
-import com.brain.gallery.ui.organize.BrainScreen
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.Cyan
@@ -78,16 +76,8 @@ class TuneViewModel @Inject constructor(private val store: SettingsStore) : View
  * nothing on this screen is decorative.
  */
 @Composable
-fun TuneScreen() {
-    val vm: TuneViewModel = hiltViewModel()
-    val orgVm: com.brain.gallery.ui.organize.OrganizeViewModel = hiltViewModel()
+fun TuneScreen(vm: TuneViewModel, onOpenBrain: () -> Unit) {
     val cfg by vm.settings.collectAsState()
-    var showBrain by remember { mutableStateOf(false) }
-
-    if (showBrain) {
-        BrainScreen(vm = orgVm, onBack = { showBrain = false })
-        return
-    }
 
     Column(Modifier.fillMaxSize().background(Bg)) {
         Row(Modifier.fillMaxWidth().padding(20.dp, 16.dp, 16.dp, 4.dp),
@@ -214,7 +204,7 @@ fun TuneScreen() {
             // ---------------- Elsewhere ----------------
             Head("Elsewhere")
             ActionRow("Engine, repairs & data", "Everything the brain does, what it " +
-                "found, and what it needs from you.") { showBrain = true }
+                "found, and what it needs from you.") { onOpenBrain() }
 
             Spacer(Modifier.height(120.dp))
         }

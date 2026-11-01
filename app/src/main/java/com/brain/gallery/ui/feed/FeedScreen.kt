@@ -85,7 +85,6 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.media3.common.Player
 import androidx.media3.ui.PlayerView
 import coil.compose.AsyncImage
@@ -123,7 +122,7 @@ fun FeedScreen(
     onLeaveFeed: () -> Unit,
     onChrome: (Boolean) -> Unit = {},
     bottomOverlay: androidx.compose.ui.unit.Dp = 0.dp,
-    vm: FeedViewModel = hiltViewModel()
+    vm: FeedViewModel
 ) {
     val feed by vm.feed.collectAsState()
     val loading by vm.loading.collectAsState()

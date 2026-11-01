@@ -48,29 +48,26 @@ Half-baked or buried (the honest list):
 - Skills merged into `.agents/skills/` (9 adopted + `braingallery` router);
   `AGENTS.md` at root; `docs/DESIGN-RESEARCH.md` for the UI direction.
 
-## Phase 1 — Navigation becomes real (next, highest-leverage refactor)
+## Phase 1 — ✅ Navigation becomes real (shipped Nov 1)
 
-**Goal:** replace the hand-rolled `AnimatedContent` tab switcher with
-`androidx.navigation:navigation-compose` + type-safe routes
-(`.agents/skills/android-navigation`), keeping the glass pill as the visual.
+Done: `androidx.navigation:navigation-compose` (2.8.5) with one NavHost in
+`MainActivity`; route table in `ui/Routes.kt` (feed · organize ·
+organize/group/{groupId} · search · tune · brain); tab switches use the
+canonical pop-to-start + `saveState`/`restoreState` pattern so each tab's
+state survives; GroupDetail and BrainScreen are stacked destinations with
+real back-stack behavior (group → organize → exit); the glass pill stays the
+visual, now driven by the back stack; Motion-token slide/fade transitions
+direction-aware by route rank; the spotlight stays an app-level overlay.
 
-Route table:
+Two deliberate deviations (upgrade paths, not oversights):
 
-```
-feed              FeedScreen (full-bleed, pill auto-hides)
-organize          OrganizeScreen (hub)
-organize/group/{id}   GroupDetail (today: state flag inside OrganizeScreen)
-search            SearchScreen
-tune              TuneScreen
-tune/brain        BrainScreen (today: overlay inside Tune/Organize)
-```
-
-- Cross-feature navigation via lambda callbacks; ids not objects.
-- Back press finally behaves: group → organize → exit, instead of exiting the
-  app from a detail screen.
-- Per-destination ViewModels get `rememberSaveable`/SavedStateHandle survival.
-- The spotlight stays an app-level overlay (it is a player, not a place).
-- Risk: moderate; do it in one sitting, behind the compile gate.
+- **String routes, not `@Serializable` type-safe routes** — that needs the
+  kotlinx-serialization plugin for exactly one string argument today. Revisit
+  when a third argument appears.
+- **ViewModels stay activity-scoped** (created in `Root`, passed down), same
+  as the pre-NavHost shell — flipping to per-destination scoping now would
+  fork the organize state between hub and detail. Phase 1b: per-destination
+  ViewModels with SavedStateHandle (see `android-presentation-mvi`).
 
 ## Phase 2 — Finish the half-built features (one definition of done each)
 
