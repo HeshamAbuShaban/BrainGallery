@@ -6,6 +6,7 @@ import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.pow
 import kotlin.math.sin
+import kotlin.math.sin
 
 /**
  * The hero mechanics' math, in one pure object.
@@ -89,6 +90,13 @@ object HeroMath {
 
     /** Stack lean: cards tip into their own motion, from live velocity. */
     fun leanFromVelocity(velocityDpPerS: Float): Float = -velocityDpPerS * 0.012f
+
+    /**
+     * The idle sweep's virtual cursor: a slow sine across the pile, period
+     * owned here so the UI never writes trig.
+     */
+    fun sweepX(elapsedSeconds: Float, centerX: Float, amplitude: Float): Float =
+        centerX + sin(elapsedSeconds * 0.45f) * amplitude
 
     /** Stack geometry: card i sits back-left of card 0. */
     fun stackOffsetX(index: Int, step: Float): Float = -index * step

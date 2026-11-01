@@ -59,6 +59,7 @@ import com.brain.gallery.domain.organize.fmtSize
 import com.brain.gallery.ui.components.VideoActionsSheet
 import com.brain.gallery.ui.components.VideoDetailsDialog
 import com.brain.gallery.ui.components.VideoThumb
+import com.brain.gallery.ui.hero.CardWaveStack
 import com.brain.gallery.ui.components.SheetMode
 import com.brain.gallery.ui.glass.Glass
 import com.brain.gallery.ui.glass.glass
@@ -127,6 +128,15 @@ fun GroupDetail(
                     Icon(Icons.Default.Edit, null, tint = Text1, modifier = Modifier.size(15.dp))
                 }
             }
+        }
+        // Mechanic B lives here and only here: the group's cover pile frames
+        // the review, then hands off to the player. One mechanic per screen.
+        if (group.videos.isNotEmpty()) {
+            CardWaveStack(
+                clips = group.videos,
+                onPlay = onPlay,
+                modifier = Modifier.padding(bottom = 4.dp)
+            )
         }
         if (group.splitSuggested) {
             Row(Modifier.fillMaxWidth().padding(20.dp, 0.dp)
