@@ -87,9 +87,12 @@ Two deliberate deviations (upgrade paths, not oversights):
    `FeedTuning` + a Voices slider in Tune; clips the voice layer heard
    speaking get a lift with reason "someone talking"; "mostly music or
    ambience" never earns it. Remaining: voice tag search/filter.
-5. **User albums.** `albums` table (id, name, kind, order); "New album" flow
-   in Organize; multi-select → add-to-album; albums appear as groups.
-   Replaces the `manual_<name>` override hack.
+5. **User albums.** ✅ Shipped (Nov 1): `albums` table + `videos.albumId`
+   (migration v7→v8, additive); "New album" in the hub header; the selection
+   bar gains an "Album" action (pick existing, or create-and-fill in one
+   gesture); albums render as groups the engine never reorders, rename via
+   the existing override system, and delete leaves their clips alone. The
+   `manual_<name>` hack now has a real home to graduate to.
 6. **Search upgrades.** Filter chips (people / category / folder / time),
    results grouped by person, and prosody tag search ("find clips where
    someone is emphatic").

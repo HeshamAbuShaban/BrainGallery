@@ -40,6 +40,7 @@ import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.Merge
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.CreateNewFolder
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.foundation.border
@@ -75,6 +76,7 @@ import androidx.activity.result.IntentSenderRequest
 import android.app.Activity
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.brain.gallery.data.local.PersonEntity
+import com.brain.gallery.domain.organize.Album
 import com.brain.gallery.domain.organize.GroupKind
 import com.brain.gallery.domain.organize.SmartGroup
 import com.brain.gallery.ui.components.SpotlightPlayer
@@ -109,7 +111,9 @@ fun OrganizeScreen(
     val stats by vm.stats.collectAsState()
     val loading by vm.loading.collectAsState()
     val customNames by vm.customNames.collectAsState()
+    val albums by vm.albums.collectAsState()
     val picked by vm.selection.collectAsState()
+    var newAlbumOpen by remember { mutableStateOf(false) }
     // While anything is ticked, the screen becomes a workbench: tap a clip to
     // add or drop it instead of opening it, and one bar moves the whole lot.
     val selecting = picked.isNotEmpty()
@@ -153,6 +157,12 @@ fun OrganizeScreen(
             IconButton(onClick = { vm.exportMemory() },
                 modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(40.dp)) {
                 Icon(Icons.Default.Save, null, tint = Text1, modifier = Modifier.size(18.dp))
+            }
+            Spacer(Modifier.width(8.dp))
+            IconButton(onClick = { newAlbumOpen = true },
+                modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(40.dp)) {
+                Icon(Icons.Default.CreateNewFolder, "New album", tint = Text1,
+                    modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.width(8.dp))
             IconButton(onClick = onOpenBrain,
@@ -211,10 +221,13 @@ fun OrganizeScreen(
                             group = g,
                             persons = groups.filter { it.kind == GroupKind.PEOPLE },
                             onOpen = { onOpenGroup(g.id) },
+                            onDeleteAlbum = if (g.kind == GroupKind.ALBUM) ({ 
+                                g.id.removePrefix("album_").toLongOrNull()?.let { vm.deleteAlbum(it) }
+                            }) else null,
                             onPlayAll = { spotlight.openPlaylist(g.videos) },
                             onSimilar = { g.videos.firstOrNull()?.let { spotlight.open(it, g.videos) } },
                             onRename = { renameTarget = g },
-                            onHide = { vm.hideGroup(g) },
+                            onHide = if (g.kind == GroupKind.ALBUM) null else ({ vm.hideGroup(g) }),
                             onMerge = { from, to ->
                                 val f = from.id.removePrefix("person_").toIntOrNull()
                                 val t = to.id.removePrefix("person_").toIntOrNull()
@@ -230,8 +243,23 @@ fun OrganizeScreen(
         SelectionBar(
             count = picked.size,
             groups = vm.groupChoices,
+            albums = albums,
             onMove = { vm.moveSelectionToGroup(it) },
+            onMoveToAlbum = { vm.moveSelectionToAlbum(it) },
+            onNewAlbumAndMove = { vm.moveSelectionToNewAlbum(it) },
             onClear = { vm.clearPicks() })
+    }
+    if (newAlbumOpen) {
+        RenameGroupDialog(
+            initial = "",
+            onDismiss = { newAlbumOpen = false },
+            heading = "New album",
+            hint = "A shelf of yours. The engine never touches it.",
+            placeholder = "e.g. Iceland 2024",
+            onSave = { name ->
+                newAlbumOpen = false
+                vm.createAlbum(name)
+            })
     }
     renameTarget?.let { g ->
         val wasRenamed = customNames.containsKey(g.id)
@@ -275,7 +303,9 @@ fun GroupCardFull(
     onSimilar: () -> Unit,
     onRename: (() -> Unit)? = null,
     onMerge: (SmartGroup, SmartGroup) -> Unit,
-    onHide: (() -> Unit)? = null
+    onHide: (() -> Unit)? = null,
+    /** Only for album cards: deleting a shelf keeps its clips. */
+    onDeleteAlbum: (() -> Unit)? = null
 ) {
     val g = group
     val accent = Color(g.accent)
@@ -348,7 +378,11 @@ fun GroupCardFull(
                     leadingIcon = { Icon(Icons.Default.Merge, null, tint = Text1, modifier = Modifier.size(18.dp)) },
                     onClick = { menu = false; merge = true })
             }
-            if (onHide != null) {
+            if (onDeleteAlbum != null) {
+                DropdownMenuItem(text = { Text("Delete album (clips stay)", color = Text2) },
+                    leadingIcon = { Icon(Icons.Default.VisibilityOff, null, tint = Text2, modifier = Modifier.size(18.dp)) },
+                    onClick = { menu = false; onDeleteAlbum() })
+            } else if (onHide != null) {
                 DropdownMenuItem(text = { Text("Hide this group", color = Text2) },
                     leadingIcon = { Icon(Icons.Default.VisibilityOff, null, tint = Text2, modifier = Modifier.size(18.dp)) },
                     onClick = { menu = false; onHide() })
@@ -400,10 +434,15 @@ private fun MergePersonDialog(
 private fun SelectionBar(
     count: Int,
     groups: List<String>,
+    albums: List<Album>,
     onMove: (String) -> Unit,
+    onMoveToAlbum: (Long) -> Unit,
+    onNewAlbumAndMove: (String) -> Unit,
     onClear: () -> Unit
 ) {
     var open by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var albumOpen by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var newAlbum by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
         Row(
             Modifier
@@ -424,6 +463,12 @@ private fun SelectionBar(
                     .clickable { open = true }
                     .padding(horizontal = 12.dp, vertical = 7.dp))
             Spacer(Modifier.width(6.dp))
+            Text("Album", color = Green, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(14.dp))
+                    .clickable { albumOpen = true }
+                    .padding(horizontal = 12.dp, vertical = 7.dp))
+            Spacer(Modifier.width(6.dp))
             Text("Clear", color = Text2, fontSize = 13.sp,
                 modifier = Modifier
                     .clip(RoundedCornerShape(14.dp))
@@ -440,6 +485,51 @@ private fun SelectionBar(
             onDismiss = { open = false },
             onPick = { g -> open = false; if (g.isNotBlank()) onMove(g) }
         )
+    }
+
+    if (albumOpen) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = { albumOpen = false }) {
+            Column(Modifier.glass(CardShape, Glass.raised(Accent)).padding(20.dp)) {
+                Text("Add $count to an album", color = Text1, fontSize = 15.sp,
+                    fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(4.dp))
+                Text("Your shelves. The engine stays out of them.", color = Text2, fontSize = 12.sp)
+                Spacer(Modifier.height(12.dp))
+                albums.forEach { a ->
+                    Row(Modifier.fillMaxWidth().clickable {
+                        albumOpen = false
+                        onMoveToAlbum(a.id)
+                    }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(a.name, color = Text1, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    }
+                }
+                if (albums.isEmpty()) {
+                    Text("No albums yet — make your first one below.",
+                        color = Text2, fontSize = 12.5.sp, modifier = Modifier.padding(bottom = 6.dp))
+                }
+                Row(Modifier.fillMaxWidth().clickable {
+                    albumOpen = false
+                    newAlbum = true
+                }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.CreateNewFolder, null, tint = Accent, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(10.dp))
+                    Text("New album…", color = Accent, fontSize = 14.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+
+    if (newAlbum) {
+        RenameGroupDialog(
+            initial = "",
+            onDismiss = { newAlbum = false },
+            heading = "New album",
+            hint = "The $count picked clips land in it right away.",
+            placeholder = "e.g. Iceland 2024",
+            onSave = { name ->
+                newAlbum = false
+                onNewAlbumAndMove(name)
+            })
     }
 }
 

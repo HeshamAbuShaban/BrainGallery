@@ -23,7 +23,14 @@ data class SmartGroup(
     val nameCollision: String? = null
 )
 
-enum class GroupKind { MEMORIES, PEOPLE, DUPLICATES, JUNK, FAVORITES, CATEGORY, EVENT, GEMS, ON_THIS_DAY, UNREVIEWED }
+enum class GroupKind { MEMORIES, PEOPLE, DUPLICATES, JUNK, FAVORITES, CATEGORY, EVENT, GEMS, ON_THIS_DAY, UNREVIEWED, ALBUM }
+
+/**
+ * A user album, as the builder sees it: the pure facts, no Room. The engine
+ * never creates or orders albums — it only renders them where the user put
+ * their clips.
+ */
+data class Album(val id: Long, val name: String, val createdAt: Long)
 
 @Singleton
 class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
@@ -34,7 +41,9 @@ class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
         duplicatesOn: Boolean = true,
         junkThreshold: Float = 0.5f,
         /** Names the user chose, keyed by group id. Always wins over the engine's label. */
-        customNames: Map<String, String> = emptyMap()
+        customNames: Map<String, String> = emptyMap(),
+        /** The user's own shelves. Shown even when empty, so a fresh album is visible. */
+        albums: List<Album> = emptyList()
     ): List<SmartGroup> {
         if (all.isEmpty()) return emptyList()
         val out = mutableListOf<SmartGroup>()
@@ -165,6 +174,19 @@ class GroupBuilder @Inject constructor(private val dups: DuplicateFinder) {
         if (junk.isNotEmpty()) out += SmartGroup("junk", "Clutter drawer",
             "${junk.size} memes, screenshots, downloads", GroupKind.JUNK,
             junk.sortedByDescending { it.dateAddedSec }, 0xFF30363D)
+
+        // The user's own shelves, exactly as they built them. Empty albums still
+        // show: a shelf you just made should be findable, not invisible until
+        // something lands in it.
+        for (a in albums) {
+            val vids = all.filter { it.albumId == a.id }.sortedByDescending { it.dateAddedSec }
+            out += SmartGroup(
+                "album_${a.id}", a.name,
+                if (vids.isEmpty()) "empty — tick clips and add them"
+                else "${vids.size} clips",
+                GroupKind.ALBUM, vids, 0xFF6366F1
+            )
+        }
 
         // A name the user chose beats any engine label, for every kind of group.
         if (customNames.isEmpty()) return out

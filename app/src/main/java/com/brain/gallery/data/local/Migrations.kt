@@ -73,3 +73,24 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
         )
     }
 }
+
+/**
+ * v7 -> v8: the user's own shelves.
+ *
+ * One new table plus one column. Additive, like every migration here: albums
+ * start empty, clips read as belonging to no album, and nothing existing is
+ * rewritten. The engine never writes albumId — it is the one column that only
+ * changes when the person holding the phone says so.
+ */
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """CREATE TABLE IF NOT EXISTS `albums` (
+                `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                `name` TEXT NOT NULL,
+                `createdAt` INTEGER NOT NULL
+            )""".trimIndent()
+        )
+        db.execSQL("ALTER TABLE videos ADD COLUMN albumId INTEGER NOT NULL DEFAULT -1")
+    }
+}

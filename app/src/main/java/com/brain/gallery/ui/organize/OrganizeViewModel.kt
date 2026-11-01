@@ -14,6 +14,7 @@ import com.brain.gallery.data.service.BrainScanService
 import com.brain.gallery.domain.BatteryOptims
 import com.brain.gallery.domain.EngineSettings
 import com.brain.gallery.domain.SettingsStore
+import com.brain.gallery.domain.organize.Album
 import com.brain.gallery.domain.organize.GroupBuilder
 import com.brain.gallery.domain.organize.SmartGroup
 import com.brain.gallery.engine.MemoryDocBuilder
@@ -43,6 +44,14 @@ data class Diagnostics(
     val lastL1a: Int = 0, val lastL1b: Int = 0, val lastMs: Long = 0,
     val tScan: Long = 0, val tL1a: Long = 0, val tL1b: Long = 0,
     val merged: Int = 0, val adopted: Int = 0, val unreadable: Int = 0, val stalled: Int = 0
+)
+
+/** One consistent frame of everything the group builder needs. */
+private data class GroupsSnapshot(
+    val videos: List<VideoEntity>,
+    val people: List<PersonEntity>,
+    val names: Map<String, String>,
+    val albums: List<Album>
 )
 
 @HiltViewModel
@@ -87,17 +96,25 @@ class OrganizeViewModel @Inject constructor(
             combine(
                 db.videoDao().observeAll().conflate(),
                 db.personDao().observePersons().conflate(),
-                db.supportDao().observeGroupOverrides().conflate()
-            ) { videos, people, over ->
-                Triple(videos, people, over.associate { it.groupId to it.name })
+                db.supportDao().observeGroupOverrides().conflate(),
+                db.supportDao().observeAlbums().conflate()
+            ) { videos, people, over, albumRows ->
+                GroupsSnapshot(
+                    videos, people,
+                    over.associate { it.groupId to it.name },
+                    albumRows.map { Album(it.id, it.name, it.createdAt) }
+                )
             }
                 .distinctUntilChanged { old, new ->
-                    old.first.size == new.first.size &&
-                        old.second.size == new.second.size &&
-                        old.third == new.third &&
-                        old.first.sumOf { it.watchCount } == new.first.sumOf { it.watchCount }
+                    old.videos.size == new.videos.size &&
+                        old.people.size == new.people.size &&
+                        old.names == new.names &&
+                        old.albums == new.albums &&
+                        old.videos.sumOf { it.watchCount } == new.videos.sumOf { it.watchCount }
                 }
-                .collect { (videos, people, names) ->
+                .collect { snap ->
+                    val (videos, people, names, albums) = snap
+                    _albums.value = albums
                     val fingerprint = Triple(videos.hashCode(), people.hashCode(), names.hashCode())
                     if (fingerprint != lastFingerprint) {
                         lastFingerprint = fingerprint
@@ -109,7 +126,8 @@ class OrganizeViewModel @Inject constructor(
                         val cfg = _settings.value
                         val built = withContext(Dispatchers.Default) {
                             groups.build(
-                                videos, people, cfg.duplicatesEnabled, cfg.junkSensitivity, names
+                                videos, people, cfg.duplicatesEnabled, cfg.junkSensitivity,
+                                names, albums
                             )
                         }
                         _groups.value = built
@@ -311,6 +329,46 @@ class OrganizeViewModel @Inject constructor(
 
     /** Semantic work still owed, at the current budget. */
     fun previewSemanticPending(): Int = allVideos.count { it.pendingSemantic || it.brainLevel < 2 }
+
+    // ---- Albums: the user's own shelves ----
+
+    private val _albums = MutableStateFlow<List<Album>>(emptyList())
+    val albums: StateFlow<List<Album>> = _albums
+
+    fun createAlbum(name: String) {
+        val clean = name.trim()
+        if (clean.isEmpty()) return
+        viewModelScope.launch { db.supportDao().insertAlbum(clean, System.currentTimeMillis()) }
+    }
+
+    /** Deleting a shelf keeps its clips: they go back to no album. */
+    fun deleteAlbum(id: Long) {
+        viewModelScope.launch {
+            db.supportDao().clearAlbumMembers(id)
+            db.supportDao().deleteAlbum(id)
+        }
+    }
+
+    /** Create a shelf and drop the selection straight into it, one gesture. */
+    fun moveSelectionToNewAlbum(name: String) {
+        val ids = _selection.value.toList()
+        val clean = name.trim()
+        if (ids.isEmpty() || clean.isEmpty()) return
+        viewModelScope.launch {
+            val id = db.supportDao().insertAlbum(clean, System.currentTimeMillis())
+            db.supportDao().assignToAlbum(ids, id)
+            _selection.value = emptySet()
+        }
+    }
+
+    fun moveSelectionToAlbum(albumId: Long) {
+        val ids = _selection.value.toList()
+        if (ids.isEmpty()) return
+        viewModelScope.launch {
+            db.supportDao().assignToAlbum(ids, albumId)
+            _selection.value = emptySet()
+        }
+    }
 
     /** Group names worth offering: the ones already in use, most-used first. */
     val groupChoices: List<String>

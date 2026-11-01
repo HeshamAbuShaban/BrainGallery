@@ -68,6 +68,13 @@ data class VideoEntity(
      */
     val manualGroup: String = "",
 
+    /**
+     * A user album this clip belongs to, -1 = none. Albums are the user's own
+     * shelves; the engine never writes this column, only the person holding
+     * the phone does.
+     */
+    val albumId: Long = -1,
+
     /** Voice and delivery, empty until the optional audio pass has run. */
     val prosodyTags: String = "",
     /** 0..1 share of the clip that is speech; 0 means not measured yet. */

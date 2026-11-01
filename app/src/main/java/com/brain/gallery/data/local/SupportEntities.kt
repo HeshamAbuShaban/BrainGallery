@@ -9,6 +9,18 @@ import androidx.room.PrimaryKey
 import androidx.room.Query
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * A shelf the user made. The engine proposes groups; albums are the ones the
+ * person holding the phone wanted. Videos point at an album by id
+ * ([VideoEntity.albumId]); deleting an album leaves the videos alone.
+ */
+@Entity(tableName = "albums")
+data class AlbumEntity(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val name: String,
+    val createdAt: Long
+)
+
 @Entity(tableName = "not_interested")
 data class NotInterestedEntity(
     @PrimaryKey val videoId: Long,
@@ -98,6 +110,26 @@ interface SupportDao {
 
     @Query("DELETE FROM group_overrides WHERE groupId = :groupId")
     suspend fun clearGroupName(groupId: String)
+
+    // ---- Albums ----
+
+    @Query("SELECT * FROM albums ORDER BY createdAt DESC")
+    fun observeAlbums(): Flow<List<AlbumEntity>>
+
+    @Query("SELECT * FROM albums WHERE id = :id")
+    suspend fun album(id: Long): AlbumEntity?
+
+    @Query("INSERT INTO albums (name, createdAt) VALUES (:name, :at)")
+    suspend fun insertAlbum(name: String, at: Long): Long
+
+    @Query("DELETE FROM albums WHERE id = :id")
+    suspend fun deleteAlbum(id: Long)
+
+    @Query("UPDATE videos SET albumId = -1 WHERE albumId = :id")
+    suspend fun clearAlbumMembers(id: Long)
+
+    @Query("UPDATE videos SET albumId = :albumId WHERE id IN (:ids)")
+    suspend fun assignToAlbum(ids: List<Long>, albumId: Long)
 
     // ---- multi-select ----
     @Query("SELECT videoId FROM selection")

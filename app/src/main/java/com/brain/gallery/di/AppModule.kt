@@ -6,6 +6,7 @@ import com.brain.gallery.data.local.BrainDatabase
 import com.brain.gallery.data.local.MIGRATION_4_5
 import com.brain.gallery.data.local.MIGRATION_5_6
 import com.brain.gallery.data.local.MIGRATION_6_7
+import com.brain.gallery.data.local.MIGRATION_7_8
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -19,7 +20,7 @@ object AppModule {
     @Provides @Singleton
     fun db(@ApplicationContext ctx: Context): BrainDatabase =
         Room.databaseBuilder(ctx, BrainDatabase::class.java, "brain_gallery.db")
-            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+            .addMigrations(MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
             .build()
 
     @Provides fun videoDao(db: BrainDatabase) = db.videoDao()
