@@ -312,7 +312,7 @@ private fun RenameDialog(
     onSave: (String) -> Unit,
     heading: String = "Name this person",
     hint: String = "",
-    placeholder: String = "e.g. Sara",
+    placeholder: String = "",
     onReset: (() -> Unit)? = null
 ) {
     var text by remember { mutableStateOf(initial) }

@@ -638,7 +638,7 @@ class SearchViewModel @Inject constructor(
     private val _recents = MutableStateFlow<List<String>>(emptyList())
     val recents: StateFlow<List<String>> = _recents
     val suggestions: List<String> = listOf(
-        "talking", "people", "birthday", "beach", "wedding", "pets", "gym")
+        "talking", "people", "music", "sport", "pets", "food")
 
     init {
         viewModelScope.launch {

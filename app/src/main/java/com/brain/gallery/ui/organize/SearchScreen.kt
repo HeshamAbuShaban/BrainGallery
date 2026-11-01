@@ -101,7 +101,7 @@ fun SearchScreen(
                     imeAction = androidx.compose.ui.text.input.ImeAction.Search),
                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(
                     onSearch = { vm.rememberSearch(q) }),
-                placeholder = { Text("birthday, beach, concert…", color = Text2) },
+                placeholder = { Text("Search your memories…", color = Text2) },
                 leadingIcon = { Icon(Icons.Default.Search, null, tint = Text2) },
                 singleLine = true, shape = RoundedCornerShape(16.dp),
                 colors = TextFieldDefaults.colors(

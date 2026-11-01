@@ -346,7 +346,7 @@ fun OrganizeScreen(
             onDismiss = { newAlbumOpen = false },
             heading = "New album",
             hint = "A shelf of yours. The engine never touches it.",
-            placeholder = "e.g. Iceland 2024",
+            placeholder = "e.g. Lectures",
             onSave = { name ->
                 newAlbumOpen = false
                 vm.createAlbum(name)
@@ -369,7 +369,7 @@ fun OrganizeScreen(
             onDismiss = { renameTarget = null },
             heading = if (g.kind == GroupKind.PEOPLE) "Name this person" else "Name this group",
             hint = "Your name sticks everywhere and survives a rebuild.",
-            placeholder = if (g.kind == GroupKind.PEOPLE) "e.g. Sara" else "e.g. Music & clips",
+            placeholder = if (g.kind == GroupKind.PEOPLE) "" else "e.g. My clips",
             onReset = if (wasRenamed) ({ vm.resetGroupName(g.id) }) else null,
             onSave = { name ->
                 renameTarget = null
@@ -638,7 +638,7 @@ private fun SelectionBar(
             onDismiss = { newAlbum = false },
             heading = "New album",
             hint = "The $count picked clips land in it right away.",
-            placeholder = "e.g. Iceland 2024",
+            placeholder = "e.g. Lectures",
             onSave = { name ->
                 newAlbum = false
                 onNewAlbumAndMove(name)
