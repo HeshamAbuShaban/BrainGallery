@@ -42,6 +42,7 @@ import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.ui.glass.Glass
 import com.brain.gallery.ui.glass.glass
 import com.brain.gallery.ui.theme.Accent
+import com.brain.gallery.ui.theme.Hairline
 import com.brain.gallery.ui.theme.CardShape
 import com.brain.gallery.ui.theme.Pink
 
@@ -71,7 +72,7 @@ fun VideoThumb(
         // reads better than a black rectangle.
         val unplayable = video.durationMs <= 0L || video.sizeBytes <= 0L
         if (unplayable) {
-            Box(Modifier.fillMaxSize().background(Color(0xFF1A2130)),
+            Box(Modifier.fillMaxSize().background(Hairline),
                 contentAlignment = Alignment.Center) {
                 Icon(Icons.Default.VideocamOff, null, tint = Color.White.copy(alpha = 0.28f),
                     modifier = Modifier.size(22.dp))

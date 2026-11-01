@@ -61,6 +61,8 @@ import com.brain.gallery.ui.theme.Pink
 import com.brain.gallery.ui.theme.Surface
 import com.brain.gallery.ui.theme.Green
 import com.brain.gallery.ui.theme.Text1
+import com.brain.gallery.ui.theme.Elevated
+import com.brain.gallery.ui.theme.Danger
 import com.brain.gallery.ui.theme.Text2
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -149,7 +151,7 @@ fun VideoActionsSheet(
             )
         }
         if (onDelete != null)
-            SheetRow(Icons.Default.Delete, "Delete from device", Color(0xFFF87171), onDelete)
+            SheetRow(Icons.Default.Delete, "Delete from device", Danger, onDelete)
         } // ROOT
       } // when
         Spacer(Modifier.height(20.dp))
@@ -342,7 +344,7 @@ private fun MovePersonBody(
             .padding(horizontal = 16.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically) {
             val initial = p.name.ifBlank { p.suggestedName.ifBlank { "?" } }.take(1).uppercase()
-            Box(Modifier.size(38.dp).clip(CircleShape).background(Color(0xFF26324A)),
+            Box(Modifier.size(38.dp).clip(CircleShape).background(Elevated),
                 contentAlignment = Alignment.Center) {
                 Text(initial, color = Text1, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold)
             }

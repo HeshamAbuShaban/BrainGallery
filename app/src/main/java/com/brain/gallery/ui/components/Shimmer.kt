@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.brain.gallery.ui.theme.Surface2
+import com.brain.gallery.ui.theme.Line
 
 @Composable
 fun ShimmerBar(modifier: Modifier = Modifier, height: Dp = 16.dp, radius: Dp = 8.dp) {
@@ -32,6 +33,6 @@ fun ShimmerBar(modifier: Modifier = Modifier, height: Dp = 16.dp, radius: Dp = 8
         .height(height)
         .clip(RoundedCornerShape(radius))
         .background(Brush.linearGradient(
-            listOf(Surface2, Color(0xFF2A3547), Surface2),
+            listOf(Surface2, Line, Surface2),
             start = Offset(x * 600f - 200f, 0f), end = Offset(x * 600f + 200f, 0f))))
 }

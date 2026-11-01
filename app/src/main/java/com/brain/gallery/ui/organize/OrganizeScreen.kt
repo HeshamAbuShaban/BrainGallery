@@ -93,6 +93,7 @@ import com.brain.gallery.ui.components.MoveToGroupSheet
 import com.brain.gallery.ui.spotlight.SpotlightController
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
+import com.brain.gallery.ui.theme.Surface2
 import com.brain.gallery.ui.theme.CardShape
 import com.brain.gallery.ui.theme.Cyan
 import com.brain.gallery.ui.theme.Green
@@ -219,7 +220,7 @@ fun OrganizeScreen(
                         LinearProgressIndicator(
                             progress = { stats.understoodPct / 100f },
                             modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
-                            color = Cyan, trackColor = Color(0xFF1D2534))
+                            color = Cyan, trackColor = Surface2)
                     }
                 }
             }
@@ -455,7 +456,7 @@ fun GroupCardFull(
         }
         if (g.splitSuggested || g.nameCollision != null) {
             Box(Modifier.align(Alignment.TopEnd).padding(top = 36.dp, end = 6.dp)
-                .background(Color(0xFFF59E0B), CircleShape).size(18.dp),
+                .background(Yellow, CircleShape).size(18.dp),
                 contentAlignment = Alignment.Center) {
                 Text("!", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Black)
             }

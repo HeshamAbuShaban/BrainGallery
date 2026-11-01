@@ -50,6 +50,7 @@ import androidx.compose.ui.unit.sp
 import com.brain.gallery.domain.organize.SmartGroup
 import com.brain.gallery.ui.components.VideoThumb
 import com.brain.gallery.ui.theme.Text1
+import com.brain.gallery.ui.theme.Surface2
 import com.brain.gallery.ui.theme.Text2
 import kotlin.math.abs
 
@@ -261,7 +262,7 @@ private fun ShelfCard(
         if (cover != null) {
             VideoThumb(cover, Modifier.fillMaxSize())
         } else {
-            Box(Modifier.fillMaxSize().background(Color(0xFF1D2534)))
+            Box(Modifier.fillMaxSize().background(Surface2))
         }
         // Raw type only: name and one metadata line. No pills, no chips.
         Column(Modifier.align(Alignment.BottomStart).padding(10.dp)) {

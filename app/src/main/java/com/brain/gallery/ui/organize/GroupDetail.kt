@@ -68,6 +68,7 @@ import com.brain.gallery.ui.glass.Glass
 import com.brain.gallery.ui.glass.glass
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
+import com.brain.gallery.ui.theme.DangerContainer
 import com.brain.gallery.ui.theme.CardShape
 import com.brain.gallery.ui.theme.ChipShape
 import com.brain.gallery.ui.theme.Green
@@ -162,8 +163,8 @@ fun GroupDetail(
         }
         if (isDups && redundant.isNotEmpty()) {
             Button(onClick = { onDeleteRedundant(redundant.map { it.id }) },
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3A2410),
-                    contentColor = Color(0xFFF59E0B)),
+                colors = ButtonDefaults.buttonColors(containerColor = DangerContainer,
+                    contentColor = Yellow),
                 modifier = Modifier.fillMaxWidth().padding(16.dp, 4.dp)) {
                 Icon(Icons.Default.Delete, null, modifier = Modifier.size(16.dp))
                 Spacer(Modifier.width(8.dp))

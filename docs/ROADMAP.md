@@ -123,6 +123,18 @@ medium, shared brain.** Do NOT shoehorn photos into `VideoEntity`.
   (later) text extraction into MemoryDoc; a document browser screen.
 - Estimated order: 3a → 3b in one pass; 3c and 3d independent, any time after.
 
+## The reel, session-stable (Nov 2)
+
+The feed screen's structural flaws — every watch event reshuffling the
+running reel, reshuffles recycling the same sixty, deletions shifting the
+pager onto a stranger, per-page speed amnesia, finished clips
+auto-advancing on replay — are all fixed. The composition signature now
+covers only membership + suppression + taught weights + explicit
+reshuffle; watch events shape the next composition. The composer walks
+the library (served clips excluded, structural wrap when the unseen pool
+thins). Reel form: caption hierarchy, depth counter (1 · 60), speaking
+loading state, session-scoped speed. Five new tests pin the semantics.
+
 ## The three-mechanic hero system (shipped Nov 1)
 
 `ui/hero/` holds the constitution's three mechanics, each reviewed by a

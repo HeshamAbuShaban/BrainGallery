@@ -38,6 +38,9 @@ val Green = Color(0xFF10B981)
 val Cyan = Color(0xFF06B6D4)
 val Yellow = Color(0xFFF59E0B)
 val Danger = Color(0xFFF87171)
+val DangerContainer = Color(0xFF3A2410)
+/** The hairline every divider in the app sits on. */
+val Hairline = Color(0xFF1A2231)
 
 val CardShape = RoundedCornerShape(20.dp)
 val ChipShape = RoundedCornerShape(50.dp)

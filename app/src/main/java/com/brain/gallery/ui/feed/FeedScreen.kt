@@ -104,6 +104,7 @@ import com.brain.gallery.ui.player.PlayerManager
 import com.brain.gallery.ui.player.ShareHelper
 import com.brain.gallery.ui.spotlight.SpotlightController
 import com.brain.gallery.ui.theme.Accent
+import com.brain.gallery.ui.theme.Yellow
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.Cyan
 import com.brain.gallery.ui.theme.Text2
@@ -574,7 +575,7 @@ private fun ReelPage(
                     ) { onFav(); tick++ }
                     RailButton(Icons.Default.AutoAwesome, Cyan, null) { onSimilar() }
                     RailButton(Icons.Default.Speed,
-                        if (speed != 1f) Color(0xFFF59E0B) else Color.White,
+                        if (speed != 1f) Yellow else Color.White,
                         count = "${speed}x", tick = tick, onClick = onCycleSpeed)
                     RailButton(Icons.Default.Share, Color.White, null) { ShareHelper.share(ctx, v) }
                     RailButton(Icons.Default.MoreHoriz, Color.White, null) { onMenu() }

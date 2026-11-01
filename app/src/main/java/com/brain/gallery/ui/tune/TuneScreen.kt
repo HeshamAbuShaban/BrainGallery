@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -53,8 +52,12 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.draw.clip
 import com.brain.gallery.domain.ACCENT_CHOICES
 import com.brain.gallery.ui.glass.GlassSegmented
+import com.brain.gallery.ui.glass.GlassSlider
+import com.brain.gallery.ui.glass.GlassSwitch
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
+import com.brain.gallery.ui.theme.Hairline
+import com.brain.gallery.ui.theme.Line
 import com.brain.gallery.ui.theme.Cyan
 import com.brain.gallery.ui.theme.Text1
 import com.brain.gallery.ui.theme.Text2
@@ -151,7 +154,7 @@ fun TuneScreen(onOpenBrain: () -> Unit, vm: TuneViewModel = hiltViewModel()) {
                     fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
                 Text("↺", color = Cyan, fontSize = 15.sp)
             }
-            HorizontalDivider(color = Color(0xFF1A2231))
+            HorizontalDivider(color = Hairline)
 
             // ---------------- Weights ----------------
             Head("What matters")
@@ -311,15 +314,12 @@ private fun SliderRow(
             Text(help, color = Text2, fontSize = 11.5.sp,
                 modifier = Modifier.padding(top = 2.dp, end = 4.dp))
         }
-        Slider(
+        GlassSlider(
             value = shown,
             onValueChange = { dragging = it; isDragging = true },
             onValueChangeFinished = { isDragging = false; onChange(dragging) },
             valueRange = min..max,
-            steps = (steps - 1).coerceAtLeast(0),
-            colors = androidx.compose.material3.SliderDefaults.colors(
-                thumbColor = Accent, activeTrackColor = Accent, inactiveTrackColor = Color(0xFF2A3446)
-            ))
+            steps = (steps - 1).coerceAtLeast(0))
         val note = preview?.invoke(shown)
         if (!note.isNullOrBlank()) {
             Row(Modifier.fillMaxWidth().padding(top = 1.dp),
@@ -358,7 +358,7 @@ private fun AccentRow(current: Long, onPick: (Long) -> Unit) {
             }
         }
     }
-    HorizontalDivider(color = Color(0xFF1A2231))
+    HorizontalDivider(color = Hairline)
 }
 
 @Composable
@@ -368,11 +368,7 @@ private fun SwitchRow(title: String, sub: String, checked: Boolean, onChange: (B
             Text(title, color = Text1, fontSize = 13.5.sp, fontWeight = FontWeight.SemiBold)
             Text(sub, color = Text2, fontSize = 11.5.sp)
         }
-        androidx.compose.material3.Switch(checked = checked, onCheckedChange = onChange,
-            colors = androidx.compose.material3.SwitchDefaults.colors(
-                checkedThumbColor = Color.White, checkedTrackColor = Accent,
-                uncheckedThumbColor = Text2, uncheckedTrackColor = Color(0xFF2A3446)
-            ))
+        GlassSwitch(checked = checked, onCheckedChange = onChange)
     }
-    HorizontalDivider(color = Color(0xFF1A2231))
+    HorizontalDivider(color = Hairline)
 }
