@@ -57,7 +57,7 @@ class HeroMathTest {
         assertEquals(xc, HeroMath.pushedX(0f, xc), 1e-6f)
         val right = HeroMath.pushedX(300f, xc)
         val left = HeroMath.pushedX(-300f, xc)
-        assertEquals(xc + (right - xc), left, 1e-4f)
+        assertEquals(xc - (right - xc), left, 1e-4f)
         assertTrue("edge card must move outward", abs(right - xc) > 300f)
     }
 
