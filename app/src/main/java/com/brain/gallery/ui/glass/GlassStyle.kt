@@ -1,6 +1,7 @@
 package com.brain.gallery.ui.glass
 
 import androidx.compose.ui.graphics.Color
+import com.brain.gallery.ui.theme.PaletteHolder
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
@@ -56,28 +57,59 @@ data class GlassStyle(
 }
 
 object Glass {
-    /** Read against a dark surface, tinted with the accent. */
-    fun onDark(accent: Color) = GlassStyle(
+    /**
+     * The pane this app uses everywhere. It reads the palette switch and
+     * hands back the material tuned for what it will sit on: a white wash
+     * with an accent glow over dark surfaces, a stronger frost with a soft
+     * cool shadow over light ones. Same geometry either way — the glass is
+     * the glass.
+     */
+    fun pane(accent: Color): GlassStyle = if (PaletteHolder.dark) GlassStyle(
         tint = Color.White,
         shadowColor = accent,
         shadowAlpha = 0.30f
+    ) else GlassStyle(
+        alpha = 0.50f,
+        borderAlpha = 0.30f,
+        scrimAlpha = 0.08f,
+        rimAlpha = 0.50f,
+        shadowColor = Color(0xFF33415C),
+        shadowAlpha = 0.24f
     )
 
     /** A quieter pane for dense content that must stay readable. */
-    fun subtle() = GlassStyle(
+    fun subtle(): GlassStyle = if (PaletteHolder.dark) GlassStyle(
         alpha = 0.07f,
         borderAlpha = 0.10f,
         corner = 22.dp,
         elevation = 14.dp
+    ) else GlassStyle(
+        alpha = 0.42f,
+        borderAlpha = 0.26f,
+        corner = 22.dp,
+        elevation = 12.dp,
+        scrimAlpha = 0.06f,
+        rimAlpha = 0.42f,
+        shadowColor = Color(0xFF33415C),
+        shadowAlpha = 0.18f
     )
 
     /** A raised pane, for content that should sit clearly above the page. */
-    fun raised(accent: Color) = GlassStyle(
+    fun raised(accent: Color): GlassStyle = if (PaletteHolder.dark) GlassStyle(
         alpha = 0.14f,
         borderAlpha = 0.18f,
         corner = 28.dp,
         elevation = 26.dp,
         shadowColor = accent,
         shadowAlpha = 0.35f
+    ) else GlassStyle(
+        alpha = 0.58f,
+        borderAlpha = 0.34f,
+        corner = 28.dp,
+        elevation = 22.dp,
+        scrimAlpha = 0.08f,
+        rimAlpha = 0.55f,
+        shadowColor = Color(0xFF33415C),
+        shadowAlpha = 0.26f
     )
 }

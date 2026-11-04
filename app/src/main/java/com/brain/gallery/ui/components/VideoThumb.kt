@@ -61,7 +61,7 @@ fun VideoThumb(
     var dragX by androidx.compose.runtime.remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
     Box(modifier
         .offset { androidx.compose.ui.unit.IntOffset(dragX.roundToInt(), 0) }
-        .glass(CardShape, Glass.onDark(Accent))
+        .glass(CardShape, Glass.pane(Accent))
         .then(
             if (onClick != null || onLongClick != null)
                 Modifier.combinedClickable(onClick = { onClick?.invoke() },

@@ -110,7 +110,7 @@ fun TuneScreen(onOpenBrain: () -> Unit, vm: TuneViewModel = hiltViewModel()) {
                     color = Text2, fontSize = 12.sp)
             }
             androidx.compose.material3.IconButton(onClick = onOpenBrain,
-                modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(38.dp)) {
+                modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(38.dp)) {
                 androidx.compose.material3.Icon(Icons.Default.BugReport, "Engine & diagnostics",
                     tint = Text1, modifier = Modifier.size(18.dp))
             }
@@ -238,6 +238,18 @@ fun TuneScreen(onOpenBrain: () -> Unit, vm: TuneViewModel = hiltViewModel()) {
 
             // ---------------- Appearance ----------------
             Head("Appearance")
+            Text("Theme", color = Text1, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.padding(top = 6.dp, bottom = 8.dp))
+            GlassSegmented(
+                labels = listOf("Dark", "Light"),
+                selectedIndex = if (cfg.theme == "light") 1 else 0,
+                onSelect = { i ->
+                    vm.update(cfg.copy(theme = if (i == 1) "light" else "dark"))
+                },
+                modifier = Modifier.fillMaxWidth(),
+                selectedColor = Accent
+            )
+            Spacer(Modifier.height(6.dp))
             AccentRow(cfg.accentArgb) { vm.update(cfg.copy(accentArgb = it)) }
             SwitchRow("The animated shelf",
                 "The leaning card strip at the top of Organize. Folded away, it leaves a one-line door.",

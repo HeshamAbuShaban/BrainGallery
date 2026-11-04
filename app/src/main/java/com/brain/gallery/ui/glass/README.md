@@ -48,7 +48,7 @@ use it on something that is in motion; a pane at rest simply does not carry it.
 Any shape:
 
 ```kotlin
-Box(Modifier.glass(RoundedCornerShape(30.dp), Glass.onDark(Accent)))
+Box(Modifier.glass(RoundedCornerShape(30.dp), Glass.pane(Accent)))
 ```
 
 A bottom-anchored floating surface:
@@ -119,7 +119,7 @@ pill and to drag the specular with it.
 
 | Preset | Use |
 | --- | --- |
-| `Glass.onDark(accent)` | Panels over dark content; the accent colours the shadow as a glow. |
+| `Glass.pane(accent)` | Panels over dark content; the accent colours the shadow as a glow. |
 | `Glass.subtle()` | Dense content that must stay readable; lower alpha, tighter corner. |
 | `Glass.raised(accent)` | Content that should sit clearly above the page. |
 

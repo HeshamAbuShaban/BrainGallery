@@ -123,6 +123,16 @@ medium, shared brain.** Do NOT shoehorn photos into `VideoEntity`.
   (later) text extraction into MemoryDoc; a document browser screen.
 - Estimated order: 3a → 3b in one pass; 3c and 3d independent, any time after.
 
+## Theming as law (Nov 2)
+
+The palette became semantic tokens enforced across every screen — Line,
+Hairline, Surface2, Elevated, Danger/DangerContainer (newly named), with
+zero raw hex left outside the theme and glass internals. Two new
+design-system controls ended the stock-M3 cheapness: GlassSlider (10dp
+accent pill track, step dots that light as the thumb passes, glass thumb)
+and GlassSwitch (one definition, used everywhere). Verified on device in
+the Learning room.
+
 ## The reel, session-stable (Nov 2)
 
 The feed screen's structural flaws — every watch event reshuffling the

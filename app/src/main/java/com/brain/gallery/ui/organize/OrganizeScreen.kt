@@ -176,23 +176,23 @@ fun OrganizeScreen(
                 Text("Organized by your on-device brain", color = Text2, fontSize = 12.5.sp)
             }
             IconButton(onClick = { vm.exportMemory() },
-                modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(40.dp)) {
+                modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(40.dp)) {
                 Icon(Icons.Default.Save, null, tint = Text1, modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.width(8.dp))
             IconButton(onClick = { newAlbumOpen = true },
-                modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(40.dp)) {
+                modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(40.dp)) {
                 Icon(Icons.Default.CreateNewFolder, "New album", tint = Text1,
                     modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.width(8.dp))
             IconButton(onClick = onOpenBrain,
-                modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(40.dp)) {
+                modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(40.dp)) {
                 Icon(Icons.Default.BugReport, null, tint = Text1, modifier = Modifier.size(18.dp))
             }
             Spacer(Modifier.width(8.dp))
             IconButton(onClick = { vm.rescan() },
-                modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(40.dp)) {
+                modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(40.dp)) {
                 Icon(Icons.Default.Refresh, null, tint = Text1, modifier = Modifier.size(18.dp))
             }
         }
@@ -429,7 +429,7 @@ fun GroupCardFull(
     Box(Modifier
         .fillMaxWidth()
         .aspectRatio(0.86f)
-        .glass(CardShape, Glass.onDark(Accent))
+        .glass(CardShape, Glass.pane(Accent))
         .combinedClickable(
             onClick = onOpen,
             onLongClick = {

@@ -166,7 +166,7 @@ fun FeedScreen(
                     color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
                 Spacer(Modifier.height(12.dp))
                 IconButton(onClick = { vm.refresh() },
-                    modifier = Modifier.glass(CircleShape, Glass.onDark(Accent))) {
+                    modifier = Modifier.glass(CircleShape, Glass.pane(Accent))) {
                     Icon(Icons.Default.Refresh, null, tint = Color.White)
                 }
             }

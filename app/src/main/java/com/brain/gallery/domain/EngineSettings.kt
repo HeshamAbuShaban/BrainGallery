@@ -155,7 +155,9 @@ data class EngineSettings(
     /** The ✦ "why ranked" line on reel cards. Yours to turn off. */
     val showWhy: Boolean = true,
     /** The animated shelf on Organize: beautiful, and yours to fold away. */
-    val shelfHidden: Boolean = false
+    val shelfHidden: Boolean = false,
+    /** "dark" or "light". The reel and the players stay dark either way. */
+    val theme: String = "dark"
 ) {
     fun toJson(): String = JSONObject().apply {
         put("identityEnabled", identityEnabled)
@@ -173,6 +175,7 @@ data class EngineSettings(
         put("accentArgb", accentArgb)
         put("showWhy", showWhy)
         put("shelfHidden", shelfHidden)
+        put("theme", theme)
     }.toString()
 
     companion object {
@@ -197,7 +200,9 @@ data class EngineSettings(
                     tuning = tuning,
                     accentArgb = o.optLong("accentArgb", d.accentArgb),
                     showWhy = o.optBoolean("showWhy", d.showWhy),
-                    shelfHidden = o.optBoolean("shelfHidden", d.shelfHidden)
+                    shelfHidden = o.optBoolean("shelfHidden", d.shelfHidden),
+                    theme = o.optString("theme", d.theme).takeIf { it == "dark" || it == "light" }
+                        ?: d.theme
                 )
             }.getOrDefault(EngineSettings())
         }

@@ -28,3 +28,6 @@ Thumbs.db
 # Root-locked leftovers (created by a root process; needs sudo to delete)
 app/build.root-locked-*/
 app/src/main/java/com/brain/gallery/ui/glass/GlassSettingsScreen.kt.bad
+
+# root-locked originals moved aside during fixes
+*.rootlocked

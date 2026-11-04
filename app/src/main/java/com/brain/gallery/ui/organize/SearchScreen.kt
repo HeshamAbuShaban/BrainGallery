@@ -62,6 +62,7 @@ import com.brain.gallery.ui.spotlight.SpotlightController
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.Text1
+import com.brain.gallery.ui.theme.ChipFill
 import com.brain.gallery.ui.theme.Text2
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -110,7 +111,7 @@ fun SearchScreen(
                     focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent,
                     focusedTextColor = Text1, unfocusedTextColor = Text1),
                 modifier = Modifier.fillMaxWidth().padding(20.dp, 14.dp, 20.dp, 4.dp)
-                    .glass(RoundedCornerShape(16.dp), Glass.onDark(Accent)))
+                    .glass(RoundedCornerShape(16.dp), Glass.pane(Accent)))
             // The lens row: narrows what was found, never re-queries behind it.
             GlassSegmented(
                 labels = listOf("All", "People", "Favorites", "Talking"),
@@ -154,7 +155,7 @@ fun SearchScreen(
                         Text(sg, color = Accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
-                                .background(Color.White.copy(alpha = 0.06f))
+                                .background(ChipFill)
                                 .clickable { vm.query(sg); vm.rememberSearch(sg) }
                                 .padding(horizontal = 14.dp, vertical = 8.dp))
                     }

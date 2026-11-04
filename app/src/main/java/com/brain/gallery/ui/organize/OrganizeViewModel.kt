@@ -20,6 +20,7 @@ import com.brain.gallery.domain.organize.GroupBuilder
 import com.brain.gallery.domain.organize.SmartGroup
 import com.brain.gallery.engine.MemoryDocBuilder
 import com.brain.gallery.ui.theme.AccentHolder
+import com.brain.gallery.ui.theme.PaletteHolder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
@@ -89,9 +90,15 @@ class OrganizeViewModel @Inject constructor(
     private var allVideos: List<VideoEntity> = emptyList()
 
     init {
+        // Continuous, not one-shot: Tune and Brain both save through this
+        // store, and the accent and the theme must repaint the moment either
+        // does — from whichever screen the change came.
         viewModelScope.launch {
-            _settings.value = store.load()
-            AccentHolder.argb = _settings.value.accentArgb
+            store.observe().collect {
+                _settings.value = it
+                AccentHolder.argb = it.accentArgb
+                PaletteHolder.dark = it.theme != "light"
+            }
         }
         viewModelScope.launch {
             // conflate: collapse bursts of writes into one rebuild, and skip the

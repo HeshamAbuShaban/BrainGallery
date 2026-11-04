@@ -126,7 +126,7 @@ fun GroupDetail(
         Row(Modifier.fillMaxWidth().padding(8.dp, 16.dp, 16.dp, 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack,
-                modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(38.dp)) {
+                modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(38.dp)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Text1,
                     modifier = Modifier.size(18.dp))
             }
@@ -137,7 +137,7 @@ fun GroupDetail(
             }
             if (person != null) {
                 IconButton(onClick = { renameOpen = true },
-                    modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(34.dp)) {
+                    modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(34.dp)) {
                     Icon(Icons.Default.Edit, null, tint = Text1, modifier = Modifier.size(15.dp))
                 }
             }
@@ -153,7 +153,7 @@ fun GroupDetail(
         }
         if (group.splitSuggested) {
             Row(Modifier.fillMaxWidth().padding(20.dp, 0.dp)
-                .glass(CardShape, Glass.onDark(Accent)).padding(12.dp),
+                .glass(CardShape, Glass.pane(Accent)).padding(12.dp),
                 verticalAlignment = Alignment.CenterVertically) {
                 Text("This may be two different people. Tap one that looks wrong to split it out.",
                     color = Text1, fontSize = 12.sp, modifier = Modifier.weight(1f))
@@ -234,7 +234,7 @@ fun GroupDetail(
                         Text("Show 60 more (${group.videos.size - shown} left)",
                             color = Accent, fontSize = 13.5.sp, fontWeight = FontWeight.Bold,
                             modifier = Modifier
-                                .glass(ChipShape, Glass.onDark(Accent))
+                                .glass(ChipShape, Glass.pane(Accent))
                                 .clickable { shown += 60 }
                                 .padding(horizontal = 18.dp, vertical = 10.dp))
                     }

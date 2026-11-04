@@ -55,6 +55,7 @@ import com.brain.gallery.ui.glass.glassReserve
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Pink
 import com.brain.gallery.ui.theme.Text1
+import com.brain.gallery.ui.theme.ChipFill
 import com.brain.gallery.ui.theme.Text2
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -160,7 +161,7 @@ private fun FolderChip(label: String, selected: Boolean, onClick: () -> Unit) {
         fontSize = 12.sp, fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
         modifier = Modifier
             .clip(RoundedCornerShape(50))
-            .background(if (selected) Accent else Color.White.copy(alpha = 0.06f))
+            .background(if (selected) Accent else ChipFill)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 7.dp)
     )
@@ -194,7 +195,7 @@ fun PhotoViewer(
             IconButton(onClick = {
                 haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClose()
-            }, modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(38.dp)) {
+            }, modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(38.dp)) {
                 Icon(Icons.Default.Close,
                     "Close", tint = Text1, modifier = Modifier.size(18.dp))
             }
@@ -213,7 +214,7 @@ fun PhotoViewer(
             IconButton(onClick = {
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 onFav(!photo.isFavorite)
-            }, modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(46.dp)) {
+            }, modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(46.dp)) {
                 Icon(
                     if (photo.isFavorite) Icons.Default.Favorite
                     else Icons.Default.FavoriteBorder,
@@ -223,7 +224,7 @@ fun PhotoViewer(
             IconButton(onClick = {
                 haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                 onDelete()
-            }, modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(46.dp)) {
+            }, modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(46.dp)) {
                 Icon(Icons.Default.Delete,
                     "Delete", tint = Text1, modifier = Modifier.size(22.dp))
             }

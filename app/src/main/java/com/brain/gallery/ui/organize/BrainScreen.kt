@@ -392,7 +392,7 @@ private fun BrainScaffold(
         Row(Modifier.fillMaxWidth().padding(8.dp, 16.dp, 16.dp, 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack,
-                modifier = Modifier.glass(CircleShape, Glass.onDark(Accent)).size(38.dp)) {
+                modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(38.dp)) {
                 Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Text1,
                     modifier = Modifier.size(18.dp))
             }
@@ -426,7 +426,7 @@ private fun Stat(k: String, v: String, vc: Color = Text1) {
 @Composable
 private fun Card(accent: Color, content: @Composable () -> Unit) {
     Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)
-        .glass(CardShape, Glass.onDark(accent)).padding(14.dp)) { content() }
+        .glass(CardShape, Glass.pane(accent)).padding(14.dp)) { content() }
 }
 
 @Composable

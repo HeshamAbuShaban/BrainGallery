@@ -68,7 +68,7 @@ fun GlassNav(
     onSelect: (Int) -> Unit,
     visible: Float,
     modifier: Modifier = Modifier,
-    style: GlassStyle = Glass.onDark(Color(0xFF8B5CF6)),
+    style: GlassStyle = Glass.pane(Color(0xFF8B5CF6)),
     selectedColor: Color = Color(0xFF8B5CF6),
     idleColor: Color = Color(0xFF9AA6B8),
     selectedLabelColor: Color = Color.White,
