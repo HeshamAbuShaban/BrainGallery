@@ -743,15 +743,23 @@ class SearchViewModel @Inject constructor(
             _recents.value = parseRecents(db.supportDao().get("search.recents"))
         }
         viewModelScope.launch(Dispatchers.IO) {
-            val cats = runCatching { db.videoDao().getAllSync() }
-                .getOrDefault(emptyList())
-                .map { it.category }
+            // Drawn, never presumed: the two capability routes, then the
+            // categories and folders that genuinely exist in this library —
+            // and only ones with enough weight that a stray filename token
+            // can't put a word in the viewer's mouth.
+            val all = runCatching { db.videoDao().getAllSync() }.getOrDefault(emptyList())
+            val cats = all.map { it.category }
                 .filter { it != "unknown" }
-                .groupingBy { it }
-                .eachCount()
-                .entries.sortedByDescending { it.value }
-                .take(4).map { it.key }
-            _suggestions.value = (listOf("talking", "people") + cats).distinct().take(6)
+                .groupingBy { it }.eachCount()
+                .entries.filter { it.value >= 3 }.sortedByDescending { it.value }
+                .take(3).map { it.key }
+            val folders = all.map { it.folderName }
+                .filter { it.isNotBlank() }
+                .groupingBy { it }.eachCount()
+                .entries.filter { it.value >= 5 }.sortedByDescending { it.value }
+                .take(2).map { it.key }
+            _suggestions.value = (listOf("talking", "people") + cats + folders)
+                .distinct().take(7)
         }
     }
 

@@ -206,7 +206,7 @@ fun SearchScreen(
                                 .padding(20.dp, 10.dp))
                     }
                 }
-                Text(if (recents.isEmpty()) "Try searching for" else "Or try",
+                Text("Drawn from your library",
                     color = Text1, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(20.dp, 14.dp, 20.dp, 4.dp))
                 val suggestions by vm.suggestions.collectAsState()

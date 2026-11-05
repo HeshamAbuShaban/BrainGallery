@@ -42,6 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.brain.gallery.ui.theme.Accent
 
 /** How small the pane is at the start of its entrance. Enough to read as growing. */
 private const val EnterScale = 0.94f
@@ -143,7 +144,7 @@ fun GlassMenu(
     modifier: Modifier = Modifier,
     visible: Boolean = true,
     style: GlassStyle = GlassStyle(),
-    selectedColor: Color = Color(0xFF8B5CF6),
+    selectedColor: Color = Accent,
     contentColor: Color = Color(0xFFE8ECF4),
     anchorWidth: Dp = 220.dp,
     corner: Dp = style.corner
@@ -288,7 +289,7 @@ fun GlassMenuOverlay(
     anchorPadding: PaddingValues = PaddingValues(12.dp),
     scrimColor: Color = Color(0xFF05070C).copy(alpha = 0.42f),
     style: GlassStyle = GlassStyle(),
-    selectedColor: Color = Color(0xFF8B5CF6),
+    selectedColor: Color = Accent,
     contentColor: Color = Color(0xFFE8ECF4),
     anchorWidth: Dp = 220.dp,
     corner: Dp = style.corner,

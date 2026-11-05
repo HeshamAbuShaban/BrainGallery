@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
+import com.brain.gallery.ui.theme.Accent
 
 /** Floor for every tappable node in this file, per platform accessibility guidance. */
 private val MinTouchTarget = 48.dp
@@ -137,7 +138,7 @@ fun GlassChip(
     icon: ImageVector? = null,
     enabled: Boolean = true,
     style: GlassStyle = GlassStyle(),
-    accentColor: Color = Color(0xFF8B5CF6),
+    accentColor: Color = Accent,
     labelColor: Color = Color(0xFFE8ECF4),
     height: Dp = 34.dp
 ) {
@@ -228,7 +229,7 @@ fun GlassSegmented(
     onSelect: (Int) -> Unit,
     modifier: Modifier = Modifier,
     style: GlassStyle = GlassStyle(),
-    selectedColor: Color = Color(0xFF8B5CF6),
+    selectedColor: Color = Accent,
     labelColor: Color = Color(0xFFE8ECF4),
     height: Dp = 40.dp,
     corner: Dp = style.corner

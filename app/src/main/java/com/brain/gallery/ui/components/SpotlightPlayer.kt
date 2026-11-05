@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.SkipNext
@@ -54,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import com.brain.gallery.ui.components.RailPrefs
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -214,22 +217,40 @@ fun SpotlightPlayer(
                 listOf(Color.Transparent, Color.Black.copy(alpha = 0.85f)), startY = 160f))
             .padding(bottom = 14.dp)) {
             if (similar.isNotEmpty()) {
-                Text("More like this", color = Color.White, fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 16.dp))
-                Spacer(Modifier.height(6.dp))
-                LazyRow(contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    items(similar, key = { it.id }) { s ->
-                        Box {
-                            VideoThumb(s, Modifier.size(104.dp, 142.dp)) { onPick(s) }
-                            Icon(Icons.Default.AutoAwesome, "Grow from this",
-                                tint = Cyan, modifier = Modifier.align(Alignment.BottomEnd)
-                                    .padding(5.dp).size(14.dp)
-                                    .clickable { onMoreLikeThis(s) })
+                // The rail folds behind its own header: the clip comes first,
+                // the neighbours on request. One shared switch with the photo
+                // viewer's rail (RailPrefs) — both fold and unfold together.
+                Row(Modifier.fillMaxWidth()
+                    .clickable {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        RailPrefs.expanded = !RailPrefs.expanded
+                    }
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text("More like this", color = Color.White, fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Icon(if (RailPrefs.expanded) Icons.Default.KeyboardArrowDown
+                         else Icons.Default.KeyboardArrowUp, null,
+                        tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+                }
+                androidx.compose.animation.AnimatedVisibility(visible = RailPrefs.expanded) {
+                    Column {
+                        Spacer(Modifier.height(6.dp))
+                        LazyRow(contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            items(similar, key = { it.id }) { s ->
+                                Box {
+                                    VideoThumb(s, Modifier.size(104.dp, 142.dp)) { onPick(s) }
+                                    Icon(Icons.Default.AutoAwesome, "Grow from this",
+                                        tint = Cyan, modifier = Modifier.align(Alignment.BottomEnd)
+                                            .padding(5.dp).size(14.dp)
+                                            .clickable { onMoreLikeThis(s) })
+                                }
+                            }
                         }
+                        Spacer(Modifier.height(10.dp))
                     }
                 }
-                Spacer(Modifier.height(10.dp))
             }
             AnimatedVisibility(visible = controls, enter = fadeIn(tween<Float>(Motion.fastMs)),
                 exit = fadeOut(tween<Float>(Motion.fastMs))) {

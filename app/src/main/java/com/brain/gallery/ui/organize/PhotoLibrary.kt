@@ -1,6 +1,8 @@
 package com.brain.gallery.ui.organize
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -30,6 +33,11 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -49,6 +57,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -67,7 +76,12 @@ import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Pink
 import com.brain.gallery.ui.theme.Text1
 import com.brain.gallery.ui.theme.ChipFill
+import com.brain.gallery.domain.organize.PhotoGroupBuilder
+import com.brain.gallery.domain.organize.PhotoSmartGroup
+import com.brain.gallery.ui.theme.Hairline
 import com.brain.gallery.ui.theme.Text2
+import com.brain.gallery.ui.components.RailPrefs
+import com.brain.gallery.ui.theme.Yellow
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
@@ -75,6 +89,7 @@ import java.util.Date
 import java.util.Locale
 
 private val monthFormat = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
+private val dayFormat = SimpleDateFormat("d MMMM yyyy", Locale.getDefault())
 
 /**
  * The still half of the library. Organized, not dumped: a count that admits
@@ -98,15 +113,24 @@ fun PhotoLibrary(
     onOpen: (PhotoEntity) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val haptics = LocalHapticFeedback.current
     var folder by remember { mutableStateOf<String?>(null) }
     val folders = remember(photos) {
         photos.groupingBy { it.folderName.ifEmpty { "Other" } }
             .eachCount().entries.sortedByDescending { it.value }
             .take(6).map { it.key }
     }
-    val shown = remember(photos, folder) {
-        if (folder == null) photos
-        else photos.filter { it.folderName.ifEmpty { "Other" } == folder }
+    // The brain's shelves for stills — tap a shelf and the grid narrows to
+    // it, exactly as the folder chips do; the shelf cards sit above them.
+    val smartGroups = remember(photos) { PhotoGroupBuilder.build(photos) }
+    var groupFilter by remember { mutableStateOf<PhotoSmartGroup?>(null) }
+    val shown = remember(photos, folder, groupFilter) {
+        val gf = groupFilter
+        when {
+            gf != null -> gf.photos
+            folder == null -> photos
+            else -> photos.filter { it.folderName.ifEmpty { "Other" } == folder }
+        }
     }
 
     if (photos.isEmpty()) {
@@ -136,6 +160,42 @@ fun PhotoLibrary(
                 else "${fmtCount(photos.size)} photos",
                 color = Text2, fontSize = 11.5.sp,
                 modifier = Modifier.padding(top = 4.dp))
+        }
+
+        // The brain's shelves as cards — tap to walk in, tap again to leave.
+        if (smartGroups.isNotEmpty() && groupFilter == null) {
+            item(span = { GridItemSpan(3) }, key = "shelves") {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 2.dp)
+                ) {
+                    smartGroups.forEach { g ->
+                        item(key = g.id) {
+                            PhotoGroupCard(
+                                group = g,
+                                selected = false,
+                                onClick = {
+                                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    groupFilter = g
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        val openShelf = groupFilter
+        if (openShelf != null) {
+            item(span = { GridItemSpan(3) }, key = "shelf-open") {
+                Row(Modifier.fillMaxWidth().padding(top = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text("${openShelf.title} · ${openShelf.subtitle}",
+                        color = Accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.weight(1f))
+                    Text("Leave", color = Text2, fontSize = 12.sp,
+                        modifier = Modifier.clickable { groupFilter = null }.padding(6.dp))
+                }
+            }
         }
 
         if (folders.size > 1) {
@@ -218,6 +278,8 @@ fun PhotoViewer(
     onPickSimilar: (PhotoEntity) -> Unit = {}
 ) {
     val haptics = LocalHapticFeedback.current
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var infoOpen by remember { mutableStateOf(false) }
     androidx.activity.compose.BackHandler(enabled = true) { onClose() }
     // The pill steps aside for a photo, the way it does for the spotlight.
     // It is chrome for the grid; over a full-frame still it is in the way.
@@ -265,32 +327,71 @@ fun PhotoViewer(
                 .navigationBarsPadding()
                 .padding(top = 18.dp, bottom = 16.dp)
         ) {
+            // The neighbours rail folds behind its header, same shared switch
+            // as the video spotlight: the still comes first, neighbours on
+            // request.
             if (similar.isNotEmpty()) {
-                Text("More like this", color = Color.White, fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 16.dp))
-                Spacer(Modifier.height(8.dp))
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    items(similar, key = { "s_${it.id}" }) { s ->
-                        AsyncImage(
-                            model = s.uri,
-                            contentDescription = s.displayName,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .size(78.dp)
-                                .clip(RoundedCornerShape(10.dp))
-                                .clickable {
-                                    haptics.performHapticFeedback(
-                                        HapticFeedbackType.TextHandleMove)
-                                    onPickSimilar(s)
-                                }
-                        )
+                Row(Modifier.fillMaxWidth()
+                    .clickable {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        RailPrefs.expanded = !RailPrefs.expanded
+                    }
+                    .padding(horizontal = 16.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Text("More like this", color = Color.White, fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text("ⓘ", color = Text2, fontSize = 12.sp,
+                        modifier = Modifier.padding(end = 12.dp)
+                            .clickable { infoOpen = !infoOpen })
+                    Icon(if (RailPrefs.expanded) Icons.Default.KeyboardArrowDown
+                         else Icons.Default.KeyboardArrowUp, null,
+                        tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(20.dp))
+                }
+                androidx.compose.animation.AnimatedVisibility(visible = RailPrefs.expanded) {
+                    Column {
+                        Spacer(Modifier.height(8.dp))
+                        LazyRow(
+                            contentPadding = PaddingValues(horizontal = 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(similar, key = { "s_${it.id}" }) { s ->
+                                AsyncImage(
+                                    model = s.uri,
+                                    contentDescription = s.displayName,
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier
+                                        .size(78.dp)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .clickable {
+                                            haptics.performHapticFeedback(
+                                                HapticFeedbackType.TextHandleMove)
+                                            onPickSimilar(s)
+                                        }
+                                )
+                            }
+                        }
+                        Spacer(Modifier.height(14.dp))
                     }
                 }
-                Spacer(Modifier.height(14.dp))
+            }
+            androidx.compose.animation.AnimatedVisibility(visible = infoOpen) {
+                Column(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp)) {
+                    Text("Taken ${dayFormat.format(Date(photo.dateAddedSec * 1000))}" +
+                        (if (photo.width > 0) " · ${photo.width}×${photo.height}" else ""),
+                        color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                    if (photo.about.isNotBlank()) {
+                        Text(photo.about.replaceFirstChar { it.uppercase() },
+                            color = Color.White.copy(alpha = 0.75f), fontSize = 12.sp)
+                    }
+                    if (photo.tagList.isNotEmpty()) {
+                        Text(photo.tagList.take(4).joinToString("  ·  "),
+                            color = Color.White.copy(alpha = 0.5f), fontSize = 11.sp)
+                    }
+                    if (photo.isFavorite) {
+                        Text("★ In your favorites", color = Yellow, fontSize = 11.5.sp,
+                            fontWeight = FontWeight.SemiBold)
+                    }
+                }
             }
             Row(Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(
@@ -312,6 +413,13 @@ fun PhotoViewer(
                 }, modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(46.dp)) {
                     Icon(Icons.Default.Delete,
                         "Delete", tint = Text1, modifier = Modifier.size(22.dp))
+                }
+                IconButton(onClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    sharePhoto(ctx, photo)
+                }, modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(46.dp)) {
+                    Icon(Icons.Default.Share,
+                        "Share", tint = Text1, modifier = Modifier.size(22.dp))
                 }
             }
         }
@@ -349,4 +457,65 @@ private fun GifCanvas(uri: String, modifier: Modifier = Modifier) {
         },
         modifier = modifier
     )
+}
+
+/**
+ * A brain shelf for stills, as a card: cover, count, name. The photo twin
+ * of the video group card — tap in, and the grid narrows to the shelf.
+ */
+@Composable
+private fun PhotoGroupCard(
+    group: PhotoSmartGroup,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Box(
+        Modifier
+            .width(132.dp)
+            .height(96.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .then(if (selected) Modifier.border(2.dp, Accent, RoundedCornerShape(16.dp)) else Modifier)
+            .clickable(onClick = onClick)
+    ) {
+        val cover = group.photos.firstOrNull()
+        if (cover != null) {
+            AsyncImage(
+                model = cover.uri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxSize()
+            )
+        } else {
+            Box(Modifier.fillMaxSize().background(Hairline))
+        }
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
+            listOf(Color.Transparent, Color.Black.copy(alpha = 0.72f)),
+            startY = 60f)))
+        Column(Modifier.align(Alignment.BottomStart).padding(8.dp)) {
+            Text(group.title, color = Color.White, fontSize = 12.5.sp,
+                fontWeight = FontWeight.Bold, maxLines = 1,
+                overflow = TextOverflow.Ellipsis)
+            Text(group.subtitle, color = Color.White.copy(alpha = 0.72f),
+                fontSize = 10.sp, maxLines = 1,
+                overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** Send one still out of the device, through the system share sheet. */
+fun sharePhoto(ctx: android.content.Context, photo: PhotoEntity) {
+    val file = runCatching {
+        val input = ctx.contentResolver.openInputStream(android.net.Uri.parse(photo.uri))
+        val out = java.io.File(ctx.cacheDir, "share_${photo.id}_${photo.displayName}")
+        input?.use { ins -> out.outputStream().use { outs -> ins.copyTo(outs) } }
+        out
+    }.getOrDefault(java.io.File(ctx.cacheDir, "share.bin"))
+    val uri = androidx.core.content.FileProvider.getUriForFile(
+        ctx, "com.brain.gallery.fileprovider", file)
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+        type = "image/*"
+        putExtra(android.content.Intent.EXTRA_STREAM, uri)
+        addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+    ctx.startActivity(android.content.Intent.createChooser(send, "Share photo"))
 }

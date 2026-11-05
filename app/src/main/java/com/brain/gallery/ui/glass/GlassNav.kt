@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.brain.gallery.ui.theme.Accent
 
 data class GlassTab(val label: String, val icon: ImageVector)
 
@@ -72,8 +73,8 @@ fun GlassNav(
     onSelect: (Int) -> Unit,
     visible: Float,
     modifier: Modifier = Modifier,
-    style: GlassStyle = Glass.pane(Color(0xFF8B5CF6)),
-    selectedColor: Color = Color(0xFF8B5CF6),
+    style: GlassStyle = Glass.pane(Accent),
+    selectedColor: Color = Accent,
     idleColor: Color = Color(0xFF9AA6B8),
     selectedLabelColor: Color = Color.White,
     height: Dp = GlassNavHeight
