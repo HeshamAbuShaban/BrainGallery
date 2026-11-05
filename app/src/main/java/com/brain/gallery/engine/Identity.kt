@@ -9,34 +9,74 @@ import javax.inject.Singleton
 
 data class MatchDecision(val personId: Int, val ambiguous: Boolean, val best: Float, val margin: Float)
 
+private data class PersonScore(val id: Int, val sim: Float)
+
+/**
+ * The pure matcher core, pinned by unit tests: one query hands in every
+ * person's vectors, this decides. No database inside.
+ */
+internal fun decide(
+    library: Map<Int, List<FloatArray>>,
+    vec: FloatArray,
+    minSim: Float,
+    minMargin: Float
+): MatchDecision {
+    val scores = library.entries
+        .map { (id, vs) ->
+            var best = -2f
+            for (v in vs) {
+                val c = Spherical.cosine(v, vec)
+                if (c > best) best = c
+            }
+            PersonScore(id, best)
+        }
+        .filter { it.sim > -2f }
+        .sortedByDescending { it.sim }
+    val top = scores.firstOrNull() ?: return MatchDecision(-1, false, 0f, 0f)
+    val second = scores.getOrNull(1)?.sim ?: 0f
+    val margin = top.sim - second
+    if (top.sim < minSim) return MatchDecision(-1, false, top.sim, margin)
+    if (margin < minMargin) return MatchDecision(-1, true, top.sim, margin)
+    return MatchDecision(top.id, false, top.sim, margin)
+}
+
 /**
  * Incremental identity: match a new face vector against every person's stored
  * vectors by MAX similarity (not a centroid, which blurs a person into mush).
  * O(new x persons) instead of O(n^2) reclustering.
+ *
+ * Denial is how the engine shows it learned: `deny` lists persons the user
+ * has explicitly rejected for a video — those clusters are simply absent
+ * from the decision, like they were never matches to begin with.
  */
 @Singleton
 class PersonMatcher @Inject constructor(private val db: BrainDatabase) {
 
-    suspend fun match(vec: FloatArray, minSim: Float = 0.42f, minMargin: Float = 0.05f): MatchDecision {
-        val persons = db.personDao().allPersons()
-        if (persons.isEmpty()) return MatchDecision(-1, false, 0f, 0f)
-        val scores = persons.mapNotNull { p ->
-            val vs = db.personDao().vectorsForPerson(p.id)
-                .mapNotNull { FaceEmbedder.fromBytes(it.vec) }
-            if (vs.isEmpty()) null else p.id to vs.maxOf { Spherical.cosine(it, vec) }
-        }.sortedByDescending { it.second }
-        val best = scores.firstOrNull() ?: return MatchDecision(-1, false, 0f, 0f)
-        val second = scores.getOrNull(1)?.second ?: 0f
-        val margin = best.second - second
-        if (best.second < minSim) return MatchDecision(-1, false, best.second, margin)
-        if (margin < minMargin) return MatchDecision(-1, true, best.second, margin)
-        return MatchDecision(best.first, false, best.second, margin)
+    /** One query, all assigned vectors, grouped (no per-person DB round trip). */
+    suspend fun vectorsByPerson(deny: Set<Int> = emptySet()): Map<Int, List<FloatArray>> =
+        db.personDao().assignedVectors()
+            .groupBy { it.personId }
+            .filterKeys { it !in deny }
+            .mapValues { (_, rows) -> rows.mapNotNull { FaceEmbedder.fromBytes(it.vec) } }
+            .filterValues { it.isNotEmpty() }
+
+    suspend fun match(
+        vec: FloatArray,
+        minSim: Float = 0.42f,
+        minMargin: Float = 0.05f,
+        deny: Set<Int> = emptySet()
+    ): MatchDecision {
+        val library = vectorsByPerson(deny)
+        if (library.isEmpty()) return MatchDecision(-1, false, 0f, 0f)
+        return decide(library, vec, minSim, minMargin)
     }
 
     suspend fun assignOrCreate(
         videoId: Long, vec: FloatArray, quality: Float, minSim: Float = 0.42f
     ): Int {
-        val decision = match(vec, minSim)
+        // The user may have already said "this clip is not that person".
+        val denied = db.personDao().deniedPersonsFor(videoId).toSet()
+        val decision = match(vec, minSim, deny = denied)
         val personId = if (decision.ambiguous) {
             -1 // surface to user: "Person A, or someone new?"
         } else if (decision.personId >= 0) {
@@ -78,10 +118,10 @@ class PersonConsolidator @Inject constructor(
         while (merges < maxMerges) {
             val persons = db.personDao().allPersons()
             if (persons.size < 2) return merges
-            val vecs = HashMap<Int, List<FloatArray>>()
-            for (p in persons) {
-                vecs[p.id] = db.personDao().vectorsForPerson(p.id).mapNotNull { FaceEmbedder.fromBytes(it.vec) }
-            }
+            // One hop for every person's vectors, instead of one query per person.
+            val vecs = db.personDao().assignedVectors()
+                .groupBy { it.personId }
+                .mapValues { (_, rows) -> rows.mapNotNull { FaceEmbedder.fromBytes(it.vec) } }
             var bestA = -1
             var bestB = -1
             var bestSim = mergeSim
@@ -115,10 +155,14 @@ class PersonConsolidator @Inject constructor(
     suspend fun adoptUnassigned(minSim: Float = 0.50f, minMargin: Float = 0.08f): Int {
         val pending = db.personDao().unassignedVectors()
         if (pending.isEmpty()) return 0
+        // Lessons enforced in bulk: video → persons the user rejected.
+        val denied = db.personDao().allLessons()
+            .groupBy { it.videoId }
+            .mapValues { (_, l) -> l.map { it.personId }.toSet() }
         var adopted = 0
         for (row in pending) {
             val vec = FaceEmbedder.fromBytes(row.vec) ?: continue
-            val d = matcher.match(vec, minSim, minMargin)
+            val d = matcher.match(vec, minSim, minMargin, deny = denied[row.videoId].orEmpty())
             if (d.personId >= 0 && !d.ambiguous) {
                 db.personDao().assignVector(row.id, d.personId)
                 adopted++
@@ -136,9 +180,15 @@ class PersonConsolidator @Inject constructor(
 class SplitDetector @Inject constructor(private val db: BrainDatabase) {
 
     suspend fun scanAll(minSeparation: Float = 0.25f): Int {
+        val byPerson = db.personDao().assignedVectors()
+            .groupBy { it.personId }
+            .mapValues { (_, rows) -> rows.mapNotNull { FaceEmbedder.fromBytes(it.vec) } }
         var flagged = 0
         for (p in db.personDao().allPersons()) {
-            val vs = db.personDao().vectorsForPerson(p.id).mapNotNull { FaceEmbedder.fromBytes(it.vec) }
+            // A person the user decided about stays decided. Silence is the
+            // lesson; the engine has no authority to un-learn it.
+            if (p.splitSilenced == true) continue
+            val vs = byPerson[p.id].orEmpty()
             val bimodal = Spherical.looksLikeTwoPeople(vs, minSeparation = minSeparation)
             if (bimodal != p.splitSuggested) {
                 if (bimodal) db.personDao().setSplitSuggested(p.id) else db.personDao().clearSplitSuggested(p.id)

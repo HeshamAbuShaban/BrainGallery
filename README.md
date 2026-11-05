@@ -25,17 +25,19 @@ become one query.
 | Capability | How |
 |---|---|
 | **People** | On-device face detection + MobileFaceNet identity embeddings, clustered by max-similarity into named people. Smiles ranked first. |
-| **Identity you can correct** | Multi-vector per person, an ambiguity gate that asks instead of guessing, bimodality detection ("might be two people"), plus merge / split / rename. |
+| **Identity you can correct** | Multi-vector per person, an ambiguity gate that asks instead of guessing, bimodality detection ("might be two people"), plus merge / split / rename — and your corrections stick: a dismissed warning and a split-out clip are *remembered*, so the engine never quietly undoes you. |
 | **Names from context** | Folder and filename tokens co-occurring with a person are used to propose a real name. |
 | **Duplicates** | dHash fingerprints + Brenner sharpness + keeper rules (sharpest → highest-res → most-watched). One tap frees the megabytes, with system consent. |
 | **Events** | Same-folder bursts within 3-day gaps auto-cluster into trips, parties, weekends. |
 | **Nostalgia** | Buried gems (unseen 6+ months) and On-this-day surfacing. |
-| **Search** | Who/what/where/when-aware; a real name routes straight to that person's library. |
-| **For You feed** | Completion-weighted, people-aware, 80/20 explore, never repeats a category twice. Every card explains *why* it ranked. |
-| **Tune tab** | The ranking is yours: presets (Nostalgic, Hype, Calm, Funny) plus the raw weights behind them — finish rate, fresh finds, people, memories, energy, reel length, replay demotion, variety, surprise. No hidden constants. |
+| **Search** | Who/what/where/when-aware; FTS4 index over videos *and* photos, sanitized prefix queries (unicode-safe), a real name routes straight to that person's library. And it can search *words said out loud*: where the phone ships its own speech engine, clips are transcribed on-device (no mic permission, nothing leaves). |
+| **Content ID** | Shazam, but for your own library: someone sends you a clip, you pick it, the brain fingerprints its frames and answers "this is your clip in *Bookmarks*, Mar 12" — or honestly, "new to you". No description possible or needed. |
+| **GIFs, WebP** | Animated files land in the photo shelf as stills and *play* when opened — platform decode, no network, no extra artifact. |
+| **For You feed** | Completion-weighted, people-aware, 80/20 explore, never repeats a category twice — and it learns your taste from what you actually finish (decaying, evidence-honest, tunable). Every card explains *why* it ranked. |
+| **Tune tab** | The ranking is yours: presets (Nostalgic, Hype, Calm, Funny) plus the raw weights behind them — finish rate, fresh finds, people, memories, energy, your taste, reel length, replay demotion, variety, surprise. No hidden constants. |
 | **Watch anywhere** | Any thumbnail opens a spotlight player with a More-like-this rail. |
 | **Not interested** | Actually works — suppresses that clip *and its duplicates*, and travels with your data. |
-| **Portability** | Your human layer (names, favourites, history) exports as one file. Wiping the app costs you nothing that matters. |
+| **Portability** | Your human layer (names, favourites, history, taught lessons) exports as one file. Wiping the app costs you nothing that matters. |
 
 ## The brain: cascade ordered by cost, not importance
 

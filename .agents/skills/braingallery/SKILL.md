@@ -42,14 +42,16 @@ on-device.
 
 | Symptom / task | First files |
 |---|---|
-| Feed ranks wrong, "same clips every session" | `domain/engine/FeedComposer.kt` (bands + shuffle + explore), `FeedTuning` in `domain/EngineSettings.kt`, tests in `app/src/test/.../FeedComposerTest.kt` |
+| Feed ranks wrong, "same clips every session" | `domain/engine/FeedComposer.kt` (bands + shuffle + explore), `FeedTuning` in `domain/EngineSettings.kt`, learned taste in `domain/engine/TasteProfile.kt` (app_kv `taste.profile`), tests in `app/src/test/.../` |
 | Feed settings UI | `ui/tune/TuneScreen.kt` (presets + weights), `ui/organize/BrainScreen.kt` (engine switches) |
 | Scan misses videos / stuck | `data/scan/MediaScanner.kt`, `data/service/BrainScanService.kt`, `BrainGalleryApp.kt` (ContentObserver, 8 s debounce) |
-| People wrong (merge/split/naming) | `engine/Identity.kt` (PersonMatcher, PersonConsolidator, SplitDetector, NameSuggester), thresholds in `EngineSettings` (matchSim, mergeSim, splitSensitivity) |
+| People wrong (merge/split/naming) | `engine/Identity.kt` (PersonMatcher, PersonConsolidator, SplitDetector, NameSuggester), thresholds in `EngineSettings` (matchSim, mergeSim, splitSensitivity). Corrections are learned: `persons.splitSilenced` silences split warnings, `identity_lessons` forbids re-adopting split-out videos. |
 | Duplicates wrong | `engine/DuplicateFinder.kt`, `engine/ClusterMath.kt` (dHash hamming ≤ 6) |
 | Glass looks broken / contrast | `ui/glass/Glass.kt` + `ui/glass/README.md`, accent via `ui/theme/Theme.kt` `AccentHolder` |
 | Search weak | `engine/MemoryDoc.kt` + `MemoryDocBuilder.kt`, `ui/organize/SearchScreen.kt` |
+| "Shazam for my library" (Content ID) | Pure matcher `engine/ContentId.kt` (tests `ContentIdTest`, keeper bar ≤ 6), fingerprinting `data/brain/ContentHasher.kt`, verdict/launcher in `SearchScreen.kt` + `SearchViewModel.identify` |
 | Voice/prosody nonsense | `data/brain/AudioProbe.kt` (fixed in 406f5cd), gated by `prosodyEnabled` |
+| Transcripts missing/garbage | `data/brain/Transcriber.kt` (on-device `SpeechRecognizer` + `EXTRA_AUDIO_SOURCE` from a file descriptor; availability = API 33+ AND engine installed), shaping `engine/TranscriptShaper.kt` (tests `TranscriptShaperTest`), queue in `VideoDao.transcriptPending` (one attempt ever), service phase `transcripts` |
 | Export/import bundle | `data/portability/MemoryBundle.kt` — **import has no UI yet** (roadmap item) |
 | Adding a new screen | Today: hand-rolled tabs in `MainActivity.kt` `Root()`. Planned: NavHost per `.agents/skills/android-navigation` + `docs/ROADMAP.md` |
 
@@ -57,12 +59,21 @@ on-device.
 
 - **L0** filename/folder + ontology pass · **L1a** frames, dHash, sharpness,
   faces, MobileFaceNet vectors · **L1b** ML Kit labels (budgeted queue) ·
-  **prosody** audio delivery tags · **MemoryDoc** searchable per-video document ·
+  **prosody** audio delivery tags · **transcripts** the words a clip says,
+  on-device (one attempt ever, shaped by `TranscriptShaper` at write time) ·
+  **MemoryDoc** searchable per-video document ·
   **buried gem** > 180 d, unwatched, junk < 0.4 · **junkScore** clutter score,
   ≥ `junkCut` (0.85) never enters the reel.
-- Room db `BrainDatabase` v7: `videos`, `watch_events`, `persons`,
+- Room db `BrainDatabase` v12: `videos` (+ `attention`, `transcript`,
+  `transcriptTried`), `watch_events`, `persons` (+ `splitSilenced`),
   `face_vectors`, `not_interested`, `semantic_vectors` (reserved, unwritten),
-  `app_kv`, `group_overrides`, `selection`. Migrations in `data/local/Migrations.kt`.
+  `app_kv` (settings blob, `taste.profile`, `taste.cursor`),
+  `group_overrides`, `selection`, `photos` (+ `animated`, `+ phash`),
+  `identity_lessons`, and FTS `video_fts`/`photo_fts`
+  (search index, deliberately outside Room's schema check).
+  Migrations in `data/local/Migrations.kt`. v10→v11 is frozen (a flashed
+  APK already carries it); all Nov-5-second-sitting columns live in
+  `MIGRATION_11_12`.
 
 ## Build & verify
 

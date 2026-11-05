@@ -1,5 +1,6 @@
 package com.brain.gallery.data.local
 
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Entity
 import androidx.room.Index
@@ -33,7 +34,18 @@ data class PhotoEntity(
     val junkScore: Float = 0f,
     val faceCount: Int = 0,
     val smileCount: Int = 0,
-    val isFavorite: Boolean = false
+    val isFavorite: Boolean = false,
+
+    /** Animated media (GIF/WebP): the shelf shows a still, the viewer plays. */
+    val animated: Boolean? = null,
+    /**
+     * dHash fingerprint, same dialect as the videos' [phash] — filled by the
+     * image pass so a photo can be FOUND by content, not just described.
+     * 0 means not computed yet. The declared default is why the v12
+     * migration's `DEFAULT 0` passes Room's schema check.
+     */
+    @ColumnInfo(defaultValue = "0")
+    val phash: Long = 0
 ) {
     val tagList: List<String> get() = tags.split(",").map { it.trim() }.filter { it.isNotBlank() }
 }
@@ -52,8 +64,8 @@ interface PhotoDao {
     @Query("SELECT COUNT(*) FROM photos WHERE brainLevel < 1")
     suspend fun pendingCount(): Int
 
-    @Query("UPDATE photos SET category = :category, tags = :tags, about = :about, confidence = :confidence, brainLevel = 1, faceCount = :faces, smileCount = :smiles WHERE id = :id")
-    suspend fun markRead(id: Long, category: String, tags: String, about: String, confidence: Float, faces: Int, smiles: Int)
+    @Query("UPDATE photos SET category = :category, tags = :tags, about = :about, confidence = :confidence, brainLevel = 1, faceCount = :faces, smileCount = :smiles, phash = :phash WHERE id = :id")
+    suspend fun markRead(id: Long, category: String, tags: String, about: String, confidence: Float, faces: Int, smiles: Int, phash: Long)
 
     @Query("UPDATE photos SET isFavorite = :fav WHERE id = :id")
     suspend fun setFavorite(id: Long, fav: Boolean)
@@ -63,4 +75,16 @@ interface PhotoDao {
 
     @Upsert
     suspend fun upsertAll(photos: List<PhotoEntity>)
+
+    @Query("SELECT * FROM photos WHERE id = :id")
+    suspend fun getById(id: Long): PhotoEntity?
+
+    @Query("SELECT * FROM photos WHERE id IN (:ids)")
+    suspend fun getByIds(ids: List<Long>): List<PhotoEntity>
+
+    /** Substring net over the raw columns; the FTS index is the precise net. */
+    @Query("""SELECT * FROM photos WHERE displayName LIKE '%' || :q || '%' OR tags LIKE '%' || :q || '%'
+        OR category LIKE '%' || :q || '%' OR folderName LIKE '%' || :q || '%'
+        ORDER BY dateAddedSec DESC LIMIT 120""")
+    suspend fun searchLike(q: String): List<PhotoEntity>
 }

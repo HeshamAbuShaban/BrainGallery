@@ -13,7 +13,7 @@ import javax.inject.Singleton
 
 data class ScannedPhoto(
     val id: Long, val uri: String, val name: String, val folder: String,
-    val dateAddedSec: Long, val width: Int, val height: Int
+    val dateAddedSec: Long, val width: Int, val height: Int, val mime: String = ""
 )
 
 /**
@@ -41,7 +41,8 @@ class PhotoScanner @Inject constructor(@ApplicationContext private val ctx: Cont
         val projection = arrayOf(
             MediaStore.Images.Media._ID, MediaStore.Images.Media.DISPLAY_NAME,
             MediaStore.Images.Media.DATE_ADDED, MediaStore.Images.Media.RELATIVE_PATH,
-            MediaStore.Images.Media.WIDTH, MediaStore.Images.Media.HEIGHT)
+            MediaStore.Images.Media.WIDTH, MediaStore.Images.Media.HEIGHT,
+            MediaStore.Images.Media.MIME_TYPE)
         val sel: String?
         val args: Array<String>?
         if (deltaIds != null) {
@@ -56,6 +57,7 @@ class PhotoScanner @Inject constructor(@ApplicationContext private val ctx: Cont
             val iPath = c.getColumnIndexOrThrow(MediaStore.Images.Media.RELATIVE_PATH)
             val iW = c.getColumnIndexOrThrow(MediaStore.Images.Media.WIDTH)
             val iH = c.getColumnIndexOrThrow(MediaStore.Images.Media.HEIGHT)
+            val iMime = c.getColumnIndexOrThrow(MediaStore.Images.Media.MIME_TYPE)
             while (c.moveToNext()) {
                 val id = c.getLong(iId)
                 val name = c.getString(iName) ?: continue
@@ -66,7 +68,8 @@ class PhotoScanner @Inject constructor(@ApplicationContext private val ctx: Cont
                         .appendPath(id.toString()).build().toString(),
                     name = name, folder = folder,
                     dateAddedSec = c.getLong(iDate),
-                    width = c.getInt(iW), height = c.getInt(iH))
+                    width = c.getInt(iW), height = c.getInt(iH),
+                    mime = c.getString(iMime) ?: "")
             }
         }
         return out
@@ -77,9 +80,12 @@ class PhotoScanner @Inject constructor(@ApplicationContext private val ctx: Cont
 fun ScannedPhoto.toEntity(): PhotoEntity {
     val junk = CategoryOntology.junkScore(folder, name)
     val cat = CategoryOntology.matchFile("$folder $name") ?: "unknown"
+    val animated = mime == "image/gif" || mime == "image/webp" ||
+        name.lowercase().endsWith(".gif")
     return PhotoEntity(
         id = id, uri = uri, displayName = name, folderName = folder,
         dateAddedSec = dateAddedSec, width = width, height = height,
-        category = cat, junkScore = junk, confidence = if (cat == "unknown") 0f else 0.6f
+        category = cat, junkScore = junk, confidence = if (cat == "unknown") 0f else 0.6f,
+        animated = animated
     )
 }

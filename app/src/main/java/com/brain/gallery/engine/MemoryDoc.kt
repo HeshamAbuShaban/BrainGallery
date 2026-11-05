@@ -1,5 +1,6 @@
 package com.brain.gallery.engine
 
+import com.brain.gallery.data.local.PhotoEntity
 import com.brain.gallery.data.local.VideoEntity
 
 /**
@@ -35,9 +36,32 @@ object MemoryDocBuilder {
             if (v.isFavorite) add("favorite")
             if (v.watchCount > 2) add("rewatched")
         }.joinToString(" ")
-        val text = listOf(who, what, where, whenText, vibe)
+        // The words the clip says — the same field the SQL document reads, and
+        // shaping is idempotent, so both sides always agree letter for letter.
+        val heard = TranscriptShaper.shape(v.transcript)
+        val text = listOf(who, what, where, whenText, vibe, heard)
             .filter { it.isNotBlank() }.joinToString(" ").lowercase()
         return MemoryDoc(v.id, who, what, where, whenText, vibe, text)
+    }
+
+    /**
+     * Photos speak the same vocabulary, minus *who* — a photo carries no
+     * person yet. Shape and casing match the video document and the SQL the
+     * search index stores, so one scorer ranks both media honestly.
+     */
+    fun buildPhoto(p: PhotoEntity): MemoryDoc {
+        val what = listOf(p.category, p.tagList.joinToString(" "), p.about)
+            .filter { it.isNotBlank() && it != "unknown" }.joinToString(" ")
+        val cal = java.util.Calendar.getInstance().apply { timeInMillis = p.dateAddedSec * 1000 }
+        val whenText = "${cal.get(java.util.Calendar.YEAR)}-${cal.get(java.util.Calendar.MONTH) + 1}"
+        val vibe = buildList {
+            if (p.faceCount > 0) add("${p.faceCount} faces")
+            if (p.smileCount > 0) add("smiling")
+            if (p.isFavorite) add("favorite")
+        }.joinToString(" ")
+        val text = listOf(what, p.folderName, whenText, vibe, p.displayName)
+            .filter { it.isNotBlank() }.joinToString(" ").lowercase()
+        return MemoryDoc(p.id, "", what, p.folderName, whenText, vibe, text)
     }
 
     /** Lexical doc match score for a multi-token query. */

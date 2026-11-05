@@ -85,25 +85,60 @@ class MemoryBundle @Inject constructor(
         }
         root.put("groupOverrides", overrides)
 
+        // Taught identity lessons: the user's own "this clip is not that
+        // person" corrections. Human layer — without them a restore would
+        // politely re-adopt exactly the vectors the user pushed away.
+        val lessonsOut = JSONArray()
+        for (l in db.personDao().allLessons()) {
+            lessonsOut.put(JSONObject().apply {
+                put("videoId", l.videoId); put("personId", l.personId)
+            })
+        }
+        root.put("lessons", lessonsOut)
+
         root.toString()
     }
 
     /** Restore human layer. Videos/vectors are re-derived by the indexer afterwards. */
     suspend fun importJson(text: String): String = withContext(Dispatchers.IO) {
         val root = JSONObject(text)
-        var people = 0; var events = 0; var favs = 0; var overrides = 0
+        var people = 0; var events = 0; var favs = 0; var overrides = 0; var lessons = 0
         var settingsRestored = false
+        // One read for the whole import: a non-empty local human layer means
+        // the bundle's ids cannot be trusted below.
+        val locals = db.personDao().allPersons()
         root.optJSONArray("persons")?.let { arr ->
+            // Names the user fixed locally, by lower-case form for matching.
+            val claimedNames = locals.filter { it.verified && it.name.isNotBlank() }
+                .associateBy { it.name.lowercase() }
+            val adoptables = locals.filter { it.name.isBlank() && it.suggestedName.isNotBlank() }
+                .associateBy { it.suggestedName.lowercase() }
             for (i in 0 until arr.length()) {
                 val o = arr.getJSONObject(i)
-                val existing = db.personDao().allPersons().firstOrNull { it.id == o.optInt("id") }
-                if (existing == null) {
+                if (locals.isEmpty()) {
+                    // No local human layer yet: restore ids exactly. Vector
+                    // rows are re-derived by the indexer later, so the ids'
+                    // integrity belongs to this bundle.
                     db.personDao().insertPerson(PersonEntity(
                         id = o.optInt("id"), name = o.optString("name"),
                         verified = o.optBoolean("verified"), createdAt = System.currentTimeMillis()
                     ))
-                } else if (o.optString("name").isNotBlank() && !existing.verified) {
-                    db.personDao().rename(existing.id, o.optString("name"))
+                } else {
+                    // Ids can never be trusted across libraries: person #3 in
+                    // the bundle may be someone entirely different from
+                    // person #3 here, and a name silently pasted onto the
+                    // wrong cluster is not repairable — a lost name is.
+                    // Merge only on a verified name; identities that would
+                    // be new rows are left out (they carry no vectors, so a
+                    // zombie person row would never attach to a face again).
+                    val name = o.optString("name")
+                    if (name.isNotBlank() && claimedNames[name.lowercase()] == null) {
+                        // A name nobody here claims: if a local cluster was
+                        // suggested exactly this name, adopt it there.
+                        adoptables[name.lowercase()]?.let { a ->
+                            db.personDao().rename(a.id, name)
+                        }
+                    }
                 }
                 people++
             }
@@ -144,10 +179,29 @@ class MemoryBundle @Inject constructor(
                 overrides++
             }
         }
+        // Taught lessons travel only when this restore can honor the bundle's
+        // person ids — a fresh install, where ids were restored exactly. On a
+        // lived-in library the ids would point at strangers, and a lesson
+        // about nobody is worse than none.
+        root.optJSONArray("lessons")?.let { arr ->
+            if (locals.isEmpty()) {
+                val items = (0 until arr.length()).mapNotNull { i ->
+                    val o = arr.optJSONObject(i) ?: return@mapNotNull null
+                    com.brain.gallery.data.local.IdentityLessonEntity(
+                        videoId = o.optLong("videoId"), personId = o.optInt("personId"),
+                        createdAt = System.currentTimeMillis())
+                }
+                if (items.isNotEmpty()) {
+                    db.personDao().insertLessons(items)
+                    lessons = items.size
+                }
+            }
+        }
         buildString {
             append("Imported $people people, $events watch events, $favs favorites")
             if (settingsRestored) append(", your settings")
             if (overrides > 0) append(", $overrides group names")
+            if (lessons > 0) append(", $lessons taught lessons")
         }
     }
 

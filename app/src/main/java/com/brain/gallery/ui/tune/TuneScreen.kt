@@ -196,6 +196,12 @@ fun TuneScreen(onOpenBrain: () -> Unit, vm: TuneViewModel = hiltViewModel()) {
                     "Zero ignores certainty completely.") {
                 vm.update(cfg.copy(mood = "Custom", tuning = cfg.tuning.copy(qualityWeight = it)))
             }
+            WeightSlider("Your taste", cfg.tuning.tasteWeight, cfg,
+                help = "The brain quietly learns what you actually keep finishing — " +
+                    "kinds of clips, people, places — and pulls those up. Learned on " +
+                    "this phone only; zero means ignore it.") {
+                vm.update(cfg.copy(mood = "Custom", tuning = cfg.tuning.copy(tasteWeight = it)))
+            }
 
             // ---------------- Shape ----------------
             Head("The reel's shape")

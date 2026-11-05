@@ -98,8 +98,11 @@ fun BrainScreen(
         }
         SwitchRow("Voice and delivery",
             "Reads the audio of clips that look like someone talking, and notes the " +
-                "pitch, pace and emphasis. Off by default; it only ever looks at clips " +
-                "with a person in them.",
+                "pitch, pace and emphasis. Where the phone ships its own on-device " +
+                "speech reader (Android 13+ and only if installed), the words a clip " +
+                "says are written down too — for search, in the language they were " +
+                "spoken. No recording permission, nothing downloaded, nothing sent. " +
+                "Off by default; it only ever looks at clips with a person in them.",
             cfg.prosodyEnabled) {
             vm.updateSettings(cfg.copy(prosodyEnabled = it))
         }
@@ -271,6 +274,7 @@ fun BrainDiagnosticsScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
             Head("Voice reading")
             Stat("Waiting to be heard", "${vm.prosodyPending()}")
             Stat("Already heard", "${vm.prosodyLearned()}")
+            Stat("Words written down", "${vm.transcriptDone()}")
             ActionRow("Re-learn the ones it got wrong",
                 "Only clips whose delivery read came out unclear.", Cyan) { vm.relearnUnclear() }
             ActionRow("Re-learn every clip's voice",

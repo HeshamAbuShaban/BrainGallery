@@ -23,4 +23,7 @@ interface WatchEventDao {
     suspend fun recent(): List<WatchEventEntity>
     @Query("SELECT * FROM watch_events ORDER BY atMs DESC")
     suspend fun all(): List<WatchEventEntity>
+    /** Events the taste learner has not consumed yet (exactly-once by cursor). */
+    @Query("SELECT * FROM watch_events WHERE rowId > :rowId ORDER BY rowId ASC")
+    suspend fun afterRowId(rowId: Long): List<WatchEventEntity>
 }

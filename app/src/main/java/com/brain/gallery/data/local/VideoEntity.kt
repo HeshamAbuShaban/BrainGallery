@@ -80,6 +80,25 @@ data class VideoEntity(
     /** 0..1 share of the clip that is speech; 0 means not measured yet. */
     val speechRatio: Float = 0f,
 
+    /**
+     * Accumulated attention — watch and favorite bumps, capped. Quite
+     * deliberately signals for the SCAN queue (L1b deepening follows where the
+     * viewer actually goes), never for the feed; the reel is taught by
+     * FeedComposer's tunable weights, and the two must not share a number.
+     */
+    val attention: Float? = null,
+
+    /**
+     * What the voice layer heard, from the on-device transcriber — the words
+     * of the clip, in the language they were spoken. Null = never attempted;
+     * empty = attempted and nothing usable came back. Feeds the Memory
+     * Document and the search index; nothing here ever leaves the phone.
+     */
+    val transcript: String? = null,
+
+    /** The transcript pass already attempted this clip; stops the retry storm. */
+    val transcriptTried: Boolean? = null,
+
     // Mark-and-sweep bookkeeping
     val lastSeenScan: Long = 0
 ) {

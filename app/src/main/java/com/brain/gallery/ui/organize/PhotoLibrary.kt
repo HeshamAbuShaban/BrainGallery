@@ -32,6 +32,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -42,10 +43,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
+import android.graphics.ImageDecoder
+import android.graphics.drawable.Drawable
+import android.net.Uri
+import android.os.Build
+import android.widget.ImageView
 import coil.compose.AsyncImage
 import com.brain.gallery.data.local.PhotoEntity
 import com.brain.gallery.ui.components.ShimmerBar
@@ -57,6 +65,8 @@ import com.brain.gallery.ui.theme.Pink
 import com.brain.gallery.ui.theme.Text1
 import com.brain.gallery.ui.theme.ChipFill
 import com.brain.gallery.ui.theme.Text2
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -183,12 +193,19 @@ fun PhotoViewer(
     val haptics = LocalHapticFeedback.current
     androidx.activity.compose.BackHandler(enabled = true) { onClose() }
     Box(modifier.fillMaxSize().background(Color.Black)) {
-        AsyncImage(
-            model = photo.uri,
-            contentDescription = photo.displayName,
-            contentScale = ContentScale.Fit,
-            modifier = Modifier.fillMaxSize()
-        )
+        if (photo.animated == true && Build.VERSION.SDK_INT >= 28) {
+            // Animated media plays here — decoding through ImageDecoder, no
+            // extra artifact, no network. The shelf stays a still frame;
+            // opening one is the moment it moves.
+            GifCanvas(photo.uri, Modifier.fillMaxSize())
+        } else {
+            AsyncImage(
+                model = photo.uri,
+                contentDescription = photo.displayName,
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
         Row(Modifier.align(Alignment.TopStart).statusBarsPadding()
             .padding(8.dp, 8.dp, 8.dp, 0.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically) {
@@ -230,4 +247,37 @@ fun PhotoViewer(
             }
         }
     }
+}
+
+/**
+ * Plays an animated image in place. ImageDecoder hands back an
+ * [android.graphics.drawable.AnimatedImageDrawable]; an ImageView advances it
+ * on its own draw clock, so the decode is the only work this does. Any
+ * failure of the decode falls through to nothing loud — a broken GIF is
+ * still a photo.
+ */
+@Composable
+private fun GifCanvas(uri: String, modifier: Modifier = Modifier) {
+    val ctx = LocalContext.current
+    var drawable by remember(uri) { mutableStateOf<Drawable?>(null) }
+    LaunchedEffect(uri) {
+        runCatching {
+            withContext(Dispatchers.IO) {
+                ImageDecoder.decodeDrawable(
+                    ImageDecoder.createSource(ctx.contentResolver, Uri.parse(uri)))
+            }
+        }.onSuccess { drawable = it }
+    }
+    AndroidView(
+        factory = { viewCtx ->
+            ImageView(viewCtx).apply {
+                scaleType = ImageView.ScaleType.FIT_CENTER
+            }
+        },
+        update = { iv ->
+            iv.setImageDrawable(drawable)
+            (drawable as? android.graphics.drawable.AnimatedImageDrawable)?.start()
+        },
+        modifier = modifier
+    )
 }

@@ -23,6 +23,16 @@ interface VideoDao {
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertNew(items: List<VideoEntity>)
 
+    /**
+     * Attention, tier 3: an honest watch or a favorite lifts the clip's place
+     * in the L1b (semantic deepening) queue — the deep pass follows where the
+     * viewer actually goes. Numbers come from [AttentionPolicy]; the cap keeps
+     * one session from monopolizing the budget. Needs no pending guard: a
+     * bumped-but-done clip simply carries a number nobody reads.
+     */
+    @Query("UPDATE videos SET attention = min(:cap, ifnull(attention, 0) + :bump) WHERE id = :id")
+    suspend fun bumpAttention(id: Long, bump: Float, cap: Float)
+
     @Query("""UPDATE videos SET uri = :uri, displayName = :name, durationMs = :duration,
         sizeBytes = :size, folderName = :folder, width = :w, height = :h, lastSeenScan = :scan
         WHERE id = :id""")
@@ -169,6 +179,35 @@ interface VideoDao {
 
     @Query("""SELECT * FROM videos WHERE displayName LIKE '%' || :q || '%' OR tags LIKE '%' || :q || '%'
         OR category LIKE '%' || :q || '%' OR folderName LIKE '%' || :q || '%'
+        OR transcript LIKE '%' || :q || '%'
         ORDER BY watchCount DESC, dateAddedSec DESC LIMIT 60""")
     suspend fun search(q: String): List<VideoEntity>
+
+    // ---- the words pass (voice layer, one stage past the audio tags) ----
+
+    /**
+     * Clips for the transcript. Gated three ways so the recogniser is never
+     * a dogpile: the audio pass must have actually heard speech in it, the
+     * clip must be short enough to be read wholesale, and — one attempt per
+     * clip, ever — it must not have been tried before. Attention orders the
+     * queue, as it orders the rest of the scan: what the viewer actually
+     * cares about gets its words written down first.
+     */
+    @Query("""
+        SELECT * FROM videos
+        WHERE transcriptTried IS NULL
+          AND speechRatio >= :minSpeech
+          AND durationMs <= :maxMs
+        ORDER BY ifnull(attention, 0) DESC, priority DESC, dateAddedSec DESC
+        LIMIT :limit
+    """)
+    suspend fun transcriptPending(limit: Int, minSpeech: Float, maxMs: Long): List<VideoEntity>
+
+    /** One honest write: the shaped words, or empty — and tried either way. */
+    @Query("UPDATE videos SET transcript = :transcript, transcriptTried = 1 WHERE id = :id")
+    suspend fun setTranscript(id: Long, transcript: String)
+
+    /** Diagnostics: clips whose words actually made it somewhere useful. */
+    @Query("SELECT COUNT(*) FROM videos WHERE transcript IS NOT NULL AND transcript != ''")
+    suspend fun transcriptDoneCount(): Int
 }

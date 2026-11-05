@@ -58,8 +58,9 @@ val Yellow: Color get() = if (PaletteHolder.dark) Color(0xFFF59E0B) else Color(0
 val Danger: Color get() = if (PaletteHolder.dark) Color(0xFFF87171) else Color(0xFFDC2626)
 val DangerContainer: Color get() =
     if (PaletteHolder.dark) Color(0xFF3A2410) else Color(0xFFFEF3E2)
-/** The hairline every divider in the app sits on. */
-val Hairline = Color(0xFF1A2231)
+/** The hairline every divider in the app sits on — soft on either theme. */
+val Hairline: Color get() =
+    if (PaletteHolder.dark) Color(0xFF1A2231) else Color(0xFFE6EAF0)
 
 val CardShape = RoundedCornerShape(20.dp)
 val ChipShape = RoundedCornerShape(50.dp)

@@ -33,6 +33,7 @@ class FeedComposer @Inject constructor() {
         suppressed: Set<Long> = emptySet(),
         tuning: FeedTuning = FeedTuning(),
         exclude: Set<Long> = emptySet(),
+        taste: TasteProfile = TasteProfile(),
         random: Random = Random.Default
     ): List<FeedItem> {
         if (videos.isEmpty()) return emptyList()
@@ -49,13 +50,13 @@ class FeedComposer @Inject constructor() {
         // what is left unseen leads, then the served clips return as a
         // second pass behind them.
         val unseen = base.filter { it.id !in exclude }
-        if (unseen.size >= limit / 2) return reel(unseen, recentIds, hour, tuning, limit, random)
+        if (unseen.size >= limit / 2) return reel(unseen, recentIds, hour, tuning, taste, limit, random)
 
-        val head = reel(unseen, recentIds, hour, tuning, limit, random)
+        val head = reel(unseen, recentIds, hour, tuning, taste, limit, random)
         val tailNeed = limit - head.size
         if (tailNeed <= 0) return head
         val served = base.filter { it.id in exclude }
-        return head + reel(served, recentIds, hour, tuning, tailNeed, random)
+        return head + reel(served, recentIds, hour, tuning, taste, tailNeed, random)
     }
 
     /**
@@ -69,13 +70,14 @@ class FeedComposer @Inject constructor() {
         recentIds: Set<Long>,
         hour: Int,
         t: FeedTuning,
+        taste: TasteProfile,
         limit: Int,
         random: Random
     ): List<FeedItem> {
         if (pool.isEmpty() || limit <= 0) return emptyList()
         val ranked = pool.asSequence()
             .filter { it.junkScore < t.junkCut }
-            .map { v -> score(v, recentIds, hour, t) }
+            .map { v -> score(v, recentIds, hour, t, taste) }
             .sortedByDescending { it.score }
             .take(limit * 2)
             .toList()
@@ -108,7 +110,8 @@ class FeedComposer @Inject constructor() {
         v: VideoEntity,
         recentIds: Set<Long>,
         hour: Int,
-        t: FeedTuning
+        t: FeedTuning,
+        taste: TasteProfile = TasteProfile()
     ): FeedItem {
         var s = 0.3f // base exploration
         val why = mutableListOf<String>()
@@ -165,15 +168,38 @@ class FeedComposer @Inject constructor() {
             s += 0.12f * t.voiceWeight
             why += "someone talking"
         }
+        // Taste: the learned profile. Neutral is 0.5 by construction, so an
+        // uninformed profile contributes nothing and a disliked kind of clip
+        // sinks. The "why" is earned by the single strongest learned
+        // attribute, not by the diffuse blend.
+        s += (taste.affinityFor(v) - 0.5f) * 0.35f * t.tasteWeight
+        if (taste.strongestAffinityFor(v) > 0.68f) why += "matches what you keep watching"
         // Confidence: uncertain brain ranks lower until L1/L2 done. At quality 0
         // the brain's certainty stops mattering entirely.
-        s *= lerp(1f, 0.7f + v.confidence * 0.3f, t.qualityWeight)
-        // Anti-repeat-session: watched recently sinks
+        s *= lerp(1f, 0.7f + v.confidence * 0.3f, t.qualityWeight)        // Anti-repeat-session: watched recently sinks
         if (v.id in recentIds) {
             s *= 1f - t.replayPenalty * 0.65f
             why += "you saw this recently"
         }
-        return FeedItem(v, s.coerceIn(0f, 1f), why.take(2).joinToString(" · ").ifEmpty { "picked for balance" })
+        // The cap stays; but raw sums are divided by the realistic ceiling
+        // first (see [rescaled]) so a fully-loaded clip still sits apart.
+        return FeedItem(v, rescaled(s), why.take(2).joinToString(" · ").ifEmpty { "picked for balance" })
+    }
+
+    /**
+     * Score headroom. The raw sum of a fully-loaded clip (watched+favorite+
+     * people+gems+voice+taste at default weights) tops ~2.1, so a plain clamp
+     * packed a dozen different clips at a flat 1.0 and hid which one was
+     * actually best. Dividing by the realistic everyday ceiling keeps the
+     * top of the scale from walling itself into a flat line — strictly
+     * order-preserving, so bands and every pinned test keep their shape.
+     */
+    private fun rescaled(raw: Float): Float = (raw / SCORE_CEILING).coerceIn(0f, 1f)
+
+    private companion object {
+        val ENERGY_CATEGORIES = setOf("music", "sport", "gaming", "dance", "celebration")
+        /** Realistic everyday ceiling of the raw sum; see [rescaled]. */
+        const val SCORE_CEILING = 1.4f
     }
 
     private fun lerp(a: Float, b: Float, by: Float): Float = a + (b - a) * by.coerceIn(0f, 1f)
@@ -184,9 +210,5 @@ class FeedComposer @Inject constructor() {
         val then = Calendar.getInstance().apply { timeInMillis = dateAddedSec * 1000 }
         return now.get(Calendar.DAY_OF_YEAR) == then.get(Calendar.DAY_OF_YEAR) &&
             now.get(Calendar.YEAR) != then.get(Calendar.YEAR)
-    }
-
-    private companion object {
-        val ENERGY_CATEGORIES = setOf("music", "sport", "gaming", "dance", "celebration")
     }
 }

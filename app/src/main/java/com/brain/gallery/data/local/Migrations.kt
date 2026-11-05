@@ -2,6 +2,7 @@ package com.brain.gallery.data.local
 
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.brain.gallery.data.search.FtsSchema
 
 /**
  * v4 -> v5: give group names somewhere to live.
@@ -126,5 +127,69 @@ val MIGRATION_8_9 = object : Migration(8, 9) {
         )
         db.execSQL("CREATE INDEX IF NOT EXISTS index_photos_folderName ON photos (folderName)")
         db.execSQL("CREATE INDEX IF NOT EXISTS index_photos_brainLevel ON photos (brainLevel)")
+    }
+}
+
+/**
+ * v9 -> v10: search gets an index.
+ *
+ * Two FTS4 tables over the searchable document of each row — the exact text the
+ * MemoryDoc builder assembles in Kotlin, written here in SQL so the two sides
+ * can never drift apart. Room deliberately does not declare these entities:
+ * virtual-table DDL it did not generate is schema Room rejects, so the tables
+ * are created here and by the fresh-install callback, and only ever touched
+ * through raw queries ([data.search.SearchFtsDao]).
+ *
+ * A media row's rowid *is* its docid, so the index row lives and dies with the
+ * media row. Fill is wholesale from current content, which makes the upgraded
+ * library searchable the moment the app opens.
+ */
+val MIGRATION_9_10 = object : Migration(9, 10) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(FtsSchema.VIDEO_FTS_DDL)
+        db.execSQL(FtsSchema.PHOTO_FTS_DDL)
+        db.execSQL(FtsSchema.VIDEO_FILL)
+        db.execSQL(FtsSchema.PHOTO_FILL)
+    }
+}
+
+/**
+ * v10 -> v11: the identity engine starts learning from corrections.
+ *
+ * Two additions, both human-layer:
+ *  - `persons.splitSilenced` — the user saw a split warning and said "no";
+ *    the splitter never re-flags that person. Nullable column because a
+ *    NOT NULL DEFAULT added by migration is exactly the Room-validation
+ *    trap this file's header warns about.
+ *  - `identity_lessons` — video → person pairs the user rejected by
+ *    splitting a clip out; the adopt pass may never re-attach that vector.
+ */
+val MIGRATION_10_11 = object : Migration(10, 11) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE persons ADD COLUMN `splitSilenced` INTEGER")
+        db.execSQL(
+            "CREATE TABLE IF NOT EXISTS `identity_lessons` (" +
+                "`videoId` INTEGER NOT NULL, `personId` INTEGER NOT NULL, " +
+                "`createdAt` INTEGER NOT NULL, PRIMARY KEY(`videoId`, `personId`))"
+        )
+        // Attention: accumulated watch/favorite pressure that bends the L1b
+        // queue toward what the viewer actually cares about. Nullable, no
+        // default — see the Room-validation trap this file's header warns of.
+        db.execSQL("ALTER TABLE videos ADD COLUMN `attention` REAL")
+    }
+}
+
+/**
+ * v11 -> v12: file-type 3b (GIFs are photos that move) and the voice layer's
+ * new sense: on-device transcripts of what a clip says, folded into the
+ * Memory Document and the search index. All three columns are nullable
+ * additions — the default-in-migration trap again.
+ */
+val MIGRATION_11_12 = object : Migration(11, 12) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE photos ADD COLUMN `animated` INTEGER")
+        db.execSQL("ALTER TABLE photos ADD COLUMN `phash` INTEGER NOT NULL DEFAULT 0")
+        db.execSQL("ALTER TABLE videos ADD COLUMN `transcript` TEXT")
+        db.execSQL("ALTER TABLE videos ADD COLUMN `transcriptTried` INTEGER")
     }
 }

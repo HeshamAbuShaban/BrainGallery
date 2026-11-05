@@ -111,17 +111,145 @@ medium, shared brain.** Do NOT shoehorn photos into `VideoEntity`.
   the service after identity, with its own sweep and reschedule accounting;
   permissions incl. 34+ partial access; the hub gains a Videos/Photos switch
   with a plain photo grid and a mechanical full-screen viewer (favorite +
-  delete-with-consent). Deferred, deliberately: photos in search (needs
-  MemoryDoc for photos), photos in albums (albums are video shelves today),
-  and the "memories mix" reel toggle (a reel is motion; mixing stills means
-  a second page type on the sacred surface — deserves its own sitting).
-- **3b. GIFs**: land in `PhotoEntity` with `animated = true`; Coil handles
-  playback.
+  delete-with-consent). Deferred, deliberately: ~~photos in search~~ ✅
+  Shipped (Nov 5, FTS index + `SearchHit` mixed results — see below),
+  photos in albums (albums are video shelves today), and the "memories
+  mix" reel toggle (a reel is motion; mixing stills means a second page
+  type on the sacred surface — deserves its own sitting).
+- **3b. GIFs** ✅ Shipped (Nov 5, second sitting): `photos.animated` (L0 is the
+  only pass that needs to know — MIME + extension is the whole verdict), and
+  the viewer branches to `ImageDecoder.decodeDrawable` +
+  `AnimatedImageDrawable` inside an `AndroidView`, decode-and-play, guarded
+  `SDK ≥ 28`. No new Coil artifact was possible in an offline sitting and none
+  is wanted: ImageDecoder is platform, permissionless and already there. The
+  grid stays a still frame — opening one is the moment it moves.
 - **3c. Audio**: `MediaStore.Audio`; reuse `AudioProbe` (prosody) for music
   vs speech tagging; a simple player sheet; searchable by voice tags.
 - **3d. Documents/PDF**: MediaStore Downloads + manual picker; filename +
   (later) text extraction into MemoryDoc; a document browser screen.
 - Estimated order: 3a → 3b in one pass; 3c and 3d independent, any time after.
+
+## A new sense and a new question (Nov 5, second sitting)
+
+Two features that share one honest engine idea — *the query is evidence, not
+a description* — shipped together with a storage migration (v11 → v12, one
+batch: `photos.animated`, `photos.phash`, `videos.transcript`,
+`videos.transcriptTried`):
+
+- **Content ID — "Shazam for your own library"** (`engine/ContentId.kt`,
+  `data/brain/ContentHasher.kt`, route + banner in `SearchScreen.kt`).
+  Someone sends you a clip; you cannot name it. Pick it from the system
+  photo picker (no storage permission, nothing copied) and the brain
+  fingerprints it — three frames for video (0.15/0.5/0.85 of duration, so a
+  trim cannot fool the ends), one decode for images — in the same dHash
+  dialect every library item already speaks. Matches rank by hamming
+  distance against every fingerprint in the library, keeper bar ≤ 6
+  (identical meaning to DuplicateFinder), "near-identical" bar ≤ 3, and the
+  answer is a verdict sentence, not a grid dump: *almost-exact copy of your
+  clip in "Bookmarks" — Mar 12, 2026*, or the honest nothing: *new to you*.
+  No audio fingerprints — the brand forbids mic land-grabs and the visual
+  engine was already paid for. Photos gained `phash` in the same migration,
+  so the image pass now fingerprints while it reads, one decode, free.
+- **Transcripts — the words a clip says** (`data/brain/Transcriber.kt`,
+  `engine/TranscriptShaper.kt`, service phase `transcripts`). A third sense
+  for the voice layer: Android's on-device `SpeechRecognizer`, with the
+  audio fed from a *file descriptor* (`EXTRA_AUDIO_SOURCE`) instead of the
+  microphone — no RECORD_AUDIO permission is asked, ever, and nothing is
+  downloaded or sent. Availability is runt-verified and strict (API 33+,
+  engine installed); below that the pass is silently off, the queue stays
+  honestly unattempted, and the Brain screen says precisely that. The queue
+  is triple-gated so recognition never dogpiles: the audio pass must have
+  actually heard speech (`speechRatio ≥ 0.1`, `durationMs ≤ 120 s`,
+  `transcriptTried IS NULL` — one attempt per clip, ever, so a broken
+  engine cannot retry-storm), attention-ordered like the rest of the scan,
+  and capped at 8 clips per run. `TranscriptShaper` shapes once, at write
+  time (whitespace collapse, recogniser residue off, whole-word cap 240,
+  ≥ 3 letters/digits or the line is honest nothing and is not stored twice
+  or indexed). The stored words then flow the same channel everything else
+  speaks: `MemoryDoc.text`, the FTS `VIDEO_DOC` SQL, the LIKE fallback net
+  — so "search the words you said" works through every existing path, and
+  `rebuildVideoIds` reindexes only the clips that gained words.
+
+## The brain starts learning (Nov 5)
+
+Three tiers of "the brain learns", on-device only:
+
+- **Tier 1 — taste** (`domain/engine/TasteProfile.kt`): watch events fold
+  into evidence buckets — category, person, folder, short/long. Affinity
+  is a smoothed like-ratio biased hard toward neutral while the evidence
+  is thin (shrinkage 6), so one accidental finishing never hands the reel
+  to cats; buckets decay by a 21-day half-life so an obsession fades. The
+  learner folds exactly-once (app_kv cursor `taste.cursor`), called
+  debounced from the feed after each watch and as end-of-run maintenance.
+  The reel obeys through one new weight, `tasteWeight` ("Your taste" in
+  Tune): the score reads the attribute blend, and only a genuinely
+  learned single attribute may earn the "matches what you keep watching"
+  card. Learned state lives in its own app_kv key, apart from
+  EngineSettings — the settings are the user's hand, this is the brain's
+  notebook.
+- **Tier 2 — identity obeys corrections** (`engine/Identity.kt`, migration
+  v10→v11): dismissing a split warning is now a *lesson*
+  (`persons.splitSilenced`) and the splitter never re-flags that person;
+  splitting a clip out of a person records an `identity_lessons` row the
+  adopt pass honors forever; renames and hand-placed clips verify the
+  person. The same pass killed the N+1 cliff: matcher, consolidator and
+  splitter now read their vectors in ONE query per pass instead of one
+  query per person, and the match decision is a pure, pinned function
+  (`decide`).
+- **Tier 3 — attention** (`data/brain/AttentionPolicy.kt`): an honest
+  watch (or a favorite, for more) bumps the clip's `attention` column; the
+  L1b deepening queue bends toward what the viewer actually goes to,
+  capped at 3.0 so one obsessive session cannot monopolize the budget.
+  Attention is the scan queue's signal only — the feed is taught by
+  FeedComposer's tunable weights and the two never share a number.
+
+Cheap optinals that rode along: the divider Hairline is theme-aware (the
+one token the light theme missed); the feed score divides by its
+realistic ceiling
+(1.4) before clamping, so a dozen fully-loaded clips no longer read a
+flat 1.0; bundle import no longer trusts ids on a lived-in library —
+persons merge by verified name and `identity_lessons` restore only into a
+fresh install (the lessons now travel in the bundle at all). 74 tests
+green; every tier has its pinned suite (TasteProfileTest,
+IdentityMatchTest, AttentionPolicyTest).
+
+## Search gets an index (Nov 5)
+
+Search was the weakest link against the goal *think it → it's there
+instantly*: every query swept the whole library by LIKE, and photos could
+not be searched at all. Now two FTS4 tables hold the searchable document
+of every row — video AND photo — with the document written in SQL
+(`data/search/SearchIndex.kt`) so the Kotlin MemoryDoc builder and the
+stored text cannot drift apart; the photo document (`buildPhoto`) finally
+exists. Recall from the index (candidate ids, capped at 500), precision
+unchanged from `matchScore` — the index *narrows*, the scorer you can
+explain still *ranks*. Room deliberately knows nothing about the virtual
+tables (schema it didn't generate is schema it rejects): they are created
+by the v10 migration and the fresh-install callback, read only via raw
+queries, rebuilt wholesale after every service run, and healed on open
+when row counts disagree (`ensureFresh`); a rename or merge refreshes
+exactly that person's documents. Results are one mixed grid (`SearchHit`):
+videos keep the tall thumb and the long-press sheet, photos open the
+photo viewer, keys carry v_/p_ prefixes because MediaStore ids collide
+across media. A human query is sanitized into prefix terms (`FtsQuery`),
+unicode-safe by construction — an Arabic filename is found in the script
+you typed it in, and operators cannot smuggle through as tokens. The
+whole general path degrades to yesterday's behavior if the index is
+unavailable for any reason. 47 tests green (11 new pin the tokenizer and
+the photo document).
+
+## Light theme, from settings (Nov 4)
+
+The palette became a switch: PaletteHolder (the AccentHolder pattern)
+drives every Theme.kt token as a getter, with a designed light palette —
+cool paper, white surfaces, ink text, accents a step darker for weight.
+The glass material reads the palette and returns the tuned pane (stronger
+white frost, soft cool shadow, whisper scrim). Dark/Light segmented in
+Tune > Appearance, persisted as EngineSettings.theme, applied live via
+OrganizeViewModel's continuous settings observe — which also fixed the
+latent live-accent bug from Tune. Reel/spotlight/photo viewer stay dark
+(video surfaces); status-bar ink follows the theme. Device verification
+pending reconnection (36 tests green, build ready).
 
 ## Theming as law (Nov 2)
 

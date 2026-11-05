@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
+import android.net.Uri
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.lifecycle.LifecycleService
@@ -57,6 +58,9 @@ class BrainScanService : LifecycleService() {
     @Inject lateinit var splitter: SplitDetector
     @Inject lateinit var namer: NameSuggester
     @Inject lateinit var frameCache: FrameCache
+    @Inject lateinit var searchIndexer: com.brain.gallery.data.search.SearchIndexer
+    @Inject lateinit var tasteLearner: com.brain.gallery.domain.TasteLearner
+    @Inject lateinit var transcriber: com.brain.gallery.data.brain.Transcriber
 
     override fun onCreate() {
         super.onCreate()
@@ -262,6 +266,37 @@ class BrainScanService : LifecycleService() {
             }
         }
 
+        // ---- Transcripts: what a clip says, read wholesale by the phone's ----
+        // own speech engine. Same voice switch as the audio pass, but gated by
+        // what it measured: only clips that really talk, only short ones, a
+        // slice per run — and one attempt per clip ever, so an engine that
+        // cannot help still cannot hurt twice. Where the phone has no
+        // on-device engine, the pass is simply silent and the queue waits
+        // (nothing claims failure that did not happen).
+        var transcriptDone = 0
+        if (cfg.prosodyEnabled) {
+            phase("transcripts")
+            runCatching {
+                val vdao = db.videoDao()
+                for (v in vdao.transcriptPending(
+                    TRANSCRIPT_BUDGET, TRANSCRIPT_MIN_SPEECH, TRANSCRIPT_MAX_MS)) {
+                    if (System.currentTimeMillis() >= hardDeadline) break
+                    if (!transcriber.available()) break // engine gone mid-run: leave the queue honest
+                    val words = transcriber.transcribe(
+                        Uri.parse(v.uri), v.durationMs) ?: ""
+                    val shaped = com.brain.gallery.engine.TranscriptShaper.shape(words)
+                    vdao.setTranscript(v.id, shaped)
+                    transcriptDone++
+                    // The document only has new words when there are words;
+                    // an empty tombstone needs no index churn.
+                    if (com.brain.gallery.engine.TranscriptShaper.usable(shaped)) {
+                        searchIndexer.rebuildVideoIds(listOf(v.id))
+                    }
+                }
+            }.onFailure { Log.w(TAG, "transcript pass failed", it) }
+            if (transcriptDone > 0) Log.i(TAG, "transcripts attempted=$transcriptDone")
+        }
+
         // ---- Identity maintenance: repair fragmentation, then look for over-merges ----
         phase("identity")
         val merged = consolidator.consolidate(cfg.mergeSim)
@@ -299,7 +334,7 @@ class BrainScanService : LifecycleService() {
                 val r = photoAnalyzer.analyze(p.uri) ?: continue
                 val cat = if (p.category != "unknown" && r.category == "unknown") p.category else r.category
                 pdao.markRead(p.id, cat, r.tags, r.about,
-                    maxOf(r.confidence, if (cat != "unknown") 0.6f else 0f), r.faces, r.smiles)
+                    maxOf(r.confidence, if (cat != "unknown") 0.6f else 0f), r.faces, r.smiles, r.phash)
                 photosRead++
             }
             if (pfresh.isNotEmpty() || photosRead > 0) {
@@ -315,7 +350,22 @@ class BrainScanService : LifecycleService() {
         db.supportDao().put("diag.tL1b", "${tL1b - tL1a}")
         db.supportDao().put("diag.config", cfg.toJson())
         frameCache.prune()
+
+        // ---- Taste: fold any watch events this run never saw ----
+        // Exactly-once by cursor, so this is cheap call-or-miss maintenance and
+        // the feed VM's on-watch learning is never double counted.
+        runCatching { tasteLearner.learnNewEvents() }
+            .onFailure { Log.w(TAG, "taste learn failed", it) }
+
         db.supportDao().pruneEvents(20000)
+
+        // ---- Search index: FTS follows everything this run changed ----
+        // Content moved (labels, voices, identity, photos, sweep) and the
+        // index is one wholesale rebuild behind it. Wholesale on purpose:
+        // it is one DELETE plus one INSERT..SELECT per table, and a
+        // half-maintained index is exactly the kind of clever that lies.
+        runCatching { searchIndexer.rebuildAll() }
+            .onFailure { Log.w(TAG, "search index rebuild failed", it) }
 
         phase("done")
         // The voice queue has to count here as well, or an otherwise-indexed
@@ -411,6 +461,12 @@ class BrainScanService : LifecycleService() {
         /** Ceiling for the optional voice pass, so it can never eat the run. */
         const val PROSODY_BUDGET = 60
         const val PROSODY_BATCH = 20
+        /** Ceiling for the words pass: a slice per run, one attempt per clip ever. */
+        const val TRANSCRIPT_BUDGET = 8
+        /** A clip shorter than this is read wholesale by the recogniser. */
+        const val TRANSCRIPT_MAX_MS = 120_000L
+        /** Beneath this much speech a recogniser pass is not worth its cost. */
+        const val TRANSCRIPT_MIN_SPEECH = 0.1f
         /** Slack on top of the run budget so bookkeeping is always reached. */
         const val HARD_GRACE_MS = 60_000L
         fun start(ctx: Context, deltaIds: List<Long>? = null) {

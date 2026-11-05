@@ -2,6 +2,7 @@ package com.brain.gallery.data.local
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import com.brain.gallery.data.search.SearchFtsDao
 
 @Database(
     entities = [
@@ -15,9 +16,10 @@ import androidx.room.RoomDatabase
         GroupOverrideEntity::class,
         SelectionEntity::class,
         AlbumEntity::class,
-        PhotoEntity::class
+        PhotoEntity::class,
+        IdentityLessonEntity::class
     ],
-    version = 9,
+    version = 12,
     exportSchema = false
 )
 abstract class BrainDatabase : RoomDatabase() {
@@ -27,4 +29,5 @@ abstract class BrainDatabase : RoomDatabase() {
     abstract fun supportDao(): SupportDao
 
     abstract fun photoDao(): PhotoDao
+    abstract fun searchFtsDao(): SearchFtsDao
 }

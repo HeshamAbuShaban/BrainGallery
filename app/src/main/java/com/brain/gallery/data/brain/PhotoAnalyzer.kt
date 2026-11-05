@@ -22,7 +22,9 @@ data class PhotoReading(
     val about: String,
     val confidence: Float,
     val faces: Int,
-    val smiles: Int
+    val smiles: Int,
+    /** dHash of the decoded pixels — the photo's fingerprint for Content ID. */
+    val phash: Long = 0
 )
 
 /**
@@ -46,6 +48,10 @@ class PhotoAnalyzer @Inject constructor(
     suspend fun analyze(uri: String): PhotoReading? = withContext(Dispatchers.IO) {
         val bmp = decode(uri) ?: return@withContext null
         try {
+            // The fingerprint rides the one decode this pass gets — pixels
+            // already paid for, Content ID for free.
+            val phash = runCatching { com.brain.gallery.data.vision.VisionUtils.dHash(bmp) }
+                .getOrDefault(0L)
             val image = InputImage.fromBitmap(bmp, 0)
 
             val faceReading = runCatching { faces.analyze(bmp) }.getOrNull()
@@ -67,7 +73,8 @@ class PhotoAnalyzer @Inject constructor(
                 confidence = (solid.firstOrNull()?.confidence ?: 0f)
                     .coerceAtLeast(if (faceReading.count > 0) 0.5f else 0f),
                 faces = faceReading.count,
-                smiles = faceReading.smiles
+                smiles = faceReading.smiles,
+                phash = phash
             )
             reading
         } finally {

@@ -5,11 +5,15 @@ import androidx.lifecycle.viewModelScope
 import com.brain.gallery.data.local.BrainDatabase
 import com.brain.gallery.data.local.NotInterestedEntity
 import com.brain.gallery.data.local.WatchEventEntity
+import com.brain.gallery.data.brain.AttentionPolicy
 import com.brain.gallery.data.service.BrainScanService
 import com.brain.gallery.domain.SettingsStore
 import com.brain.gallery.domain.EngineSettings
+import com.brain.gallery.domain.TasteLearner
+import com.brain.gallery.domain.TasteStore
 import com.brain.gallery.domain.engine.FeedComposer
 import com.brain.gallery.domain.engine.FeedItem
+import com.brain.gallery.domain.engine.TasteProfile
 import com.brain.gallery.engine.ClusterMath
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -27,6 +31,8 @@ class FeedViewModel @Inject constructor(
     private val db: BrainDatabase,
     private val composer: FeedComposer,
     private val settings: SettingsStore,
+    private val tasteStore: TasteStore,
+    private val tasteLearner: TasteLearner,
     @ApplicationContext private val ctx: android.content.Context
 ) : ViewModel() {
     private val _feed = MutableStateFlow<List<FeedItem>>(emptyList())
@@ -38,6 +44,8 @@ class FeedViewModel @Inject constructor(
     /** Bumped when the feed runs dry so the composer can reshuffle a fresh batch. */
     private val _nonce = MutableStateFlow(0)
     val nonce: StateFlow<Int> = _nonce
+    /** The learned taste profile, refreshed whenever a composition starts. */
+    private val _taste = MutableStateFlow(TasteProfile())
 
     // Clips this session has already served. The reel walks the library:
     // a reshuffle serves what is left, and wraps only when the unseen pool
@@ -79,9 +87,13 @@ class FeedViewModel @Inject constructor(
                     lastSig = sig
 
                     val events = db.watchDao().recent()
+                    // This composition reads the freshest profile; a watch
+                    // under it re-ranks the NEXT composition, never this one.
+                    _taste.value = runCatching { tasteStore.load() }.getOrDefault(TasteProfile())
                     val composed = composer.compose(
                         videos, events, suppressed,
-                        tuning = cfg.tuning, exclude = servedIds.toSet())
+                        tuning = cfg.tuning, exclude = servedIds.toSet(),
+                        taste = _taste.value)
                     servedIds.addAll(composed.map { it.video.id })
                     _feed.value = composed
                     _loading.value = false
@@ -132,11 +144,29 @@ class FeedViewModel @Inject constructor(
                 id = videoId, now = System.currentTimeMillis(),
                 completion = completion, skipped = if (skipped) 1 else 0
             )
+            // Tier 3: attention. An honest watch says "understand this one
+            // better" — the deep pass bends toward what the viewer actually goes to.
+            if (!skipped) db.videoDao().bumpAttention(
+                videoId, AttentionPolicy.WATCH_BUMP, AttentionPolicy.CAP)
+            // The taste notebook folds events as they happen (debounced so a
+            // scrub session is one lesson, not ten). Exactly-once: the learner
+            // works from the same cursor the end-of-run pass uses.
+            tasteLearnJob?.cancel()
+            tasteLearnJob = viewModelScope.launch(Dispatchers.IO) {
+                kotlinx.coroutines.delay(600)
+                runCatching { tasteLearner.learnNewEvents() }
+            }
         }
     }
 
+    private var tasteLearnJob: kotlinx.coroutines.Job? = null
+
     fun toggleFav(id: Long, fav: Boolean) {
-        viewModelScope.launch { db.videoDao().setFavorite(id, fav) }
+        viewModelScope.launch {
+            db.videoDao().setFavorite(id, fav)
+            // A considered favorite is worth more attention than an itch.
+            if (fav) db.videoDao().bumpAttention(id, AttentionPolicy.FAV_BUMP, AttentionPolicy.CAP)
+        }
     }
 
     /** Real, persistent dismissal: hides this clip and its duplicates for good. */
