@@ -4,7 +4,7 @@ import android.content.Context
 import android.os.Build
 import android.provider.MediaStore
 import com.brain.gallery.data.local.PhotoEntity
-import com.brain.gallery.data.brain.CategoryOntology
+import com.brain.gallery.data.brain.PhotoPolicy
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -76,16 +76,22 @@ class PhotoScanner @Inject constructor(@ApplicationContext private val ctx: Cont
     }
 }
 
-/** L0 for photos: folder/name tokens decide the first guess, for free. */
+/**
+ * L0 for photos: folder/name tokens and the file's shape decide the first
+ * guess, for free. The same [PhotoPolicy] the image pass will use, just
+ * without labels yet — so the row is searchable before any pixels are read,
+ * and the junk price can skip a screenshot's ML read entirely.
+ */
 fun ScannedPhoto.toEntity(): PhotoEntity {
-    val junk = CategoryOntology.junkScore(folder, name)
-    val cat = CategoryOntology.matchFile("$folder $name") ?: "unknown"
+    val verdict = PhotoPolicy.decide(folder, name, emptyList())
     val animated = mime == "image/gif" || mime == "image/webp" ||
         name.lowercase().endsWith(".gif")
     return PhotoEntity(
         id = id, uri = uri, displayName = name, folderName = folder,
         dateAddedSec = dateAddedSec, width = width, height = height,
-        category = cat, junkScore = junk, confidence = if (cat == "unknown") 0f else 0.6f,
+        category = verdict.category, tags = verdict.tags, about = verdict.about,
+        junkScore = PhotoPolicy.junkScore(folder, name, width, height),
+        confidence = verdict.confidence,
         animated = animated
     )
 }

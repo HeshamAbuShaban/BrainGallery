@@ -19,27 +19,108 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 /**
- * The palette switch. One boolean flips every token in the app — the tokens
- * below are getters over this state, so a composable that reads a color
- * subscribes and repaints the moment the viewer flips the switch in Tune.
- * The reel, the spotlight and the photo viewer stay dark in both themes:
- * they are video surfaces, and video surfaces are dark.
+ * A full palette, hand-picked. Six curated themes — the app's own Midnight,
+ * four beloved editor-world classics retuned for a gallery, and a paper
+ * light. A theme is not just a background: every token below reads from the
+ * active palette, so switching repaints the entire app in one state write.
+ *
+ * The viewer's accent ([AccentHolder]) is deliberately separate from the
+ * theme: the theme sets the room, the accent is the one thing you own.
  */
-object PaletteHolder { var dark by mutableStateOf(true) }
+data class Palette(
+    val id: String,
+    val label: String,
+    val dark: Boolean,
+    val bg: Color,
+    val surface: Color,
+    val surface2: Color,
+    val elevated: Color,
+    val line: Color,
+    val text1: Color,
+    val text2: Color,
+    val text3: Color,
+    val pink: Color,
+    val green: Color,
+    val cyan: Color,
+    val yellow: Color,
+    val danger: Color,
+    val dangerContainer: Color,
+    val chipFill: Color
+)
 
-val Bg: Color get() = if (PaletteHolder.dark) Color(0xFF0B0E14) else Color(0xFFF3F5F9)
-val Surface: Color get() = if (PaletteHolder.dark) Color(0xFF151B26) else Color(0xFFFFFFFF)
-val Surface2: Color get() = if (PaletteHolder.dark) Color(0xFF1D2534) else Color(0xFFE7ECF3)
-val Elevated: Color get() = if (PaletteHolder.dark) Color(0xFF222B3C) else Color(0xFFFFFFFF)
-val Line: Color get() = if (PaletteHolder.dark) Color(0xFF2A3446) else Color(0xFFD5DCE6)
-val Text1: Color get() = if (PaletteHolder.dark) Color(0xFFF2F5FA) else Color(0xFF12161F)
-val Text2: Color get() = if (PaletteHolder.dark) Color(0xFF9AA6B8) else Color(0xFF59637A)
-val Text3: Color get() = if (PaletteHolder.dark) Color(0xFF5F6B7E) else Color(0xFF8C97AB)
+val PALETTES = listOf(
+    Palette("midnight", "Midnight", true,
+        bg = Color(0xFF0B0E14), surface = Color(0xFF151B26), surface2 = Color(0xFF1D2534),
+        elevated = Color(0xFF222B3C), line = Color(0xFF2A3446),
+        text1 = Color(0xFFF2F5FA), text2 = Color(0xFF9AA6B8), text3 = Color(0xFF5F6B7E),
+        pink = Color(0xFFEC4899), green = Color(0xFF10B981), cyan = Color(0xFF06B6D4),
+        yellow = Color(0xFFF59E0B), danger = Color(0xFFF87171),
+        dangerContainer = Color(0xFF3A2410), chipFill = Color.White.copy(alpha = 0.06f)),
+    Palette("mocha", "Catppuccin Mocha", true,
+        bg = Color(0xFF1E1E2E), surface = Color(0xFF181825), surface2 = Color(0xFF313244),
+        elevated = Color(0xFF45475A), line = Color(0xFF585B70),
+        text1 = Color(0xFFCDD6F4), text2 = Color(0xFFA6ADC8), text3 = Color(0xFF9399B2),
+        pink = Color(0xFFF5C2E7), green = Color(0xFFA6E3A1), cyan = Color(0xFF94E2D5),
+        yellow = Color(0xFFF9E2AF), danger = Color(0xFFF38BA8),
+        dangerContainer = Color(0xFF3B2A3A), chipFill = Color.White.copy(alpha = 0.07f)),
+    Palette("tokyo", "Tokyo Night", true,
+        bg = Color(0xFF1A1B26), surface = Color(0xFF16161E), surface2 = Color(0xFF292E42),
+        elevated = Color(0xFF2F334D), line = Color(0xFF3B4261),
+        text1 = Color(0xFFC0CAF5), text2 = Color(0xFFA9B1D6), text3 = Color(0xFF565F89),
+        pink = Color(0xFFBB9AF7), green = Color(0xFF9ECE6A), cyan = Color(0xFF7DCFFF),
+        yellow = Color(0xFFE0AF68), danger = Color(0xFFF7768E),
+        dangerContainer = Color(0xFF3A2A3C), chipFill = Color.White.copy(alpha = 0.07f)),
+    Palette("github", "GitHub Dark", true,
+        bg = Color(0xFF0D1117), surface = Color(0xFF161B22), surface2 = Color(0xFF21262D),
+        elevated = Color(0xFF293039), line = Color(0xFF30363D),
+        text1 = Color(0xFFE6EDF3), text2 = Color(0xFF8B949E), text3 = Color(0xFF6E7681),
+        pink = Color(0xFFDB61A2), green = Color(0xFF3FB950), cyan = Color(0xFF58A6FF),
+        yellow = Color(0xFFD29922), danger = Color(0xFFF85149),
+        dangerContainer = Color(0xFF2D1419), chipFill = Color.White.copy(alpha = 0.06f)),
+    Palette("paper", "Paper", false,
+        bg = Color(0xFFF3F5F9), surface = Color(0xFFFFFFFF), surface2 = Color(0xFFE7ECF3),
+        elevated = Color(0xFFFFFFFF), line = Color(0xFFD5DCE6),
+        text1 = Color(0xFF12161F), text2 = Color(0xFF59637A), text3 = Color(0xFF8C97AB),
+        pink = Color(0xFFDB2777), green = Color(0xFF059669), cyan = Color(0xFF0E7490),
+        yellow = Color(0xFFB45309), danger = Color(0xFFDC2626),
+        dangerContainer = Color(0xFFFEF3E2), chipFill = Color(0xFF12161F).copy(alpha = 0.06f)),
+    Palette("latte", "Catppuccin Latte", false,
+        bg = Color(0xFFEFF1F5), surface = Color(0xFFE6E9EF), surface2 = Color(0xFFCCD0DA),
+        elevated = Color(0xFFFFFFFF), line = Color(0xFFBCC0CC),
+        text1 = Color(0xFF4C4F69), text2 = Color(0xFF6C6F85), text3 = Color(0xFF8C8FA1),
+        pink = Color(0xFFEA76CB), green = Color(0xFF40A02B), cyan = Color(0xFF179299),
+        yellow = Color(0xFFDF8E1D), danger = Color(0xFFD20F39),
+        dangerContainer = Color(0xFFF9E6E6), chipFill = Color(0xFF4C4F69).copy(alpha = 0.07f))
+)
+
+object PaletteHolder {
+    var theme by mutableStateOf(PALETTES.first())
+
+    /**
+     * The old one-boolean seam, kept alive while the theme picker catches up:
+     * dark lands on Midnight, light on the last curated light palette. New
+     * code should set [theme]; this only exists so a "dark/light" preference
+     * already on disk still means something.
+     */
+    var dark: Boolean
+        get() = theme.dark
+        set(value) { theme = if (value) PALETTES.first() else PALETTES.last() }
+
+    /** Unknown ids fall back to Midnight — a setting can never break the app. */
+    fun byId(id: String): Palette = PALETTES.firstOrNull { it.id == id } ?: PALETTES.first()
+}
+
+val Bg: Color get() = PaletteHolder.theme.bg
+val Surface: Color get() = PaletteHolder.theme.surface
+val Surface2: Color get() = PaletteHolder.theme.surface2
+val Elevated: Color get() = PaletteHolder.theme.elevated
+val Line: Color get() = PaletteHolder.theme.line
+val Text1: Color get() = PaletteHolder.theme.text1
+val Text2: Color get() = PaletteHolder.theme.text2
+val Text3: Color get() = PaletteHolder.theme.text3
 
 /** Fill for interactive chips on flat pages — subtle on either theme. */
-val ChipFill: Color get() =
-    if (PaletteHolder.dark) Color.White.copy(alpha = 0.06f)
-    else Color(0xFF12161F).copy(alpha = 0.06f)
+val ChipFill: Color get() = PaletteHolder.theme.chipFill
 /**
  * The one accent everything reads. It is a getter over observable state, not
  * a constant, so picking a color in settings repaints the whole app without
@@ -48,16 +129,15 @@ val ChipFill: Color get() =
  */
 object AccentHolder { var argb by mutableLongStateOf(0xFF8B5CF6L) }
 val Accent: Color get() = Color(AccentHolder.argb)
-val AccentSoft: Color get() = Accent.copy(alpha = if (PaletteHolder.dark) 0.2f else 0.12f)
-// Accents shift a step darker on light paper so text and fills keep their
-// weight; the viewer's accent (AccentHolder) stays exactly as picked.
-val Pink: Color get() = if (PaletteHolder.dark) Color(0xFFEC4899) else Color(0xFFDB2777)
-val Green: Color get() = if (PaletteHolder.dark) Color(0xFF10B981) else Color(0xFF059669)
-val Cyan: Color get() = if (PaletteHolder.dark) Color(0xFF06B6D4) else Color(0xFF0E7490)
-val Yellow: Color get() = if (PaletteHolder.dark) Color(0xFFF59E0B) else Color(0xFFB45309)
-val Danger: Color get() = if (PaletteHolder.dark) Color(0xFFF87171) else Color(0xFFDC2626)
-val DangerContainer: Color get() =
-    if (PaletteHolder.dark) Color(0xFF3A2410) else Color(0xFFFEF3E2)
+val AccentSoft: Color get() = Accent.copy(alpha = if (PaletteHolder.theme.dark) 0.2f else 0.12f)
+// The semantic accents come from the palette, so Catppuccin reads as
+// Catppuccin and Tokyo reads as Tokyo — not as the app wearing a wig.
+val Pink: Color get() = PaletteHolder.theme.pink
+val Green: Color get() = PaletteHolder.theme.green
+val Cyan: Color get() = PaletteHolder.theme.cyan
+val Yellow: Color get() = PaletteHolder.theme.yellow
+val Danger: Color get() = PaletteHolder.theme.danger
+val DangerContainer: Color get() = PaletteHolder.theme.dangerContainer
 /** The hairline every divider in the app sits on — soft on either theme. */
 val Hairline: Color get() =
     if (PaletteHolder.dark) Color(0xFF1A2231) else Color(0xFFE6EAF0)
@@ -126,20 +206,20 @@ private val Type = Typography(
 fun BrainTheme(content: @Composable () -> Unit) {
     // Reading the holders subscribes: a new accent or a flipped theme
     // rebuilds the scheme once.
-    val scheme = if (PaletteHolder.dark)
-        remember(AccentHolder.argb) { darkScheme(Accent) }
+    val scheme = if (PaletteHolder.theme.dark)
+        remember(AccentHolder.argb, PaletteHolder.theme) { darkScheme(Accent) }
     else
-        remember(AccentHolder.argb) { lightScheme(Accent) }
+        remember(AccentHolder.argb, PaletteHolder.theme) { lightScheme(Accent) }
 
     // The system bars read the theme too: dark ink icons over light paper,
     // light icons over the dark canvas. The reel and the players stay dark
     // regardless — they paint their own full-bleed world.
     val view = androidx.compose.ui.platform.LocalView.current
     if (!view.isInEditMode) {
-        androidx.compose.runtime.LaunchedEffect(PaletteHolder.dark) {
+        androidx.compose.runtime.LaunchedEffect(PaletteHolder.theme) {
             val window = (view.context as android.app.Activity).window
             androidx.core.view.WindowCompat.getInsetsController(window, view)
-                .isAppearanceLightStatusBars = !PaletteHolder.dark
+                .isAppearanceLightStatusBars = !PaletteHolder.theme.dark
         }
     }
 

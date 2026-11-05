@@ -238,6 +238,46 @@ whole general path degrades to yesterday's behavior if the index is
 unavailable for any reason. 47 tests green (11 new pin the tokenizer and
 the photo document).
 
+## The photo brain, upgraded (Nov 5)
+
+Photos were the one medium whose two senses never compared notes: L0 read
+the folder, L1 read the pixels, and whichever ran last won. Four fixes,
+no schema change, no new dependency:
+
+- **EXIF orientation** (`PhotoAnalyzer.decode`). API 28+ decodes through
+  `ImageDecoder`, which applies the camera's rotation; the old
+  `BitmapFactory` path stays below 28 and as the fallback for files the
+  decoder rejects. A portrait shot used to reach the face detector on its
+  side — a rotated face is a missed face. The fingerprint deliberately
+  keeps the old unrotated decode: `ContentHasher` still hashes picked
+  images through BitmapFactory, and a hash in a different dialect would
+  turn every picked portrait into "new to you".
+- **One fusion rule** (`PhotoPolicy.decide`, pure). Category precedence is
+  filename (0.85) → folder (0.70) → the strongest label that speaks the
+  ontology → a raw label only when nothing else does. The losing claim
+  stays in `tags`, so a dog at a birthday is filed under birthday and is
+  still findable by "dog". Empty labels, Unicode names and unmeasured
+  sharpness are pinned.
+- **Honest confidence**. The service used to floor every known-looking
+  row at 0.6; that floor is gone, and the stored number is the winning
+  claim's own confidence. A decode with no detail (Brenner < 8, L1a's
+  existing mush bar) earns no label at all — `brainLevel` never retries,
+  so a blurry guess would have been permanent.
+- **Junk by shape** (`PhotoPolicy.junkScore`). Filename/folder tokens
+  (screenshot, scan, receipt, …) plus exact phone-screen dimensions and a
+  20:9 aspect, camera-named files exempt. An exact screen-sized still
+  prices at 0.9 — the photo pass's "don't spend ML here" bar — so a
+  library of screenshots no longer crowds photographs out of the 40-per-
+  run read budget. Those rows are marked settled in the same phase,
+  otherwise `pendingCount` would keep rescheduling the service over work
+  `pendingBrain` refuses to return.
+
+Skipped deliberately: sampling a later GIF/WebP frame. The platform API
+already in the project exposes frame count through `AnimatedImageDrawable`
+but no seek, so a representative later frame is not reachable without
+writing a decoder of our own. The first frame stays. 20 tests pin the new
+policy (`PhotoPolicyTest`); no migration, no column, no dependency.
+
 ## Light theme, from settings (Nov 4)
 
 The palette became a switch: PaletteHolder (the AccentHolder pattern)

@@ -320,7 +320,8 @@ class BrainScanService : LifecycleService() {
             val pscanned = if (deltaIds == null) photoScanner.scan() else emptyList()
             val pbyId = pdao.all().associateBy { it.id }
             val pfresh = pscanned.filter { it.id !in pbyId }
-            if (pfresh.isNotEmpty()) pdao.upsertAll(pfresh.map { it.toEntity() })
+            val freshEntities = pfresh.map { it.toEntity() }
+            if (freshEntities.isNotEmpty()) pdao.upsertAll(freshEntities)
             val pseenSet = pscanned.map { it.id }.toSet()
             if (deltaIds == null && pbyId.isNotEmpty() && pseenSet.size < pbyId.size / 2) {
                 Log.w(TAG, "photo scan returned ${pseenSet.size} of ${pbyId.size}; skipping sweep")
@@ -328,17 +329,31 @@ class BrainScanService : LifecycleService() {
                 val gone = pbyId.keys.filter { it !in pseenSet }
                 gone.chunked(400).forEach { pdao.deleteByIds(it) }
             }
+            // Junk is settled here, not left queued forever: pendingBrain
+            // never returns a row at or above 0.9, but pendingCount counts
+            // every brainLevel < 1. Without this, a library of screenshots
+            // would keep rescheduling the service over rows it will never
+            // read. The L0 verdict is the whole read for them.
+            val settledJunk = (pbyId.values + freshEntities)
+                .filter { it.brainLevel < 1 && it.junkScore >= 0.9f }
+            for (p in settledJunk) {
+                pdao.markRead(p.id, p.category, p.tags, p.about, p.confidence, 0, 0, 0L)
+            }
             val budget = 40
             val pending = pdao.pendingBrain(budget)
             for (p in pending) {
-                val r = photoAnalyzer.analyze(p.uri) ?: continue
-                val cat = if (p.category != "unknown" && r.category == "unknown") p.category else r.category
-                pdao.markRead(p.id, cat, r.tags, r.about,
-                    maxOf(r.confidence, if (cat != "unknown") 0.6f else 0f), r.faces, r.smiles, r.phash)
+                // The analyzer re-runs L0's fusion with pixels added: folder
+                // and name go in, so a weak label cannot overwrite the shelf
+                // the photo was filed on. Its verdict is already honest; the
+                // old 0.6 "known category" floor inflated every fallback.
+                val r = photoAnalyzer.analyze(p.uri, p.folderName, p.displayName) ?: continue
+                pdao.markRead(p.id, r.category, r.tags, r.about,
+                    r.confidence, r.faces, r.smiles, r.phash)
                 photosRead++
             }
-            if (pfresh.isNotEmpty() || photosRead > 0) {
-                Log.i(TAG, "photos scanned=${pscanned.size} fresh=${pfresh.size} read=$photosRead")
+            if (pfresh.isNotEmpty() || photosRead > 0 || settledJunk.isNotEmpty()) {
+                Log.i(TAG, "photos scanned=${pscanned.size} fresh=${pfresh.size} " +
+                    "settled=${settledJunk.size} read=$photosRead")
             }
         }.onFailure { Log.w(TAG, "photo pass failed", it) }
 
