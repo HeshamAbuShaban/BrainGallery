@@ -183,6 +183,8 @@ data class EngineSettings(
     }.toString()
 
     companion object {
+        /** The canonical theme ids, in picker order. Theme.kt's PALETTES must match. */
+        val THEME_IDS = listOf("midnight", "mocha", "tokyo", "github", "paper", "latte")
         fun fromJson(s: String?): EngineSettings {
             if (s.isNullOrBlank()) return EngineSettings()
             return runCatching {
@@ -205,8 +207,16 @@ data class EngineSettings(
                     accentArgb = o.optLong("accentArgb", d.accentArgb),
                     showWhy = o.optBoolean("showWhy", d.showWhy),
                     shelfHidden = o.optBoolean("shelfHidden", d.shelfHidden),
-                    theme = o.optString("theme", d.theme).takeIf { it == "dark" || it == "light" }
-                        ?: d.theme
+                    theme = o.optString("theme", d.theme).let { id ->
+                        // The first light-theme builds stored "dark"/"light";
+                        // those names graduate to the curated palettes.
+                        when (id) {
+                            "dark" -> "midnight"
+                            "light" -> "paper"
+                            in THEME_IDS -> id
+                            else -> d.theme
+                        }
+                    }
                 )
             }.getOrDefault(EngineSettings())
         }

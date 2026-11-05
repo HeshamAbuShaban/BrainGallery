@@ -1,6 +1,12 @@
 package com.brain.gallery.ui.tune
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.shape.RoundedCornerShape
+import com.brain.gallery.ui.theme.PALETTES
+import com.brain.gallery.ui.theme.ChipFill
+import com.brain.gallery.ui.theme.AccentSoft
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -16,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
@@ -247,15 +254,36 @@ fun TuneScreen(onOpenBrain: () -> Unit, vm: TuneViewModel = hiltViewModel()) {
             Head("Appearance")
             Text("Theme", color = Text1, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(top = 6.dp, bottom = 8.dp))
-            GlassSegmented(
-                labels = listOf("Dark", "Light"),
-                selectedIndex = if (cfg.theme == "light") 1 else 0,
-                onSelect = { i ->
-                    vm.update(cfg.copy(theme = if (i == 1) "light" else "dark"))
-                },
-                modifier = Modifier.fillMaxWidth(),
-                selectedColor = Accent
-            )
+            // Six curated rooms. Each chip wears its own palette's colors:
+            // you pick the room by seeing it, not by reading its name.
+            FlowRow(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                PALETTES.forEach { pal ->
+                    val selected = cfg.theme == pal.id
+                    Row(
+                        Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(if (selected) AccentSoft else ChipFill)
+                            .then(if (selected) Modifier.border(1.dp, Accent, RoundedCornerShape(50)) else Modifier)
+                            .clickable { vm.update(cfg.copy(theme = pal.id)) }
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Box(Modifier.size(10.dp).clip(CircleShape)
+                            .background(pal.bg).border(1.dp, pal.line, CircleShape))
+                        Spacer(Modifier.width(4.dp))
+                        Box(Modifier.size(10.dp).clip(CircleShape).background(pal.pink))
+                        Spacer(Modifier.width(4.dp))
+                        Box(Modifier.size(10.dp).clip(CircleShape).background(pal.cyan))
+                        Spacer(Modifier.width(7.dp))
+                        Text(pal.label, color = if (selected) Text1 else Text2,
+                            fontSize = 12.5.sp,
+                            fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium)
+                    }
+                }
+            }
             Spacer(Modifier.height(6.dp))
             AccentRow(cfg.accentArgb) { vm.update(cfg.copy(accentArgb = it)) }
             SwitchRow("The animated shelf",

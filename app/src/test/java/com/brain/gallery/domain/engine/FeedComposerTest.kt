@@ -231,6 +231,12 @@ class FeedComposerTest {
     }
 
     @Test
+    fun `theme ids agree between settings and palettes`() {
+        val paletteIds = com.brain.gallery.ui.theme.PALETTES.map { it.id }
+        org.junit.Assert.assertEquals(EngineSettings.THEME_IDS, paletteIds)
+    }
+
+    @Test
     fun `every preset is a complete weights hand`() {
         assertEquals(5, FeedTuning.PRESETS.size)
         FeedTuning.PRESETS.values.forEach { t ->
