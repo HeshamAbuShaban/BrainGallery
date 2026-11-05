@@ -27,6 +27,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -171,6 +173,10 @@ fun ShelfCarousel(
         // Headroom for the center-line rise: cards lift by up to 14dp as
         // they near the edges, and the strip label sits right above.
         .height(cardHeight + 16.dp)
+        // The strip scrolls wider than the screen. Without this the end cards
+        // paint into the page's 20dp gutter; the first one looked chopped by
+        // the display edge instead of ending at the shelf.
+        .clipToBounds()
         .onSizeChanged { stripWidthPx = it.width }
         .pointerInput(items.size) {
             // Tap maps a position to a card: the cards themselves carry no

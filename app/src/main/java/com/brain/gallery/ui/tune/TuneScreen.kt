@@ -54,6 +54,7 @@ import com.brain.gallery.domain.ACCENT_CHOICES
 import com.brain.gallery.ui.glass.GlassSegmented
 import com.brain.gallery.ui.glass.GlassSlider
 import com.brain.gallery.ui.glass.GlassSwitch
+import com.brain.gallery.ui.glass.glassReserve
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.Hairline
@@ -263,7 +264,7 @@ fun TuneScreen(onOpenBrain: () -> Unit, vm: TuneViewModel = hiltViewModel()) {
                 vm.update(cfg.copy(shelfHidden = !it))
             }
 
-            Spacer(Modifier.height(120.dp))
+            Spacer(Modifier.height(glassReserve() + 16.dp))
         }
     }
 }

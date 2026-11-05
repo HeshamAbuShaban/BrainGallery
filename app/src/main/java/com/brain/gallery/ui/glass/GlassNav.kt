@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -45,6 +46,9 @@ import androidx.compose.ui.unit.sp
 
 data class GlassTab(val label: String, val icon: ImageVector)
 
+/** The pill's height, shared with [glassReserve] so the two cannot drift. */
+internal val GlassNavHeight = 56.dp
+
 /** Breathing room between the pill and the edge of its tab. */
 private val PillInset = 5.dp
 
@@ -72,7 +76,7 @@ fun GlassNav(
     selectedColor: Color = Color(0xFF8B5CF6),
     idleColor: Color = Color(0xFF9AA6B8),
     selectedLabelColor: Color = Color.White,
-    height: Dp = 56.dp
+    height: Dp = GlassNavHeight
 ) {
     if (tabs.isEmpty()) return
     val index = selected.coerceIn(0, tabs.lastIndex)
@@ -100,7 +104,10 @@ fun GlassNav(
         dragVelocityPx = { dragVelocity.value }
     )
 
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.BottomCenter) {
+    Box(
+        modifier.fillMaxSize().navigationBarsPadding(),
+        contentAlignment = Alignment.BottomCenter
+    ) {
         Box(
             Modifier
                 .glassNavReveal { alpha.value }
@@ -108,7 +115,11 @@ fun GlassNav(
                 .height(height)
                 .glass(RoundedCornerShape(style.corner), style)
                 .padding(horizontal = 5.dp)
-                .pointerInput(tabs.size, onSelect) {
+                .pointerInput(tabs.size, onSelect, visible > 0.01f) {
+                    // A nav at zero is gone, not transparent. Without this an
+                    // invisible pill still swallows taps meant for the photo
+                    // viewer or reel controls underneath it.
+                    if (visible <= 0.01f) return@pointerInput
                     val slop = viewConfiguration.touchSlop
                     awaitEachGesture {
                         val down = awaitFirstDown(requireUnconsumed = false)

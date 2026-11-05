@@ -40,6 +40,7 @@ import com.brain.gallery.ui.glass.Glass
 import com.brain.gallery.ui.glass.GlassSlider
 import com.brain.gallery.ui.glass.GlassSwitch
 import com.brain.gallery.ui.glass.glass
+import com.brain.gallery.ui.glass.glassReserve
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.Hairline
@@ -175,7 +176,7 @@ fun BrainScreen(
         Text("Every model runs locally. Nothing about your library leaves the phone.",
             color = Text2, fontSize = 11.5.sp)
 
-        Spacer(Modifier.height(30.dp))
+        Spacer(Modifier.height(glassReserve() + 8.dp))
     }
 }
 
@@ -232,7 +233,7 @@ fun BrainLearningScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
         Text("Nothing here deletes anything. Clutter only means the brain sets a clip aside; " +
             "the file stays on your phone until you delete it yourself.",
             color = Text2, fontSize = 11.5.sp, modifier = Modifier.padding(top = 6.dp))
-        Spacer(Modifier.height(30.dp))
+        Spacer(Modifier.height(glassReserve() + 8.dp))
     }
 }
 
@@ -286,7 +287,7 @@ fun BrainDiagnosticsScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
                 color = Text2, fontSize = 11.5.sp)
         }
 
-        Spacer(Modifier.height(30.dp))
+        Spacer(Modifier.height(glassReserve() + 8.dp))
     }
 }
 
@@ -358,7 +359,7 @@ fun BrainStorageScreen(vm: OrganizeViewModel, onBack: () -> Unit) {
         Text("Clears tags, hashes and identity, keeps favourites and history, then re-indexes.",
             color = Text2, fontSize = 11.5.sp, modifier = Modifier.padding(top = 4.dp))
 
-        Spacer(Modifier.height(30.dp))
+        Spacer(Modifier.height(glassReserve() + 8.dp))
     }
 
     if (confirmReset) {

@@ -19,10 +19,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -115,10 +113,15 @@ fun SearchScreen(
     }
     val identifyMsg by vm.identifyMsg.collectAsState()
     val identifying by vm.identifying.collectAsState()
+    // The rail in the viewer is read from the library, not from the result
+    // page: "more like this" should leave the search behind.
+    var photoSimilar by remember { mutableStateOf<List<PhotoEntity>>(emptyList()) }
+    LaunchedEffect(photoFor?.id) {
+        photoSimilar = photoFor?.let { vm.photoNeighbors(it) }.orEmpty()
+    }
 
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize().background(Bg).padding(top = 20.dp)
-        .windowInsetsPadding(WindowInsets.navigationBars).padding(bottom = 84.dp)) {
+        Column(Modifier.fillMaxSize().background(Bg).statusBarsPadding().padding(top = 4.dp)) {
             Text("Search", color = Text1, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier.padding(horizontal = 20.dp))
             Text("Names, tags, people, voice, photos — try \"talking\"", color = Text2, fontSize = 12.5.sp,
@@ -230,9 +233,12 @@ fun SearchScreen(
             // long-press sheet, photos keep their plain flat tile — a result
             // is a result, but each medium stays shaped like itself.
             LazyVerticalGrid(GridCells.Fixed(3),
-                contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 24.dp),
+                contentPadding = PaddingValues(
+                    start = 20.dp, end = 20.dp, top = 8.dp,
+                    bottom = glassReserve() + 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.weight(1f)) {
                 items(results, key = {
                     when (it) {
                         is SearchHit.VideoHit -> "v_${it.video.id}"
@@ -278,6 +284,8 @@ fun SearchScreen(
         photoFor?.let { p ->
             PhotoViewer(
                 photo = p,
+                similar = photoSimilar,
+                onPickSimilar = { photoFor = it },
                 onClose = { photoFor = null },
                 onFav = { vm.togglePhotoFav(p) },
                 onDelete = { photoFor = null; vm.requestDeletePhotos(listOf(p.id)) })

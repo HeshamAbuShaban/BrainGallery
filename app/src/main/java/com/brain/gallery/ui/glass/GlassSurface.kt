@@ -55,9 +55,22 @@ fun GlassSurface(
 private fun Modifier.paddingByEdge(alignment: Alignment, bottom: Dp): Modifier =
     this.padding(bottom = bottom)
 
-/** Padding a caller should add so its content clears a floating surface. */
+/**
+ * Padding a caller should add so its content clears a floating surface.
+ *
+ * The system bar is read, never guessed. The old 24dp stand-in was a guess
+ * that both over-reserved on gesture navigation and sat under a real
+ * three-button bar — a dead band on one phone, covered content on another.
+ * This is pill + breathing room + the actual bottom inset, and the nav
+ * itself uses the same inset, so the two can never drift apart.
+ */
+@Composable
 fun glassReserve(
-    style: GlassStyle = GlassStyle(),
     edgePadding: Dp = 10.dp,
     respectNavigationBars: Boolean = true
-): Dp = 56.dp + edgePadding + if (respectNavigationBars) 24.dp else 0.dp
+): Dp {
+    val systemBottom = if (respectNavigationBars) {
+        WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    } else 0.dp
+    return GlassNavHeight + edgePadding + systemBottom
+}

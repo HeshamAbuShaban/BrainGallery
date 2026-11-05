@@ -13,10 +13,12 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -40,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
@@ -79,6 +82,15 @@ private val monthFormat = SimpleDateFormat("MMMM yyyy", Locale.getDefault())
  * narrowed, and month headers so scrolling reads like time passing. No
  * mechanic — a browse surface people move through quickly gets none.
  */
+/**
+ * The still half of the library. Organized, not dumped: a count that admits
+ * what is still being read, folder chips so a wall of 3.8k thumbnails can be
+ * narrowed, and month headers so scrolling reads like time passing. No
+ * mechanic — a browse surface people move through quickly gets none.
+ *
+ * The count and the chips live inside the grid now. They used to be a fixed
+ * lid over a grid that already had one, and the lid never moved.
+ */
 @Composable
 fun PhotoLibrary(
     photos: List<PhotoEntity>,
@@ -97,70 +109,78 @@ fun PhotoLibrary(
         else photos.filter { it.folderName.ifEmpty { "Other" } == folder }
     }
 
-    Column(modifier.fillMaxSize()) {
-        Text(
-            if (pending > 0) "${fmtCount(photos.size)} photos · $pending still being read"
-            else "${fmtCount(photos.size)} photos",
-            color = Text2, fontSize = 11.5.sp,
-            modifier = Modifier.padding(20.dp, 8.dp, 20.dp, 0.dp))
+    if (photos.isEmpty()) {
+        Column(modifier.fillMaxSize().padding(20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(
+                if (pending > 0) "The indexer is still reading your photos…"
+                else "No photos found yet — grant image access and rescan.",
+                color = Text2, fontSize = 12.5.sp)
+            repeat(3) { ShimmerBar(Modifier.fillMaxWidth(), 110.dp, 20.dp) }
+        }
+        return
+    }
+
+    LazyVerticalGrid(
+        GridCells.Fixed(3),
+        contentPadding = PaddingValues(
+            start = 20.dp, end = 20.dp, top = 2.dp,
+            bottom = glassReserve() + 24.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+        modifier = modifier.fillMaxSize()
+    ) {
+        item(span = { GridItemSpan(3) }, key = "count") {
+            Text(
+                if (pending > 0) "${fmtCount(photos.size)} photos · $pending still being read"
+                else "${fmtCount(photos.size)} photos",
+                color = Text2, fontSize = 11.5.sp,
+                modifier = Modifier.padding(top = 4.dp))
+        }
 
         if (folders.size > 1) {
-            LazyRow(
-                contentPadding = PaddingValues(horizontal = 20.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.padding(top = 8.dp)
-            ) {
-                item { FolderChip("All", folder == null) { folder = null } }
-                folders.forEach { f ->
-                    item(key = f) { FolderChip(f, folder == f) { folder = if (folder == f) null else f } }
+            item(span = { GridItemSpan(3) }, key = "folders") {
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp)
+                ) {
+                    item { FolderChip("All", folder == null) { folder = null } }
+                    folders.forEach { f ->
+                        item(key = f) {
+                            FolderChip(f, folder == f) { folder = if (folder == f) null else f }
+                        }
+                    }
                 }
             }
         }
 
-        if (photos.isEmpty()) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text(
-                    if (pending > 0) "The indexer is still reading your photos…"
-                    else "No photos found yet — grant image access and rescan.",
-                    color = Text2, fontSize = 12.5.sp)
-                repeat(3) { ShimmerBar(Modifier.fillMaxWidth(), 110.dp, 20.dp) }
-            }
-            return
-        }
         if (shown.isEmpty()) {
-            Text("Nothing in \"$folder\" yet.", color = Text2, fontSize = 12.5.sp,
-                modifier = Modifier.padding(20.dp, 14.dp))
-            return
+            item(span = { GridItemSpan(3) }, key = "empty") {
+                Text("Nothing in \"$folder\" yet.", color = Text2, fontSize = 12.5.sp,
+                    modifier = Modifier.padding(vertical = 14.dp))
+            }
         }
 
-        LazyVerticalGrid(
-            GridCells.Fixed(3),
-            contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 32.dp),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Months read as chapters: a header span, then that month's grid.
-            shown.groupBy { monthFormat.format(Date(it.dateAddedSec * 1000)) }
-                .forEach { (month, list) ->
-                    item(span = { GridItemSpan(3) }, key = "m_$month") {
-                        Text(month, color = Text1, fontSize = 12.5.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(top = 14.dp, bottom = 4.dp))
-                    }
-                    items(list, key = { "p_${it.id}" }) { p ->
-                        AsyncImage(
-                            model = p.uri,
-                            contentDescription = p.displayName,
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier
-                                .aspectRatio(1f)
-                                .clip(RoundedCornerShape(8.dp))
-                                .clickable { onOpen(p) }
-                        )
-                    }
+        // Months read as chapters: a header span, then that month's grid.
+        shown.groupBy { monthFormat.format(Date(it.dateAddedSec * 1000)) }
+            .forEach { (month, list) ->
+                item(span = { GridItemSpan(3) }, key = "m_$month") {
+                    Text(month, color = Text1, fontSize = 12.5.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 14.dp, bottom = 4.dp))
                 }
-        }
+                items(list, key = { "p_${it.id}" }) { p ->
+                    AsyncImage(
+                        model = p.uri,
+                        contentDescription = p.displayName,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .aspectRatio(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { onOpen(p) }
+                    )
+                }
+            }
     }
 }
 
@@ -182,16 +202,29 @@ private fun FolderChip(label: String, selected: Boolean, onClick: () -> Unit) {
  * The photo fills what the screen gives it; no mechanic, no ceremony. The
  * viewer is not the reel: it is a look, and looking ends with a tap.
  */
+/**
+ * Full-screen look at one photo. Close, favorite, delete — and the same
+ * "More like this" rail the player has had, because a still has neighbours
+ * too. The viewer is not the reel: it is a look, and looking ends with a tap.
+ */
 @Composable
 fun PhotoViewer(
     photo: PhotoEntity,
     onClose: () -> Unit,
     onFav: (Boolean) -> Unit,
     onDelete: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    similar: List<PhotoEntity> = emptyList(),
+    onPickSimilar: (PhotoEntity) -> Unit = {}
 ) {
     val haptics = LocalHapticFeedback.current
     androidx.activity.compose.BackHandler(enabled = true) { onClose() }
+    // The pill steps aside for a photo, the way it does for the spotlight.
+    // It is chrome for the grid; over a full-frame still it is in the way.
+    androidx.compose.runtime.DisposableEffect(Unit) {
+        PhotoViewerState.set(true)
+        onDispose { PhotoViewerState.set(false) }
+    }
     Box(modifier.fillMaxSize().background(Color.Black)) {
         if (photo.animated == true && Build.VERSION.SDK_INT >= 28) {
             // Animated media plays here — decoding through ImageDecoder, no
@@ -224,26 +257,62 @@ fun PhotoViewer(
                     fontSize = 10.5.sp, maxLines = 1)
             }
         }
-        Row(Modifier.align(Alignment.BottomCenter)
-            .padding(bottom = 24.dp + com.brain.gallery.ui.glass.glassReserve()),
-            horizontalArrangement = Arrangement.spacedBy(28.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                onFav(!photo.isFavorite)
-            }, modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(46.dp)) {
-                Icon(
-                    if (photo.isFavorite) Icons.Default.Favorite
-                    else Icons.Default.FavoriteBorder,
-                    "Favorite", tint = if (photo.isFavorite) Pink else Text1,
-                    modifier = Modifier.size(22.dp))
+        Column(
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                .background(Brush.verticalGradient(
+                    listOf(Color.Transparent, Color.Black.copy(alpha = 0.82f)),
+                    startY = 90f))
+                .navigationBarsPadding()
+                .padding(top = 18.dp, bottom = 16.dp)
+        ) {
+            if (similar.isNotEmpty()) {
+                Text("More like this", color = Color.White, fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 16.dp))
+                Spacer(Modifier.height(8.dp))
+                LazyRow(
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(similar, key = { "s_${it.id}" }) { s ->
+                        AsyncImage(
+                            model = s.uri,
+                            contentDescription = s.displayName,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(78.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .clickable {
+                                    haptics.performHapticFeedback(
+                                        HapticFeedbackType.TextHandleMove)
+                                    onPickSimilar(s)
+                                }
+                        )
+                    }
+                }
+                Spacer(Modifier.height(14.dp))
             }
-            IconButton(onClick = {
-                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                onDelete()
-            }, modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(46.dp)) {
-                Icon(Icons.Default.Delete,
-                    "Delete", tint = Text1, modifier = Modifier.size(22.dp))
+            Row(Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(
+                    28.dp, Alignment.CenterHorizontally),
+                verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onFav(!photo.isFavorite)
+                }, modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(46.dp)) {
+                    Icon(
+                        if (photo.isFavorite) Icons.Default.Favorite
+                        else Icons.Default.FavoriteBorder,
+                        "Favorite", tint = if (photo.isFavorite) Pink else Text1,
+                        modifier = Modifier.size(22.dp))
+                }
+                IconButton(onClick = {
+                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onDelete()
+                }, modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(46.dp)) {
+                    Icon(Icons.Default.Delete,
+                        "Delete", tint = Text1, modifier = Modifier.size(22.dp))
+                }
             }
         }
     }

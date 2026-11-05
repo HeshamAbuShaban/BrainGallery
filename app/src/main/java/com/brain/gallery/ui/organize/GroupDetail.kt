@@ -1,6 +1,10 @@
 package com.brain.gallery.ui.organize
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -11,18 +15,20 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -38,6 +44,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,6 +73,7 @@ import com.brain.gallery.ui.hero.rememberReducedMotion
 import com.brain.gallery.ui.components.SheetMode
 import com.brain.gallery.ui.glass.Glass
 import com.brain.gallery.ui.glass.glass
+import com.brain.gallery.ui.glass.glassReserve
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.DangerContainer
@@ -120,62 +128,90 @@ fun GroupDetail(
         if (PortalGate.canPortal() && !reducedMotion) portalFor = v else onPlay(v)
     }
 
-    Column(Modifier.fillMaxSize().background(Bg)
-        .windowInsetsPadding(WindowInsets.navigationBars)
-        .padding(bottom = 84.dp)) {
-        Row(Modifier.fillMaxWidth().padding(8.dp, 16.dp, 16.dp, 4.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            IconButton(onClick = onBack,
-                modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(38.dp)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Text1,
-                    modifier = Modifier.size(18.dp))
-            }
-            Spacer(Modifier.width(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(group.title, color = Text1, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
-                Text(group.subtitle, color = Text2, fontSize = 12.sp)
-            }
-            if (person != null) {
-                IconButton(onClick = { renameOpen = true },
-                    modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(34.dp)) {
-                    Icon(Icons.Default.Edit, null, tint = Text1, modifier = Modifier.size(15.dp))
+    // The whole crown is grid content now: title, cover pile and the warning
+    // banners scroll away with the clips. Before, a 320dp stack held the
+    // screen while a 3-column grid tried to live in what was left.
+    val gridState = rememberLazyGridState()
+    val crownGone by remember {
+        derivedStateOf {
+            gridState.firstVisibleItemIndex > 0 || gridState.firstVisibleItemScrollOffset > 24
+        }
+    }
+    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+
+    Box(Modifier.fillMaxSize().background(Bg)) {
+        LazyVerticalGrid(
+            GridCells.Fixed(3),
+            state = gridState,
+            contentPadding = PaddingValues(
+                start = 16.dp, end = 16.dp,
+                top = topInset + 8.dp,
+                bottom = glassReserve() + 24.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.fillMaxSize()
+        ) {
+            item(span = { GridItemSpan(3) }, key = "header") {
+                Row(Modifier.fillMaxWidth().padding(bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack,
+                        modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(38.dp)) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, null, tint = Text1,
+                            modifier = Modifier.size(18.dp))
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        Text(group.title, color = Text1, fontSize = 22.sp,
+                            fontWeight = FontWeight.ExtraBold)
+                        Text(group.subtitle, color = Text2, fontSize = 12.sp)
+                    }
+                    if (person != null) {
+                        IconButton(onClick = { renameOpen = true },
+                            modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(34.dp)) {
+                            Icon(Icons.Default.Edit, null, tint = Text1,
+                                modifier = Modifier.size(15.dp))
+                        }
+                    }
                 }
             }
-        }
-        // Mechanic B lives here and only here: the group's cover pile frames
-        // the review, then hands off to the player. One mechanic per screen.
-        if (group.videos.isNotEmpty()) {
-            CardWaveStack(
-                clips = group.videos,
-                onPlay = onPlay,
-                modifier = Modifier.padding(bottom = 4.dp)
-            )
-        }
-        if (group.splitSuggested) {
-            Row(Modifier.fillMaxWidth().padding(20.dp, 0.dp)
-                .glass(CardShape, Glass.pane(Accent)).padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically) {
-                Text("This may be two different people. Tap one that looks wrong to split it out.",
-                    color = Text1, fontSize = 12.sp, modifier = Modifier.weight(1f))
-                Text("Got it", color = Yellow, fontSize = 12.sp, fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { onDismissSplit(person?.id ?: -1) }.padding(6.dp))
+            // Mechanic B lives here and only here: the group's cover pile
+            // frames the review, then hands off to the player. One mechanic
+            // per screen — and it travels with the review now.
+            if (group.videos.isNotEmpty()) {
+                item(span = { GridItemSpan(3) }, key = "hero") {
+                    CardWaveStack(
+                        clips = group.videos,
+                        onPlay = onPlay,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+                }
             }
-        }
-        if (isDups && redundant.isNotEmpty()) {
-            Button(onClick = { onDeleteRedundant(redundant.map { it.id }) },
-                colors = ButtonDefaults.buttonColors(containerColor = DangerContainer,
-                    contentColor = Yellow),
-                modifier = Modifier.fillMaxWidth().padding(16.dp, 4.dp)) {
-                Icon(Icons.Default.Delete, null, modifier = Modifier.size(16.dp))
-                Spacer(Modifier.width(8.dp))
-                Text("Delete ${redundant.size} redundant • free ${fmtSize(group.savingsBytes)}",
-                    fontSize = 13.sp, fontWeight = FontWeight.Bold)
+            if (group.splitSuggested) {
+                item(span = { GridItemSpan(3) }, key = "split") {
+                    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)
+                        .glass(CardShape, Glass.pane(Accent)).padding(12.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Text("This may be two different people. Tap one that looks wrong to split it out.",
+                            color = Text1, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                        Text("Got it", color = Yellow, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                            modifier = Modifier
+                                .clickable { onDismissSplit(person?.id ?: -1) }.padding(6.dp))
+                    }
+                }
             }
-        }
-        LazyVerticalGrid(GridCells.Fixed(3),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 28.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (isDups && redundant.isNotEmpty()) {
+                item(span = { GridItemSpan(3) }, key = "redundant") {
+                    Button(onClick = { onDeleteRedundant(redundant.map { it.id }) },
+                        colors = ButtonDefaults.buttonColors(containerColor = DangerContainer,
+                            contentColor = Yellow),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+                        Icon(Icons.Default.Delete, null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Delete ${redundant.size} redundant • free ${fmtSize(group.savingsBytes)}",
+                            fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
             items(visible, key = { it.id }) { v ->
                 val keeper = v.id in group.keeperIds
                 val redund = v.id in group.redundantIds
@@ -228,7 +264,7 @@ fun GroupDetail(
                 }
             }
             if (shown < group.videos.size) {
-                item(span = { GridItemSpan(3) }) {
+                item(span = { GridItemSpan(3) }, key = "more") {
                     Box(Modifier.fillMaxWidth().padding(vertical = 10.dp),
                         contentAlignment = Alignment.Center) {
                         Text("Show 60 more (${group.videos.size - shown} left)",
@@ -241,7 +277,21 @@ fun GroupDetail(
                 }
             }
         }
-        Spacer(Modifier.height(4.dp))
+        // Once the crown is gone the way back must not require scrolling up:
+        // one small pane appears in its place, and leaves when the crown does.
+        AnimatedVisibility(
+            visible = crownGone,
+            enter = fadeIn(tween(160)),
+            exit = fadeOut(tween(160)),
+            modifier = Modifier.align(Alignment.TopStart)
+                .statusBarsPadding().padding(10.dp)
+        ) {
+            IconButton(onClick = onBack,
+                modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(38.dp)) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = Text1,
+                    modifier = Modifier.size(18.dp))
+            }
+        }
     }
     menuFor?.let { mv ->
         VideoActionsSheet(video = mv,

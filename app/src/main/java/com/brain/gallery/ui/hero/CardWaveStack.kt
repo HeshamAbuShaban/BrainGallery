@@ -141,7 +141,9 @@ fun CardWaveStack(
 
     Box(modifier
         .fillMaxWidth()
-        .height(158.dp)
+        // Two lift radii of headroom: a card rising 26dp inside a 158dp
+        // strip was clipped 16dp by the stack's own bounds.
+        .height(cardH + liftMax * 2)
         .clipToBounds()
         .onSizeChanged { stackSize = it }
         .pointerInput(count, window) {

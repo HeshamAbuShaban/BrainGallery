@@ -16,17 +16,15 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -79,6 +77,7 @@ import com.brain.gallery.data.local.PersonEntity
 import com.brain.gallery.domain.organize.Album
 import com.brain.gallery.domain.organize.GroupKind
 import com.brain.gallery.domain.organize.SmartGroup
+import com.brain.gallery.engine.PhotoNeighbors
 import com.brain.gallery.ui.components.SpotlightPlayer
 import com.brain.gallery.ui.components.ShimmerBar
 import com.brain.gallery.ui.components.VideoThumb
@@ -119,10 +118,11 @@ fun OrganizeScreen(
     val photos by vm.photos.collectAsState()
     val photoPending by vm.photoPending.collectAsState()
     val picked by vm.selection.collectAsState()
+    val viewingPhoto by vm.viewingPhoto.collectAsState()
     var newAlbumOpen by remember { mutableStateOf(false) }
+    var menuOpen by remember { mutableStateOf(false) }
     // Videos or photos: the hub's one switch between the two media.
     var mediaView by remember { mutableStateOf(0) }
-    var viewingPhoto by remember { mutableStateOf<com.brain.gallery.data.local.PhotoEntity?>(null) }
     val photoDelLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()) { res ->
         if (res.resultCode == Activity.RESULT_OK) vm.confirmPhotoDelete()
@@ -165,171 +165,210 @@ fun OrganizeScreen(
         onRefresh = { refreshing = true },
         modifier = Modifier.fillMaxSize()
     ) {
-    Column(Modifier.fillMaxSize().background(Bg)
-        .windowInsetsPadding(WindowInsets.navigationBars)
-        .padding(bottom = glassReserve())) {
-        // Header
-        Row(Modifier.fillMaxWidth().padding(20.dp, 20.dp, 20.dp, 4.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Library", color = Text1, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold)
-                Text("Organized by your on-device brain", color = Text2, fontSize = 12.5.sp)
-            }
-            IconButton(onClick = { vm.exportMemory() },
-                modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(40.dp)) {
-                Icon(Icons.Default.Save, null, tint = Text1, modifier = Modifier.size(18.dp))
-            }
-            Spacer(Modifier.width(8.dp))
-            IconButton(onClick = { newAlbumOpen = true },
-                modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(40.dp)) {
-                Icon(Icons.Default.CreateNewFolder, "New album", tint = Text1,
-                    modifier = Modifier.size(18.dp))
-            }
-            Spacer(Modifier.width(8.dp))
-            IconButton(onClick = onOpenBrain,
-                modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(40.dp)) {
-                Icon(Icons.Default.BugReport, null, tint = Text1, modifier = Modifier.size(18.dp))
-            }
-            Spacer(Modifier.width(8.dp))
-            IconButton(onClick = { vm.rescan() },
-                modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(40.dp)) {
-                Icon(Icons.Default.Refresh, null, tint = Text1, modifier = Modifier.size(18.dp))
-            }
-        }
-        // Stats strip
-        if (loading) {
-            Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                repeat(3) { ShimmerBar(Modifier.weight(1f), 56.dp, 16.dp) }
-            }
-        } else {
-            Row(Modifier.fillMaxWidth().padding(20.dp, 10.dp),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                // Big numerals read abbreviated once they grow — 1.3k, not
-                // 1328 fighting its own tile.
-                StatCard(fmtCount(stats.total), "videos", Accent, Modifier.weight(1f))
-                StatCard(fmtCount(stats.memories), "memories", Green, Modifier.weight(1f))
-                StatCard(fmtCount(stats.clutter), "clutter", Yellow, Modifier.weight(1f))
-                StatCard(fmtCount(stats.people), "people", Pink, Modifier.weight(1f))
-            }
-            if (stats.pending > 0) {
-                Row(Modifier.fillMaxWidth().padding(20.dp, 0.dp, 20.dp, 6.dp),
-                    verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f)) {
-                        Text("Understanding ${stats.pending} videos…",
-                            color = Text2, fontSize = 11.5.sp)
-                        LinearProgressIndicator(
-                            progress = { stats.understoodPct / 100f },
-                            modifier = Modifier.fillMaxWidth().height(4.dp).clip(CircleShape),
-                            color = Cyan, trackColor = Surface2)
+        Column(Modifier.fillMaxSize().background(Bg)) {
+            // A slim crown, fixed: name the place, then two doors. Export,
+            // albums and a rescan used to be three more circles fighting the
+            // title for a row that never scrolled; they live in the overflow
+            // now and the library gets the width back.
+            Row(
+                Modifier.fillMaxWidth().statusBarsPadding()
+                    .padding(start = 20.dp, top = 12.dp, end = 10.dp, bottom = 2.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text("Library", color = Text1, fontSize = 26.sp,
+                        fontWeight = FontWeight.ExtraBold)
+                    Text("Organized by your on-device brain", color = Text2,
+                        fontSize = 12.5.sp)
+                }
+                IconButton(onClick = onOpenBrain,
+                    modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(40.dp)) {
+                    Icon(Icons.Default.BugReport, "Brain", tint = Text1,
+                        modifier = Modifier.size(18.dp))
+                }
+                Spacer(Modifier.width(8.dp))
+                Box {
+                    IconButton(onClick = { menuOpen = true },
+                        modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(40.dp)) {
+                        Icon(Icons.Default.MoreHoriz, "Library actions", tint = Text1,
+                            modifier = Modifier.size(18.dp))
+                    }
+                    DropdownMenu(
+                        expanded = menuOpen,
+                        onDismissRequest = { menuOpen = false },
+                        modifier = Modifier.width(230.dp)
+                            .glass(RoundedCornerShape(20.dp), GlassStyle())
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text("Export memory", color = Text1) },
+                            leadingIcon = { Icon(Icons.Default.Save, null, tint = Text1,
+                                modifier = Modifier.size(18.dp)) },
+                            onClick = { menuOpen = false; vm.exportMemory() })
+                        DropdownMenuItem(
+                            text = { Text("New album", color = Text1) },
+                            leadingIcon = { Icon(Icons.Default.CreateNewFolder, null, tint = Text1,
+                                modifier = Modifier.size(18.dp)) },
+                            onClick = { menuOpen = false; newAlbumOpen = true })
+                        DropdownMenuItem(
+                            text = { Text("Re-scan library", color = Text1) },
+                            leadingIcon = { Icon(Icons.Default.Refresh, null, tint = Text1,
+                                modifier = Modifier.size(18.dp)) },
+                            onClick = { menuOpen = false; vm.rescan() })
                     }
                 }
             }
-        }
-        Text("Every clip on this device is in a group below — \"Everything\" is the proof.",
-            color = Text2, fontSize = 11.sp,
-            modifier = Modifier.padding(20.dp, 4.dp, 20.dp, 0.dp))
-        // One switch, two media. The glass segmented control is the hub's
-        // only chrome here; both views below stay mechanical.
-        GlassSegmented(
-            labels = listOf("Videos", "Photos"),
-            selectedIndex = mediaView,
-            onSelect = { i ->
-                haptics.performHapticFeedback(androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
-                mediaView = i
-            },
-            modifier = Modifier.fillMaxWidth().padding(20.dp, 14.dp, 20.dp, 0.dp),
-            selectedColor = Accent
-        )
-        if (mediaView == 1) {
-            PhotoLibrary(
-                photos = photos,
-                pending = photoPending,
-                onOpen = { viewingPhoto = it },
-                modifier = Modifier.weight(1f, fill = false)
+            // One switch, two media. It stays put: the thing you are switching
+            // between should not move every time the content does.
+            GlassSegmented(
+                labels = listOf("Videos", "Photos"),
+                selectedIndex = mediaView,
+                onSelect = { i ->
+                    haptics.performHapticFeedback(
+                        androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                    mediaView = i
+                },
+                modifier = Modifier.fillMaxWidth().padding(20.dp, 12.dp, 20.dp, 4.dp),
+                selectedColor = Accent
             )
-            // The video sections below do not render in the photos view.
-            Spacer(Modifier.height(24.dp))
-        } else {
-        // The Shelf — mechanic A, the only mechanic on this screen. Featured
-        // groups leaning on the inside of a cylinder; tap opens the group.
-        if (!loading) {
-            val shelf = buildList {
-                groups.firstOrNull { it.kind == GroupKind.ON_THIS_DAY }?.let { add(it) }
-                groups.firstOrNull { it.kind == GroupKind.MEMORIES }?.let { add(it) }
-                groups.firstOrNull { it.kind == GroupKind.GEMS }?.let { add(it) }
-                groups.firstOrNull { it.kind == GroupKind.FAVORITES }?.let { add(it) }
-                groups.filter { it.kind == GroupKind.PEOPLE }.take(2).forEach { add(it) }
-                groups.lastOrNull { it.kind == GroupKind.ALBUM }?.let { add(it) }
-            }.distinctBy { it.id }.take(8)
-            if (shelf.isNotEmpty()) {
-                if (!cfg.shelfHidden) {
-                    Row(Modifier.fillMaxWidth().padding(20.dp, 14.dp, 20.dp, 0.dp),
-                        verticalAlignment = Alignment.CenterVertically) {
-                        Text("The shelf", color = Cyan, fontSize = 11.sp,
-                            fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp,
-                            modifier = Modifier.weight(1f))
-                        Text("Hide", color = Text2, fontSize = 12.sp,
-                            modifier = Modifier.clickable {
-                                vm.updateSettings(cfg.copy(shelfHidden = true))
-                            }.padding(6.dp))
-                    }
-                    ShelfCarousel(
-                        items = shelf,
-                        onOpen = { onOpenGroup(it.id) },
-                        modifier = Modifier.padding(top = 6.dp)
-                    )
-                } else {
-                    // Folded, not gone: one calm line where the shelf was.
-                    Row(Modifier.fillMaxWidth().padding(20.dp, 14.dp, 20.dp, 0.dp)
-                        .clickable { vm.updateSettings(cfg.copy(shelfHidden = false)) },
-                        verticalAlignment = Alignment.CenterVertically) {
-                        Text("The shelf", color = Text2, fontSize = 11.sp,
-                            fontWeight = FontWeight.ExtraBold, letterSpacing = 1.sp,
-                            modifier = Modifier.weight(1f))
-                        Text("Show", color = Accent, fontSize = 12.sp,
-                            modifier = Modifier.padding(6.dp))
+            if (mediaView == 1) {
+                PhotoLibrary(
+                    photos = photos,
+                    pending = photoPending,
+                    onOpen = { vm.openPhoto(it) },
+                    modifier = Modifier.weight(1f)
+                )
+            } else {
+                // One grid owns everything that moves: stats, the shelf and
+                // the groups. The old stack pinned half the hub above the
+                // scroll and left a reserved band under it; now the whole
+                // page travels and the content actually reaches the nav.
+                LazyVerticalGrid(
+                    GridCells.Fixed(2),
+                    contentPadding = PaddingValues(
+                        start = 20.dp, end = 20.dp, top = 2.dp,
+                        bottom = glassReserve() + 28.dp),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    if (loading) {
+                        item(span = { GridItemSpan(2) }, key = "stats-shimmer") {
+                            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                repeat(3) { ShimmerBar(Modifier.weight(1f), 56.dp, 16.dp) }
+                            }
+                        }
+                        item(span = { GridItemSpan(2) }, key = "groups-shimmer") {
+                            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                                repeat(3) { ShimmerBar(Modifier.fillMaxWidth(), 120.dp, 20.dp) }
+                            }
+                        }
+                    } else {
+                        item(span = { GridItemSpan(2) }, key = "stats") {
+                            Row(Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                // Big numerals read abbreviated once they grow —
+                                // 1.3k, not 1328 fighting its own tile.
+                                StatCard(fmtCount(stats.total), "videos", Accent,
+                                    Modifier.weight(1f))
+                                StatCard(fmtCount(stats.memories), "memories", Green,
+                                    Modifier.weight(1f))
+                                StatCard(fmtCount(stats.clutter), "clutter", Yellow,
+                                    Modifier.weight(1f))
+                                StatCard(fmtCount(stats.people), "people", Pink,
+                                    Modifier.weight(1f))
+                            }
+                        }
+                        if (stats.pending > 0) {
+                            item(span = { GridItemSpan(2) }, key = "pending") {
+                                Column(Modifier.fillMaxWidth()) {
+                                    Text("Understanding ${stats.pending} videos…",
+                                        color = Text2, fontSize = 11.5.sp)
+                                    LinearProgressIndicator(
+                                        progress = { stats.understoodPct / 100f },
+                                        modifier = Modifier.fillMaxWidth().height(4.dp)
+                                            .clip(CircleShape),
+                                        color = Cyan, trackColor = Surface2)
+                                }
+                            }
+                        }
+                        // The Shelf — mechanic A, the only mechanic on this
+                        // screen. Featured groups leaning on the inside of a
+                        // cylinder; tap opens the group.
+                        val shelf = buildList {
+                            groups.firstOrNull { it.kind == GroupKind.ON_THIS_DAY }?.let { add(it) }
+                            groups.firstOrNull { it.kind == GroupKind.MEMORIES }?.let { add(it) }
+                            groups.firstOrNull { it.kind == GroupKind.GEMS }?.let { add(it) }
+                            groups.firstOrNull { it.kind == GroupKind.FAVORITES }?.let { add(it) }
+                            groups.filter { it.kind == GroupKind.PEOPLE }.take(2)
+                                .forEach { add(it) }
+                            groups.lastOrNull { it.kind == GroupKind.ALBUM }?.let { add(it) }
+                        }.distinctBy { it.id }.take(8)
+                        if (shelf.isNotEmpty()) {
+                            val toggle = {
+                                vm.updateSettings(cfg.copy(shelfHidden = !cfg.shelfHidden))
+                            }
+                            item(span = { GridItemSpan(2) }, key = "shelf-head") {
+                                Row(
+                                    Modifier.fillMaxWidth().padding(top = 2.dp)
+                                        .then(
+                                            if (cfg.shelfHidden)
+                                                Modifier.clickable { toggle() }
+                                            else Modifier),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text("The shelf",
+                                        color = if (cfg.shelfHidden) Text2 else Cyan,
+                                        fontSize = 11.sp, fontWeight = FontWeight.ExtraBold,
+                                        letterSpacing = 1.sp, modifier = Modifier.weight(1f))
+                                    Text(if (cfg.shelfHidden) "Show" else "Hide",
+                                        color = if (cfg.shelfHidden) Accent else Text2,
+                                        fontSize = 12.sp,
+                                        modifier = Modifier.clickable { toggle() }.padding(6.dp))
+                                }
+                            }
+                            if (!cfg.shelfHidden) {
+                                item(span = { GridItemSpan(2) }, key = "shelf") {
+                                    ShelfCarousel(
+                                        items = shelf,
+                                        onOpen = { onOpenGroup(it.id) },
+                                        modifier = Modifier.padding(top = 2.dp)
+                                    )
+                                }
+                            }
+                        }
+                        itemsIndexed(groups, key = { _, g -> g.id }) { i, g ->
+                            val vis = remember {
+                                MutableTransitionState(false).apply { targetState = true }
+                            }
+                            AnimatedVisibility(vis,
+                                enter = fadeIn(tween(350, i * 60)) +
+                                    slideInVertically(tween(350, i * 60)) { it / 3 }) {
+                                GroupCardFull(
+                                    group = g,
+                                    persons = groups.filter { it.kind == GroupKind.PEOPLE },
+                                    onOpen = { onOpenGroup(g.id) },
+                                    onDeleteAlbum = if (g.kind == GroupKind.ALBUM) ({
+                                        g.id.removePrefix("album_").toLongOrNull()
+                                            ?.let { vm.deleteAlbum(it) }
+                                    }) else null,
+                                    onPlayAll = { spotlight.openPlaylist(g.videos) },
+                                    onSimilar = {
+                                        g.videos.firstOrNull()?.let { spotlight.open(it, g.videos) }
+                                    },
+                                    onRename = if (g.kind == GroupKind.ALL) null else ({ renameTarget = g }),
+                                    onHide = if (g.kind == GroupKind.ALBUM || g.kind == GroupKind.ALL) null
+                                             else ({ vm.hideGroup(g) }),
+                                    onMerge = { from, to ->
+                                        val f = from.id.removePrefix("person_").toIntOrNull()
+                                        val t = to.id.removePrefix("person_").toIntOrNull()
+                                        if (f != null && t != null) vm.mergePersons(f, t)
+                                    })
+                            }
+                        }
                     }
                 }
             }
         }
-        // Groups grid
-        if (loading) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                repeat(3) { ShimmerBar(Modifier.fillMaxWidth(), 120.dp, 20.dp) }
-            }
-        } else {
-            LazyVerticalGrid(GridCells.Fixed(2),
-                contentPadding = PaddingValues(20.dp, 8.dp, 20.dp, 32.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                itemsIndexed(groups, key = { _, g -> g.id }) { i, g ->
-                    val vis = remember { MutableTransitionState(false).apply { targetState = true } }
-                    AnimatedVisibility(vis,
-                        enter = fadeIn(tween(350, i * 60)) +
-                            slideInVertically(tween(350, i * 60)) { it / 3 }) {
-                        GroupCardFull(
-                            group = g,
-                            persons = groups.filter { it.kind == GroupKind.PEOPLE },
-                            onOpen = { onOpenGroup(g.id) },
-                            onDeleteAlbum = if (g.kind == GroupKind.ALBUM) ({ 
-                                g.id.removePrefix("album_").toLongOrNull()?.let { vm.deleteAlbum(it) }
-                            }) else null,
-                            onPlayAll = { spotlight.openPlaylist(g.videos) },
-                            onSimilar = { g.videos.firstOrNull()?.let { spotlight.open(it, g.videos) } },
-                            onRename = if (g.kind == GroupKind.ALL) null else ({ renameTarget = g }),
-                            onHide = if (g.kind == GroupKind.ALBUM || g.kind == GroupKind.ALL) null
-                                     else ({ vm.hideGroup(g) }),
-                            onMerge = { from, to ->
-                                val f = from.id.removePrefix("person_").toIntOrNull()
-                                val t = to.id.removePrefix("person_").toIntOrNull()
-                                if (f != null && t != null) vm.mergePersons(f, t)
-                            })
-                    }
-                }
-            }
-        }
-        }
-    }
     }
     if (selecting) {
         SelectionBar(
@@ -354,12 +393,15 @@ fun OrganizeScreen(
             })
     }
     viewingPhoto?.let { p ->
+        val similar = remember(p.id, photos) { PhotoNeighbors.of(p, photos) }
         PhotoViewer(
             photo = p,
-            onClose = { viewingPhoto = null },
+            similar = similar,
+            onPickSimilar = { vm.openPhoto(it) },
+            onClose = { vm.closePhoto() },
             onFav = { vm.togglePhotoFav(p.id, it) },
             onDelete = {
-                viewingPhoto = null
+                vm.closePhoto()
                 vm.requestPhotoDelete(listOf(p.id))
             })
     }

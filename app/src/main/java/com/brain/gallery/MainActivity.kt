@@ -15,11 +15,7 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.PlayArrow
@@ -51,6 +47,7 @@ import com.brain.gallery.ui.organize.BrainStorageScreen
 import com.brain.gallery.ui.organize.GroupDetailRoute
 import com.brain.gallery.ui.organize.OrganizeScreen
 import com.brain.gallery.ui.organize.OrganizeViewModel
+import com.brain.gallery.ui.organize.PhotoViewerState
 import com.brain.gallery.ui.organize.SearchScreen
 import com.brain.gallery.ui.glass.GlassNav
 import com.brain.gallery.ui.glass.GlassTab
@@ -114,6 +111,7 @@ private fun Root(spotlight: SpotlightController) {
 
     val open by spotlight.current.collectAsState()
     val similar by spotlight.similar.collectAsState()
+    val photoOpen by PhotoViewerState.open.collectAsState()
     var reelChrome by remember { mutableStateOf(true) }
 
     val tabs = listOf(
@@ -138,11 +136,13 @@ private fun Root(spotlight: SpotlightController) {
         }
     }
 
-    // The pill is always reachable except in two situations: a spotlight is
-    // covering the screen, or a reel is playing with its own chrome hidden.
-    // Tapping the reel brings its chrome back, which brings this back too.
+    // The pill is always reachable except in three situations: a spotlight is
+    // covering the screen, a photo is open full-frame, or a reel is playing
+    // with its own chrome hidden. Tapping the reel brings its chrome back,
+    // which brings this back too.
     val navVisible = when {
         open != null -> 0f
+        photoOpen -> 0f
         route == Routes.FEED && !reelChrome -> 0f
         else -> 1f
     }
@@ -171,15 +171,16 @@ private fun Root(spotlight: SpotlightController) {
             }
         ) {
             composable(Routes.FEED) {
-                Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars)) {
-                    FeedScreen(
-                        player = spotlight.player,
-                        spotlight = spotlight,
-                        onLeaveFeed = { goTab(1) },
-                        onChrome = { reelChrome = it },
-                        bottomOverlay = glassReserve()
-                    )
-                }
+                // The reel fills the frame, system bar included; its own
+                // bottomOverlay reads the real inset, so the caption clears
+                // the pill without letterboxing the video.
+                FeedScreen(
+                    player = spotlight.player,
+                    spotlight = spotlight,
+                    onLeaveFeed = { goTab(1) },
+                    onChrome = { reelChrome = it },
+                    bottomOverlay = glassReserve()
+                )
             }
             composable(Routes.ORGANIZE) {
                 OrganizeScreen(

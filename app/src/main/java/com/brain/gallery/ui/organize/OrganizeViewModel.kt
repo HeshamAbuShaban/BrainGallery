@@ -20,6 +20,7 @@ import com.brain.gallery.domain.organize.GroupBuilder
 import com.brain.gallery.domain.organize.SmartGroup
 import com.brain.gallery.engine.MemoryDocBuilder
 import com.brain.gallery.engine.ContentId
+import com.brain.gallery.engine.PhotoNeighbors
 import com.brain.gallery.data.search.FtsSchema
 import com.brain.gallery.data.search.SearchIndexer
 import com.brain.gallery.data.brain.ContentHasher
@@ -421,6 +422,19 @@ class OrganizeViewModel @Inject constructor(
     val photos: StateFlow<List<PhotoEntity>> = _photos
     private val _photoPending = MutableStateFlow(0)
     val photoPending: StateFlow<Int> = _photoPending
+
+    // The open photo is a session fact, not a screen fact: the hub and
+    // Search both open one, and the nav pill reads it from here. Deriving
+    // the row from the photos flow means a favorite or a delete is seen by
+    // the viewer without copying stale state into it.
+    private val _viewingPhotoId = MutableStateFlow<Long?>(null)
+    val viewingPhoto: StateFlow<PhotoEntity?> =
+        combine(_photos, _viewingPhotoId) { list, id ->
+            if (id == null) null else list.firstOrNull { it.id == id }
+        }.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+
+    fun openPhoto(p: PhotoEntity) { _viewingPhotoId.value = p.id }
+    fun closePhoto() { _viewingPhotoId.value = null }
 
     init {
         viewModelScope.launch {
@@ -936,6 +950,10 @@ class SearchViewModel @Inject constructor(
     fun togglePhotoFav(p: PhotoEntity) {
         viewModelScope.launch { db.photoDao().setFavorite(p.id, !p.isFavorite) }
     }
+
+    /** The viewer's rail: same rules as the hub's, over the whole library. */
+    suspend fun photoNeighbors(photo: PhotoEntity): List<PhotoEntity> =
+        withContext(Dispatchers.IO) { PhotoNeighbors.of(photo, db.photoDao().all()) }
 
     // Deleting a photo result: same consent path as videos, own channel.
     private val _photoDeleteAsk = MutableStateFlow<IntentSender?>(null)
