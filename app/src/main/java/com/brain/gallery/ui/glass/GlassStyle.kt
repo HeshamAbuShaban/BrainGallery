@@ -16,38 +16,36 @@ import androidx.compose.ui.unit.dp
  * and given that project's colours.
  */
 data class GlassStyle(
-    /** Tint of the pane. White works on dark surfaces; on light, pass a dark tint. */
+    /**
+     * The defaults read the palette switch, so a bare `GlassStyle()` — the
+     * way every design-system widget builds its pane — is correct on both
+     * themes with no call site thinking about it. Dark: a whisper of white
+     * wash over the canvas and a real dark scrim under bright video. Light:
+     * a true white frost over paper, the scrim dropped to a whisper (dark
+     * ink on frost is readable by itself), and a soft cool shadow instead
+     * of a black drop.
+     */
     val tint: Color = Color.White,
-    /** How much of [tint] to lay down. Low values are what read as glass. */
-    val alpha: Float = 0.10f,
-    /** Edge highlight. This is the line that makes the shape legible. */
-    val borderAlpha: Float = 0.13f,
+    val alpha: Float = if (PaletteHolder.dark) 0.10f else 0.50f,
+    val borderAlpha: Float = if (PaletteHolder.dark) 0.13f else 0.30f,
     val borderWidth: Dp = 1.dp,
-    /** Blur is faked with layered translucency; see [bands]. */
     val bands: List<Float> = listOf(0.115f, 0.055f, 0.085f),
     val corner: Dp = 30.dp,
     val elevation: Dp = 20.dp,
-    /** Colour of the shadow underneath. Accent for a glow, black for depth. */
-    val shadowColor: Color = Color.Black,
-    /** How much of [shadowColor] the shadow carries, 0f..1f. */
-    val shadowAlpha: Float = 1f,
+    val shadowColor: Color =
+        if (PaletteHolder.dark) Color.Black else Color(0xFF33415C),
+    val shadowAlpha: Float = if (PaletteHolder.dark) 1f else 0.35f,
     /**
-     * Black laid under the wash, 0f..1f. The contrast guarantee.
-     *
-     * A white wash alone can only ever lighten its backdrop, and a pane that
-     * makes a bright video frame brighter is a pane whose labels stop being
-     * readable on it. This layer is nearly invisible over dark content and does
-     * its work exactly where contrast fails; raise it for text over video.
+     * Dark laid under the wash, 0f..1f. The contrast guarantee over video:
+     * a white wash alone can only lighten its backdrop, and a pane that
+     * makes a bright frame brighter is a pane whose labels stop being
+     * readable. Nearly invisible over dark content, doing its work exactly
+     * where contrast fails. On the light theme the paper is already bright,
+     * so it drops to a whisper.
      */
-    val scrimAlpha: Float = 0.6f,
-    /**
-     * Lit top edge, 0f..1f, drawn in [tint].
-     *
-     * The static half of the glass read: every pane catches light along its top
-     * rim without paying for a moving reflection. The moving half is the opt-in
-     * [glassSheen]. Set to 0f for a flat pane.
-     */
-    val rimAlpha: Float = 0.17f
+    val scrimAlpha: Float = if (PaletteHolder.dark) 0.6f else 0.08f,
+    /** Lit top edge, 0f..1f, drawn in [tint]. See [glassSheen] for the moving half. */
+    val rimAlpha: Float = if (PaletteHolder.dark) 0.17f else 0.5f
 ) {
     /** Band alphas, scaled by [alpha] so one knob governs the whole wash. */
     fun scaledBands(): List<Float> = bands.map { it * (alpha / 0.10f) }
@@ -69,10 +67,6 @@ object Glass {
         shadowColor = accent,
         shadowAlpha = 0.30f
     ) else GlassStyle(
-        alpha = 0.50f,
-        borderAlpha = 0.30f,
-        scrimAlpha = 0.08f,
-        rimAlpha = 0.50f,
         shadowColor = Color(0xFF33415C),
         shadowAlpha = 0.24f
     )
@@ -88,8 +82,6 @@ object Glass {
         borderAlpha = 0.26f,
         corner = 22.dp,
         elevation = 12.dp,
-        scrimAlpha = 0.06f,
-        rimAlpha = 0.42f,
         shadowColor = Color(0xFF33415C),
         shadowAlpha = 0.18f
     )
@@ -107,8 +99,6 @@ object Glass {
         borderAlpha = 0.34f,
         corner = 28.dp,
         elevation = 22.dp,
-        scrimAlpha = 0.08f,
-        rimAlpha = 0.55f,
         shadowColor = Color(0xFF33415C),
         shadowAlpha = 0.26f
     )

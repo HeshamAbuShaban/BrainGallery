@@ -106,7 +106,7 @@ class OrganizeViewModel @Inject constructor(
             store.observe().collect {
                 _settings.value = it
                 AccentHolder.argb = it.accentArgb
-                PaletteHolder.dark = it.theme != "light"
+                PaletteHolder.theme = PaletteHolder.byId(it.theme)
             }
         }
         viewModelScope.launch {
@@ -552,6 +552,7 @@ class OrganizeViewModel @Inject constructor(
         _settings.value = s
         // The holder is the live accent; the save below only persists it.
         AccentHolder.argb = s.accentArgb
+        PaletteHolder.theme = PaletteHolder.byId(s.theme)
         viewModelScope.launch(Dispatchers.IO) { store.save(s) }
     }
     fun resetDerived() {
