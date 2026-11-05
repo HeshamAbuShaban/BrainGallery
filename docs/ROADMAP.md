@@ -278,6 +278,24 @@ but no seek, so a representative later frame is not reachable without
 writing a decoder of our own. The first frame stays. 20 tests pin the new
 policy (`PhotoPolicyTest`); no migration, no column, no dependency.
 
+## Six curated themes, device-verified (Nov 5)
+
+The two-theme switch grew into six hand-tuned palettes — Midnight, Catppuccin
+Mocha, Tokyo Night, GitHub Dark, Paper, Catppuccin Latte — picked from their
+official specs and retuned for a gallery. Palette/PALETTES/PaletteHolder.theme;
+every token getter reads the active palette (accents included, so Mocha reads
+as Mocha); hairline became a per-theme field; Tune's Appearance wears the
+themes as color-dot chips; EngineSettings.THEME_IDS is the canonical list with
+dark→midnight / light→paper graduation, pinned by a coherence test.
+
+Device verification caught two bugs the lab never showed: the palette sync
+still carried the two-theme boolean (five of six themes could never apply —
+fixed through PaletteHolder.byId on both sync paths), and bare GlassStyle()
+defaults were dark-tuned, skipping the dispatch (stat tiles rendered dark on
+Paper — the defaults now read the palette themselves, so light GlassStyle()
+is a true white frost). Verified live: Midnight ↔ Mocha ↔ Tokyo ↔ Paper, frost
+over paper, dark status-bar ink.
+
 ## Light theme, from settings (Nov 4)
 
 The palette became a switch: PaletteHolder (the AccentHolder pattern)
