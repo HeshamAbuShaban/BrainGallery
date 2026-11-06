@@ -53,12 +53,41 @@ pg, Content ID and PhotoPolicy work already had.
 
 ## Status
 
-Queued, untouched. The sitting starts when the owner calls the turn — and
-REA's cost is the model's context, so the heavy decompiles go to
-subagents while the main line returns to the mission at hand.
+First slice executed (see the log below). The APK acquisition and the REA
+decompile study remain queued for their own sitting — heavy decompiles go
+to subagents; REA's cost is the model's context.
+
+## What this sitting actually found (2026-11-06, first slice)
+
+- The Reddit write-up is unreachable from this network tonight — www,
+  old.reddit and the tool fetcher all serve the block page; no verified
+  mirror of the post's full text surfaced in search either. The
+  Hackernoon SDK deep-dive timed out. Recorded as blocked, not skipped.
+- What remains usable is the cross-source consensus (2026 signal guides
+  and the SDK-era coverage), which is remarkably consistent and maps
+  directly onto our own parts:
+  1. First-seconds retention carries the heaviest vote — a clip abandoned
+     in its first moments is a stronger negative than a late skip.
+  2. Rewatches/completions are the strongest positive; likes and shares
+     are weaker social-style signals we deliberately do not model.
+  3. Negative signals act fast and hard (not-interested, fast skips).
+  4. Cold start leans on quality/context until behavior exists.
+  5. No social graph in the core loop — behavioral evidence only. Our
+     constitution already matches this; noted, not adopted.
+- Landed tonight, re-anchored on top of the parallel sitting's
+  TasteProfile composer: the early-abandon verdict (-0.3, reason 'closed
+  fast') and the rewatch lift (+0.18 per return, capped at three, reason
+  'you came back to it', added after the anti-repeat demotion so the
+  return outweighs it). Both fold into completionWeight, both tested.
+- Verified in an isolated git worktree at HEAD — the main tree carries
+  the parallel session's in-flight FavButton work and stays untouched.
 
 ## Status log
 
+- 2026-11-06 (later) — first slice executed: signals landed, tests green
+  in the isolated worktree, main line untouched. Acquisition of the
+  actual APK remains open (no TikTok on the POCO; a mirror fetch is the
+  next sitting's step, then REA subagents per the plan above).
 - 2026-11-06 — queued per the owner's instruction; references recorded;
   no acquisition attempted. The sitting runs as a mode of long-running
   agents when the owner calls it; the main line stays on the app mission.
