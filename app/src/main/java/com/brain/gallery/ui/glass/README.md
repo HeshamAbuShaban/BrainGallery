@@ -14,12 +14,12 @@ Copy this folder, hand it the host project's colours, and it works.
 
 | File | Contents |
 | --- | --- |
-| `GlassStyle.kt` | `GlassStyle` — every value of the material in one data class — and the `Glass.onDark` / `Glass.subtle` / `Glass.raised` presets |
+| `GlassStyle.kt` | `GlassStyle` — every value of the material in one data class — and the `Glass.pane` / `Glass.subtle` / `Glass.raised` presets |
 | `Glass.kt` | `Modifier.glass(shape, style)`, the paint itself |
-| `GlassSurface.kt` | generic edge-anchored floating pane, plus `glassReserve()` |
+| `GlassSurface.kt` | `glassReserve()` — the pill's padding contract, read from the real bottom inset |
 | `GlassNav.kt` / `GlassNavMotion.kt` | the tab bar: one shared gesture, `semantics { role = Tab; selected; onClick }` per tab, and the pill that travels between them — velocity-driven squash/stretch, moving specular (`glassSheen`), drag handling |
 | `GlassMenu.kt` | menu pane, `glassMenuItems { }` DSL, and `GlassMenuOverlay` with its scrim |
-| `GlassWidgets.kt` | `GlassCard`, `GlassChip`, `GlassSegmented`, `GlassStatTile` |
+| `GlassWidgets.kt` | `GlassSegmented`, `GlassStatTile` |
 | `GlassMotion.kt` | durations and easings as named tokens, and `liquid()` |
 
 ## The material
@@ -51,17 +51,17 @@ Any shape:
 Box(Modifier.glass(RoundedCornerShape(30.dp), Glass.pane(Accent)))
 ```
 
-A bottom-anchored floating surface:
+A list that must clear the floating nav:
 
 ```kotlin
-GlassSurface(edgePadding = 12.dp) {
-    MyControls()
+Column(contentPadding = PaddingValues(bottom = glassReserve())) {
+    MyRows()
 }
 ```
 
-`GlassSurface` fills its window and pins the content to an edge, so callers do
-not reserve space themselves. `glassReserve()` gives the content's padding a
-value so it cannot drift from the surface.
+`glassReserve()` reads the real system bar it floats above — pill + breathing
+room + the inset — so content cannot hide under the nav and the two can never
+drift apart.
 
 ## How the motion works
 
@@ -98,7 +98,7 @@ pill and to drag the specular with it.
   does.
 - **48.dp touch targets, artwork untouched.** Every tappable node carries
   `minimumInteractiveComponentSize()`. It grows the *node*, never what it draws:
-  the menu row still paints 40.dp of wash, the chip still paints a 34.dp pill,
+  the menu row still paints 40.dp of wash,
   the segmented track still keeps the caller's height. The interactive modifier
   is ordered before the floor so the semantics node owns the grown bounds, and
   TalkBack and the accessibility scanner see the target instead of the artwork.
@@ -133,10 +133,6 @@ independent ones.
 - `GlassMenu` is a pane in the caller's overlay, not a real `Popup`. A Popup
   cannot read what is behind it, so there would be nothing for the glass to
   tint.
-- `GlassChip` builds its own wash from the style's tint rather than using the
-  full `glass` modifier. A row of chips each casting a 20dp shadow stops being
-  chips — but it takes the style's scrim back, since a chip is often the only
-  thing between its label and a bright frame.
 - `GlassSegmented` draws the track and the hit row as two boxes: the track keeps
   the visual height, the segments never go below 48.dp, and both share the same
   horizontal inset so a label stays centred on the indicator under it.

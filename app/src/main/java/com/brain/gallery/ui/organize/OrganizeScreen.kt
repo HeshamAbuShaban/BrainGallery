@@ -19,7 +19,10 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -87,6 +90,7 @@ import com.brain.gallery.ui.glass.glass
 import com.brain.gallery.ui.glass.GlassStyle
 import com.brain.gallery.ui.glass.glassReserve
 import com.brain.gallery.ui.hero.ShelfCarousel
+import com.brain.gallery.ui.glass.GlassMenuOverlay
 import com.brain.gallery.ui.glass.GlassSegmented
 import com.brain.gallery.ui.components.MoveToGroupSheet
 import com.brain.gallery.ui.spotlight.SpotlightController
@@ -140,6 +144,8 @@ fun OrganizeScreen(
     var renameTarget by remember { mutableStateOf<SmartGroup?>(null) }
     val deleteAsk by vm.deleteAsk.collectAsState()
     val haptics = LocalHapticFeedback.current
+    // Status bar inset, read once; the overflow pane anchors under its button.
+    val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
 
     val delLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartIntentSenderForResult()) { res ->
@@ -187,34 +193,10 @@ fun OrganizeScreen(
                         modifier = Modifier.size(18.dp))
                 }
                 Spacer(Modifier.width(8.dp))
-                Box {
-                    IconButton(onClick = { menuOpen = true },
-                        modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(40.dp)) {
-                        Icon(Icons.Default.MoreHoriz, "Library actions", tint = Text1,
-                            modifier = Modifier.size(18.dp))
-                    }
-                    DropdownMenu(
-                        expanded = menuOpen,
-                        onDismissRequest = { menuOpen = false },
-                        modifier = Modifier.width(230.dp)
-                            .glass(RoundedCornerShape(20.dp), GlassStyle())
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Export memory", color = Text1) },
-                            leadingIcon = { Icon(Icons.Default.Save, null, tint = Text1,
-                                modifier = Modifier.size(18.dp)) },
-                            onClick = { menuOpen = false; vm.exportMemory() })
-                        DropdownMenuItem(
-                            text = { Text("New album", color = Text1) },
-                            leadingIcon = { Icon(Icons.Default.CreateNewFolder, null, tint = Text1,
-                                modifier = Modifier.size(18.dp)) },
-                            onClick = { menuOpen = false; newAlbumOpen = true })
-                        DropdownMenuItem(
-                            text = { Text("Re-scan library", color = Text1) },
-                            leadingIcon = { Icon(Icons.Default.Refresh, null, tint = Text1,
-                                modifier = Modifier.size(18.dp)) },
-                            onClick = { menuOpen = false; vm.rescan() })
-                    }
+                IconButton(onClick = { menuOpen = true },
+                    modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(40.dp)) {
+                    Icon(Icons.Default.MoreHoriz, "Library actions", tint = Text1,
+                        modifier = Modifier.size(18.dp))
                 }
             }
             // One switch, two media. It stays put: the thing you are switching
@@ -418,6 +400,26 @@ fun OrganizeScreen(
                 renameTarget = null
                 vm.renameGroup(g.id, name)
             })
+    }
+    // The hub's overflow, in liquid glass: a pane over the same window with a
+    // dismissing scrim, not a platform Popup — what it paints, it actually
+    // sits on. Anchored under the overflow button (status bar + the 12dp
+    // crown top + the 40dp button).
+    GlassMenuOverlay(
+        visible = menuOpen,
+        onDismiss = { menuOpen = false },
+        alignment = Alignment.TopEnd,
+        anchorPadding = PaddingValues(top = topInset + 56.dp, end = 10.dp)
+    ) {
+        item("Export memory", Icons.Default.Save) {
+            menuOpen = false; vm.exportMemory()
+        }
+        item("New album", Icons.Default.CreateNewFolder) {
+            menuOpen = false; newAlbumOpen = true
+        }
+        item("Re-scan library", Icons.Default.Refresh) {
+            menuOpen = false; vm.rescan()
+        }
     }
 }
 
