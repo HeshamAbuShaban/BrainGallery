@@ -66,9 +66,9 @@ fun FavIcon(
             pop.animateTo(1f, spring(dampingRatio = 0.65f, stiffness = 760f))
         }
     }
-    val burstProgress by animateFloatAsState(
+    val burstProgress by androidx.compose.animation.core.animateFloatAsState(
         targetValue = if (burst) 1f else 0f,
-        animationSpec = if (burst) tween(520) else tween(0),
+        animationSpec = if (burst) androidx.compose.animation.core.tween(520) else androidx.compose.animation.core.tween(0),
         label = "favBurst"
     )
 

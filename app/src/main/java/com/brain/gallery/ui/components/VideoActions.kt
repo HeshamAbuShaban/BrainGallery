@@ -124,39 +124,40 @@ fun VideoActionsSheet(
                 Text("${video.category} • ${video.folderName}", color = Text2, fontSize = 11.5.sp)
             }
         }
-        SheetRow(Icons.Default.PlayArrow, "Play", Text1, onPlay)
+        SheetRow(Icons.Default.PlayArrow, "Play", Text1, onClick = onPlay)
         // Pops on toggle — the same heart behavior, every surface.
         SheetRow(Icons.Default.Favorite,
             if (video.isFavorite) "Remove favorite" else "Favorite",
-            if (video.isFavorite) Pink else Text1, onFav,
+            if (video.isFavorite) Pink else Text1,
+            onClick = onFav,
             iconContent = {
                 FavIcon(video.isFavorite, size = 21.dp,
                     activeColor = Pink, tint = Text1)
             })
-        SheetRow(Icons.Default.Search, "More like this", Text1, onSimilar)
-        SheetRow(Icons.Default.Info, "Details", Text1, onDetails)
+        SheetRow(Icons.Default.Search, "More like this", Text1, onClick = onSimilar)
+        SheetRow(Icons.Default.Info, "Details", Text1, onClick = onDetails)
         if (onNotInterested != null)
-            SheetRow(Icons.Default.VisibilityOff, "Not interested — show less", Text1, onNotInterested)
+            SheetRow(Icons.Default.VisibilityOff, "Not interested — show less", Text1, onClick = onNotInterested)
         if (hasIdentity && onMovePerson != null) {
             SheetRow(Icons.Default.PersonSearch,
                 if (inPersonGroup) "Wrong person — move to…" else "Add to a person…", Cyan,
-                { onMovePerson() })
+                onClick = { onMovePerson() })
         }
         if (inPersonGroup && onRemoveFromPerson != null) {
-            SheetRow(Icons.Default.PersonOff, "Not this person", Text1, onRemoveFromPerson)
+            SheetRow(Icons.Default.PersonOff, "Not this person", Text1, onClick = onRemoveFromPerson)
         }
         if (onMoveGroup != null) {
-            SheetRow(Icons.Default.DriveFileMove, "Move to another group…", Cyan, onMoveGroup)
+            SheetRow(Icons.Default.DriveFileMove, "Move to another group…", Cyan, onClick = onMoveGroup)
         }
         if (onPick != null) {
             SheetRow(
                 if (picked) Icons.Default.CheckCircle else Icons.Default.CheckCircleOutline,
                 if (picked) "Unselect" else "Select for a group of actions",
-                if (picked) Green else Text1, onPick
+                if (picked) Green else Text1, onClick = onPick
             )
         }
         if (onDelete != null)
-            SheetRow(Icons.Default.Delete, "Delete from device", Danger, onDelete)
+            SheetRow(Icons.Default.Delete, "Delete from device", Danger, onClick = onDelete)
         } // ROOT
       } // when
         Spacer(Modifier.height(20.dp))
@@ -165,7 +166,8 @@ fun VideoActionsSheet(
 
 @Composable
 private fun SheetRow(icon: ImageVector, label: String, tint: Color,
-    iconContent: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
+    iconContent: (@Composable () -> Unit)? = null,
+    onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable { onClick() }.padding(18.dp, 13.dp),
         verticalAlignment = Alignment.CenterVertically) {
         if (iconContent != null) {
