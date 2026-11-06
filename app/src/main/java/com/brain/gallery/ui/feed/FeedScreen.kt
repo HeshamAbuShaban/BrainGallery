@@ -159,11 +159,16 @@ fun FeedScreen(
     if (shown.isEmpty()) {
         Box(Modifier.fillMaxSize().background(Bg), contentAlignment = Alignment.Center) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Text("Nothing to show", color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
-                Text(
-                    if (vm.feed.value.isEmpty()) "Everything got filtered out — tap refresh"
-                    else "Grant access, then rescan",
-                    color = Color.White.copy(alpha = 0.6f), fontSize = 13.sp)
+                // An empty reel is an unread library, never a failing engine —
+                // the copy says what is missing and where the work happens.
+                Text("Nothing to show yet", color = Color.White, fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold)
+                Spacer(Modifier.height(6.dp))
+                Text("The reel is filled by the brain reading this library.\n" +
+                        "Grant video and photo access, then scan again —\n" +
+                        "nothing ever leaves the phone.",
+                    color = Color.White.copy(alpha = 0.72f), fontSize = 13.sp,
+                    lineHeight = 19.sp)
                 Spacer(Modifier.height(12.dp))
                 IconButton(onClick = { vm.refresh() },
                     modifier = Modifier.glass(CircleShape, Glass.pane(Accent))) {

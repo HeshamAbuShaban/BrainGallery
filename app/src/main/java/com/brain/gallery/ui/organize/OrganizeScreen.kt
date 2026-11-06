@@ -262,6 +262,28 @@ fun OrganizeScreen(
                                     Modifier.weight(1f))
                             }
                         }
+                        // An empty library is the one screen that must not
+                        // look like a broken one: the story, in the app's own
+                        // voice, before the shelves it will one day hold.
+                        if (stats.total == 0) {
+                            item(span = { GridItemSpan(2) }, key = "empty-library") {
+                                Column(Modifier.fillMaxWidth()
+                                    .glass(RoundedCornerShape(20.dp), Glass.pane(Accent))
+                                    .padding(22.dp),
+                                    verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text("The brain has nothing to read here yet",
+                                        color = Text1, fontSize = 15.sp,
+                                        fontWeight = FontWeight.Bold)
+                                    Text("Grant video and photo access and it starts quietly: " +
+                                        "faces, labels, duplicates, motion — a reel that finally " +
+                                        "knows who is who. No network call, ever.",
+                                        color = Text2, fontSize = 12.sp, lineHeight = 17.sp)
+                                    Text("then this page becomes shelves, people and memory",
+                                        color = Accent, fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold)
+                                }
+                            }
+                        }
                         if (stats.pending > 0) {
                             item(span = { GridItemSpan(2) }, key = "pending") {
                                 Column(Modifier.fillMaxWidth()) {
@@ -423,7 +445,7 @@ fun OrganizeScreen(
         visible = menuOpen,
         onDismiss = { menuOpen = false },
         alignment = Alignment.TopEnd,
-        anchorPadding = PaddingValues(top = topInset + 56.dp, end = 10.dp)
+        anchorPadding = PaddingValues(top = topInset + 64.dp, end = 10.dp)
     ) {
         item("Export memory", Icons.Default.Save) {
             menuOpen = false; vm.exportMemory()

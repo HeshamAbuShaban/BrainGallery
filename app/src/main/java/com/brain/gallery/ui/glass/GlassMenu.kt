@@ -302,25 +302,21 @@ fun GlassMenuOverlay(
         label = "menuScrim"
     )
 
-    Box(
-        modifier
-            .fillMaxSize()
+    Box(modifier.fillMaxSize(), contentAlignment = alignment) {
+        // The tap trap is the scrim, and only when it exists: nothing in this
+        // overlay consumes a touch while the pane is gone, and a hidden scrim is
+        // not a node at all — a root-level enabled=false clickable ate the
+        // header's taps before this was moved here.
+        if (scrim > 0f) {
             // The pane is a child, so it wins the hit test and the scrim only
             // catches the taps that land beside it. Menu rows are merging nodes
             // of their own, so they stay separate TalkBack targets rather than
             // being flattened into the scrim's node.
-            .clickable(
-                interactionSource = null,
-                indication = null,
-                enabled = visible
-            ) { onDismiss() },
-        contentAlignment = alignment
-    ) {
-        if (scrim > 0f) {
             Box(
                 Modifier
                     .fillMaxSize()
                     .background(scrimColor.copy(alpha = scrimColor.alpha * scrim))
+                    .clickable(interactionSource = null, indication = null) { onDismiss() }
             )
         }
         GlassMenu(

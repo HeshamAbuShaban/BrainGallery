@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
@@ -394,7 +395,7 @@ private fun BrainScaffold(
     content: @Composable () -> Unit
 ) {
     Column(Modifier.fillMaxSize().background(Bg)) {
-        Row(Modifier.fillMaxWidth().padding(8.dp, 16.dp, 16.dp, 4.dp),
+        Row(Modifier.fillMaxWidth().statusBarsPadding().padding(8.dp, 8.dp, 16.dp, 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
             IconButton(onClick = onBack,
                 modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(38.dp)) {

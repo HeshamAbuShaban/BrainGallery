@@ -133,7 +133,8 @@ fun SearchScreen(
         Column(Modifier.fillMaxSize().background(Bg).statusBarsPadding().padding(top = 4.dp)) {
             Text("Search", color = Text1, fontSize = 26.sp, fontWeight = FontWeight.ExtraBold,
                 modifier = Modifier.padding(horizontal = 20.dp))
-            Text("Names, tags, people, voice, photos — try \"talking\"", color = Text2, fontSize = 12.5.sp,
+            Text("names · tags · faces · voices — then narrow with chips: this week, this month, who's in frame",
+                color = Text2, fontSize = 12.sp, maxLines = 2,
                 modifier = Modifier.padding(horizontal = 20.dp))
             TextField(value = q, onValueChange = { vm.query(it) },
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
@@ -239,7 +240,7 @@ fun SearchScreen(
                                 .padding(20.dp, 10.dp))
                     }
                 }
-                Text("Drawn from your library",
+                Text("Things worth trying",
                     color = Text1, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(20.dp, 14.dp, 20.dp, 4.dp))
                 val suggestions by vm.suggestions.collectAsState()
@@ -255,6 +256,28 @@ fun SearchScreen(
                                 .clickable { vm.query(sg); vm.rememberSearch(sg) }
                                 .padding(horizontal = 14.dp, vertical = 8.dp))
                     }
+                    // Two compound doorways: the query and the week set in
+                    // one tap. They explain chips better than any caption.
+                    Text("talking · this week", color = Accent, fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(ChipFill)
+                            .clickable {
+                                vm.query("talking"); vm.rememberSearch("talking")
+                                vm.toggleTime(TimeLens.WEEK)
+                            }
+                            .padding(horizontal = 14.dp, vertical = 8.dp))
+                    Text("people · this year", color = Accent, fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(ChipFill)
+                            .clickable {
+                                vm.query("people"); vm.rememberSearch("people")
+                                vm.toggleTime(TimeLens.YEAR)
+                            }
+                            .padding(horizontal = 14.dp, vertical = 8.dp))
                 }
                 Spacer(Modifier.height(12.dp))
             }

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -110,7 +111,7 @@ fun TuneScreen(onOpenBrain: () -> Unit, vm: TuneViewModel = hiltViewModel()) {
     val cfg by vm.settings.collectAsState()
 
     Column(Modifier.fillMaxSize().background(Bg)) {
-        Row(Modifier.fillMaxWidth().padding(20.dp, 16.dp, 16.dp, 4.dp),
+        Row(Modifier.fillMaxWidth().statusBarsPadding().padding(20.dp, 10.dp, 16.dp, 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
                 Text("Tune", color = Text1, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
