@@ -84,6 +84,13 @@ to subagents; REA's cost is the model's context.
 
 ## Status log
 
+- 2026-11-06 (later) — first slice executed:
+  - A long-running read-only audit subagent is sweeping the six themes and
+    the reel scenarios (AREA: theme correctness per palette; AREA: remaining
+    reel logic scenarios) — its findings feed the next app-mission turn.
+  - REA next-sitting prep recorded: the skill lives in this machine's agent
+    skills; acquisition via a public mirror (no TikTok on the POCO); heavy
+    decompiles stay in subagents.
 - 2026-11-06 (later) — first slice executed: signals landed, tests green
   in the isolated worktree, main line untouched. Acquisition of the
   actual APK remains open (no TikTok on the POCO; a mirror fetch is the
