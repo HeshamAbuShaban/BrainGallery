@@ -682,6 +682,20 @@ class OrganizeViewModel @Inject constructor(
 /** The chip row over search results. A lens, not a query. */
 enum class VoiceFilter { ALL, PEOPLE, FAVORITES, TALKING }
 
+/** The time lens over a result set. */
+enum class TimeLens { ANY, WEEK, MONTH, YEAR }
+
+/**
+ * The narrowing lenses that ride on top of the spoken one. Independent on
+ * purpose — "talking, this month" is a question a person actually asks, and
+ * the grid should answer it.
+ */
+data class SearchLens(
+    val time: TimeLens = TimeLens.ANY,
+    val category: String? = null,
+    val folder: String? = null
+)
+
 /**
  * One search result, either way. Its vocabulary is the same in both media:
  * faces, favorites, and (video-only) the voice layer — which is what the lens
@@ -691,17 +705,26 @@ sealed interface SearchHit {
     val faceCount: Int
     val isFavorite: Boolean
     val prosodyTags: String
+    val category: String
+    val folderName: String
+    val dateAddedSec: Long
 
     data class VideoHit(val video: VideoEntity) : SearchHit {
         override val faceCount get() = video.faceCount
         override val isFavorite get() = video.isFavorite
         override val prosodyTags get() = video.prosodyTags
+        override val category get() = video.category
+        override val folderName get() = video.folderName
+        override val dateAddedSec get() = video.dateAddedSec
     }
 
     data class PhotoHit(val photo: PhotoEntity) : SearchHit {
         override val faceCount get() = photo.faceCount
         override val isFavorite get() = photo.isFavorite
         override val prosodyTags get() = ""
+        override val category get() = photo.category
+        override val folderName get() = photo.folderName
+        override val dateAddedSec get() = photo.dateAddedSec
     }
 }
 
@@ -723,6 +746,36 @@ class SearchViewModel @Inject constructor(
     val query: StateFlow<String> = _q
     private val _results = MutableStateFlow<List<SearchHit>>(emptyList())
     private val _filter = MutableStateFlow(VoiceFilter.ALL)
+    // The narrowing lenses — time, category, folder — riding on top of the
+    // spoken one. Chips live next to the words you type, not over them.
+    private val _lens = MutableStateFlow(SearchLens())
+    val lens: StateFlow<SearchLens> = _lens
+    private val _narrowingCategories = MutableStateFlow<List<String>>(emptyList())
+    val narrowingCategories: StateFlow<List<String>> = _narrowingCategories
+    private val _narrowingFolders = MutableStateFlow<List<String>>(emptyList())
+    val narrowingFolders: StateFlow<List<String>> = _narrowingFolders
+
+    /** Names of the people the grouping needs; renames flow in live. */
+    private val _personNames = MutableStateFlow<Map<Int, String>>(emptyMap())
+    val personNames: StateFlow<Map<Int, String>> = _personNames
+
+    fun toggleTime(t: TimeLens) {
+        _lens.value = _lens.value.let {
+            it.copy(time = if (it.time == t) TimeLens.ANY else t)
+        }
+    }
+
+    fun toggleCategory(c: String) {
+        _lens.value = _lens.value.let {
+            it.copy(category = if (it.category == c) null else c)
+        }
+    }
+
+    fun toggleFolder(f: String) {
+        _lens.value = _lens.value.let {
+            it.copy(folder = if (it.folder == f) null else f)
+        }
+    }
 
     // The search landing: what you looked for before, and where to start.
     private val _recents = MutableStateFlow<List<String>>(emptyList())
@@ -760,6 +813,17 @@ class SearchViewModel @Inject constructor(
                 .take(2).map { it.key }
             _suggestions.value = (listOf("talking", "people") + cats + folders)
                 .distinct().take(7)
+            // The same drawn lists narrow a result set — no chip appears that
+            // the library could not mean.
+            _narrowingCategories.value = cats
+            _narrowingFolders.value = folders
+        }
+        viewModelScope.launch {
+            db.personDao().observePersons().collect { list ->
+                _personNames.value = list.associate { p ->
+                    p.id to p.name.trim().ifBlank { p.suggestedName.trim() }
+                }
+            }
         }
     }
 
@@ -789,16 +853,30 @@ class SearchViewModel @Inject constructor(
     fun filter(f: VoiceFilter) { _filter.value = f }
 
     /**
-     * The visible grid: raw matches narrowed by the chip row. Client-side on
+     * The visible grid: raw matches narrowed by the lens row. Client-side on
      * purpose — the filter is a lens on what was found, not a new query.
      */
-    val results: StateFlow<List<SearchHit>> = combine(_results, _filter) { r, f ->
-        when (f) {
-            VoiceFilter.ALL -> r
-            VoiceFilter.PEOPLE -> r.filter { it.faceCount > 0 }
-            VoiceFilter.FAVORITES -> r.filter { it.isFavorite }
-            VoiceFilter.TALKING -> r.filter { it.prosodyTags.contains("speaking") }
+    val results: StateFlow<List<SearchHit>> = combine(_results, _filter, _lens) { r, f, lens ->
+        val now = System.currentTimeMillis() / 1000
+        val floor = when (lens.time) {
+            TimeLens.ANY -> 0L
+            TimeLens.WEEK -> now - 7 * 86_400L
+            TimeLens.MONTH -> now - 30 * 86_400L
+            TimeLens.YEAR -> now - 365 * 86_400L
         }
+        r.asSequence()
+            .filter { hit ->
+                when (f) {
+                    VoiceFilter.ALL -> true
+                    VoiceFilter.PEOPLE -> hit.faceCount > 0
+                    VoiceFilter.FAVORITES -> hit.isFavorite
+                    VoiceFilter.TALKING -> hit.prosodyTags.contains("speaking")
+                }
+            }
+            .filter { lens.time == TimeLens.ANY || it.dateAddedSec >= floor }
+            .filter { lens.category == null || it.category == lens.category }
+            .filter { lens.folder == null || it.folderName.equals(lens.folder, ignoreCase = true) }
+            .toList()
     }.stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
 
     init {

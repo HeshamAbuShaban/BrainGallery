@@ -23,7 +23,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -66,6 +68,7 @@ import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.Text1
 import com.brain.gallery.ui.theme.ChipFill
+import com.brain.gallery.ui.theme.Cyan
 import com.brain.gallery.ui.theme.Text2
 import com.brain.gallery.ui.theme.Pink
 
@@ -119,6 +122,12 @@ fun SearchScreen(
     LaunchedEffect(photoFor?.id) {
         photoSimilar = photoFor?.let { vm.photoNeighbors(it) }.orEmpty()
     }
+    // The narrowing lenses and the people the grid groups by.
+    val lens by vm.lens.collectAsState()
+    val personNames by vm.personNames.collectAsState()
+    val narrowingCategories by vm.narrowingCategories.collectAsState()
+    val narrowingFolders by vm.narrowingFolders.collectAsState()
+    val sections = remember(results, personNames) { resultSections(results, personNames) }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().background(Bg).statusBarsPadding().padding(top = 4.dp)) {
@@ -164,6 +173,30 @@ fun SearchScreen(
                 modifier = Modifier.fillMaxWidth().padding(20.dp, 8.dp, 20.dp, 0.dp),
                 selectedColor = Accent
             )
+            // The narrowing lenses: what the device actually holds narrows the
+            // query; chips appear once a query exists. Drawn from the library,
+            // never invented.
+            if (q.length >= 2) {
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                    contentPadding = PaddingValues(horizontal = 20.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item { LensChip("This week", lens.time == TimeLens.WEEK) { vm.toggleTime(TimeLens.WEEK) } }
+                    item { LensChip("This month", lens.time == TimeLens.MONTH) { vm.toggleTime(TimeLens.MONTH) } }
+                    item { LensChip("This year", lens.time == TimeLens.YEAR) { vm.toggleTime(TimeLens.YEAR) } }
+                    narrowingCategories.forEach { c ->
+                        item(key = "cat_$c") {
+                            LensChip(c, lens.category == c) { vm.toggleCategory(c) }
+                        }
+                    }
+                    narrowingFolders.forEach { f ->
+                        item(key = "fold_$f") {
+                            LensChip(f, lens.folder == f) { vm.toggleFolder(f) }
+                        }
+                    }
+                }
+            }
             if (q.length < 2) {
                 // The landing: what you looked for, and where to start. An
                 // empty field should invite, not blankly wait. One gifting
@@ -226,12 +259,19 @@ fun SearchScreen(
                 Spacer(Modifier.height(12.dp))
             }
             if (q.length >= 2 && results.isEmpty()) {
-                Text("No matches for \"$q\"", color = Text2, fontSize = 13.sp,
+                val lensActive = lens.time != TimeLens.ANY ||
+                    lens.category != null || lens.folder != null
+                Text(
+                    if (lensActive) "Nothing under this lens — try clearing it."
+                    else "No matches for \"$q\"",
+                    color = Text2, fontSize = 13.sp,
                     modifier = Modifier.padding(20.dp))
             }
             // One grid, both media: videos keep their tall frame and the
             // long-press sheet, photos keep their plain flat tile — a result
-            // is a result, but each medium stays shaped like itself.
+            // is a result, but each medium stays shaped like itself. Person
+            // headers ride full-width when the library knows more than one
+            // named face among the matches; a single bucket stays flat.
             LazyVerticalGrid(GridCells.Fixed(3),
                 contentPadding = PaddingValues(
                     start = 20.dp, end = 20.dp, top = 8.dp,
@@ -239,12 +279,18 @@ fun SearchScreen(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 modifier = Modifier.weight(1f)) {
-                items(results, key = {
-                    when (it) {
-                        is SearchHit.VideoHit -> "v_${it.video.id}"
-                        is SearchHit.PhotoHit -> "p_${it.photo.id}"
+                sections.forEachIndexed { i, section ->
+                    section.title?.let { t ->
+                        item(span = { GridItemSpan(3) }, key = "hdr_$i") {
+                            SectionHeader(t, section.hits.size)
+                        }
                     }
-                }) { hit ->
+                    items(section.hits, key = {
+                        when (it) {
+                            is SearchHit.VideoHit -> "v_${it.video.id}"
+                            is SearchHit.PhotoHit -> "p_${it.photo.id}"
+                        }
+                    }) { hit ->
                     when (hit) {
                         is SearchHit.VideoHit -> VideoThumb(hit.video, Modifier.aspectRatio(0.7f),
                             onClick = { spotlight.open(hit.video) },
@@ -268,6 +314,7 @@ fun SearchScreen(
                             }
                         }
                     }
+                    }
                 }
             }
         }
@@ -290,5 +337,38 @@ fun SearchScreen(
                 onFav = { vm.togglePhotoFav(p) },
                 onDelete = { photoFor = null; vm.requestDeletePhotos(listOf(p.id)) })
         }
+    }
+}
+
+/** A chip the library itself drew — the same values that seed the suggestions. */
+@Composable
+private fun LensChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    val haptics = LocalHapticFeedback.current
+    Text(
+        label,
+        color = if (selected) Color.Black else Accent,
+        fontSize = 12.sp,
+        fontWeight = FontWeight.SemiBold,
+        maxLines = 1,
+        modifier = Modifier.clip(RoundedCornerShape(50))
+            .background(if (selected) Accent else ChipFill)
+            .clickable {
+                haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }
+            .padding(horizontal = 14.dp, vertical = 8.dp)
+    )
+}
+
+/** A person the grid groups by. Chips and captions, never a guess on screen. */
+@Composable
+private fun SectionHeader(title: String, count: Int) {
+    Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically) {
+        Text(title.uppercase(), color = Cyan, fontSize = 11.sp,
+            fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp)
+        Spacer(Modifier.weight(1f))
+        Text("$count", color = Text2, fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold)
     }
 }
