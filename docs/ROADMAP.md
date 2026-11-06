@@ -278,6 +278,20 @@ but no seek, so a representative later frame is not reachable without
 writing a decoder of our own. The first frame stays. 20 tests pin the new
 policy (`PhotoPolicyTest`); no migration, no column, no dependency.
 
+## Stewardship pass (Nov 6, night)
+
+The parallel sitting's in-flight work (spring heart FavButton + SheetRow
+icon slots) carried across the line: one wrong Animatable import and one
+trailing-lambda parameter order fixed — their features now live and
+compile. The QA audit's priority fixes landed with them: glass ink
+defaults read theme tokens (six invisible-ink surfaces on the light
+palettes repaired), Hairline is per-palette, Latte contrast stepped
+darker, inkOn() governs chip ink by luminance, FeedViewModel composes
+off-Main with reshuffle jump-to-start (no replay flash), speed and pause
+are session-scoped, and the reason line sorts by a fixed rank (a rewatch
+leads; a demotion note never rides as line two). Gated in an isolated
+worktree so the parallel session could keep typing.
+
 ## The photo half gets its mind (Nov 5, evening)
 
 The user's five-point critique, shipped and device-verified: nav pill reads
