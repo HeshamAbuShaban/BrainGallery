@@ -24,8 +24,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -56,6 +54,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
+import com.brain.gallery.ui.components.FavButton
 import com.brain.gallery.ui.components.RailPrefs
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -166,12 +165,15 @@ fun SpotlightPlayer(
                         fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 2)
                     Text("${video.category} • ${video.folderName}", color = Text2, fontSize = 11.sp)
                 }
-                IconButton(onClick = { onFav(video); haptics.performHapticFeedback(HapticFeedbackType.LongPress) },
-                    modifier = Modifier.size(38.dp)) {
-                    Icon(if (video.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        null, tint = if (video.isFavorite) Pink else Color.White,
-                        modifier = Modifier.size(22.dp))
-                }
+                // The spotlight's heart carries its answer in full: spring and haptic.
+                FavButton(
+                    favorite = video.isFavorite,
+                    onToggle = { onFav(video) },
+                    modifier = Modifier.size(38.dp),
+                    size = 22.dp,
+                    tapTarget = 38.dp,
+                    contentDescription = if (video.isFavorite) "Unfavorite" else "Favorite"
+                )
                 IconButton(onClick = { ShareHelper.share(ctx, video) },
                     modifier = Modifier.size(38.dp)) {
                     Icon(Icons.Default.Share, "Share", tint = Color.White,

@@ -23,7 +23,6 @@ import androidx.compose.material.icons.filled.CheckCircleOutline
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DriveFileMove
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Label
 import androidx.compose.material.icons.filled.PlayArrow
@@ -55,6 +54,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.engine.MemoryDocBuilder
+import com.brain.gallery.ui.components.FavIcon
 import com.brain.gallery.ui.theme.CardShape
 import com.brain.gallery.ui.theme.Cyan
 import com.brain.gallery.ui.theme.Pink
@@ -125,9 +125,14 @@ fun VideoActionsSheet(
             }
         }
         SheetRow(Icons.Default.PlayArrow, "Play", Text1, onPlay)
-        SheetRow(if (video.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+        // Pops on toggle — the same heart behavior, every surface.
+        SheetRow(Icons.Default.Favorite,
             if (video.isFavorite) "Remove favorite" else "Favorite",
-            if (video.isFavorite) Pink else Text1, onFav)
+            if (video.isFavorite) Pink else Text1, onFav,
+            iconContent = {
+                FavIcon(video.isFavorite, size = 21.dp,
+                    activeColor = Pink, tint = Text1)
+            })
         SheetRow(Icons.Default.Search, "More like this", Text1, onSimilar)
         SheetRow(Icons.Default.Info, "Details", Text1, onDetails)
         if (onNotInterested != null)
@@ -159,10 +164,15 @@ fun VideoActionsSheet(
 }
 
 @Composable
-private fun SheetRow(icon: ImageVector, label: String, tint: Color, onClick: () -> Unit) {
+private fun SheetRow(icon: ImageVector, label: String, tint: Color,
+    iconContent: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable { onClick() }.padding(18.dp, 13.dp),
         verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = tint, modifier = Modifier.size(21.dp))
+        if (iconContent != null) {
+            iconContent()
+        } else {
+            Icon(icon, null, tint = tint, modifier = Modifier.size(21.dp))
+        }
         Spacer(Modifier.width(14.dp))
         Text(label, color = Text1, fontSize = 14.5.sp)
     }

@@ -231,6 +231,26 @@ class FeedComposerTest {
     }
 
     @Test
+    fun `a rewatched clip says it came back`() {
+        val clips = (1L..20).map { video(it, watched = true, completion = 0.9f) }
+        val events = listOf(
+            WatchEventEntity(videoId = 1, atMs = 0, completion = 0.9f, skipped = false, hourOfDay = 12),
+            WatchEventEntity(videoId = 1, atMs = 1, completion = 0.95f, skipped = false, hourOfDay = 13))
+        val out = composer.compose(clips, events, random = Random(7))
+        val one = out.first { it.video.id == 1L }
+        assertTrue(one.reason.contains("came back"), "reason was: ${one.reason}")
+    }
+
+    @Test
+    fun `an early abandon says closed fast, never pairs it with a favorite`() {
+        val abandoned = video(1, watched = true, completion = 0.1f).copy(skipCount = 1)
+        val out = composer.compose(listOf(abandoned), emptyList(), random = Random(7))
+        val reason = out.first().reason
+        assertTrue(reason.contains("closed fast"), "reason was: $reason")
+        assertFalse(reason.contains("a favorite"))
+    }
+
+    @Test
     fun `theme ids agree between settings and palettes`() {
         val paletteIds = com.brain.gallery.ui.theme.PALETTES.map { it.id }
         org.junit.Assert.assertEquals(EngineSettings.THEME_IDS, paletteIds)

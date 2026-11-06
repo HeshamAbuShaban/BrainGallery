@@ -43,6 +43,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brain.gallery.ui.theme.Accent
+import com.brain.gallery.ui.theme.PaletteHolder
+import com.brain.gallery.ui.theme.Text1
 
 /** How small the pane is at the start of its entrance. Enough to read as growing. */
 private const val EnterScale = 0.94f
@@ -145,7 +147,7 @@ fun GlassMenu(
     visible: Boolean = true,
     style: GlassStyle = GlassStyle(),
     selectedColor: Color = Accent,
-    contentColor: Color = Color(0xFFE8ECF4),
+    contentColor: Color = Text1,
     anchorWidth: Dp = 220.dp,
     corner: Dp = style.corner
 ) {
@@ -287,7 +289,7 @@ fun GlassMenuOverlay(
     modifier: Modifier = Modifier,
     alignment: Alignment = Alignment.TopEnd,
     anchorPadding: PaddingValues = PaddingValues(12.dp),
-    scrimColor: Color = Color(0xFF05070C).copy(alpha = 0.42f),
+    scrimColor: Color = if (PaletteHolder.dark) Color(0xFF05070C).copy(alpha = 0.42f) else Color(0xFF05070C).copy(alpha = 0.18f),
     style: GlassStyle = GlassStyle(),
     selectedColor: Color = Accent,
     contentColor: Color = Color(0xFFE8ECF4),

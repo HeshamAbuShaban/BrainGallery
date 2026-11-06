@@ -45,7 +45,8 @@ data class Palette(
     val yellow: Color,
     val danger: Color,
     val dangerContainer: Color,
-    val chipFill: Color
+    val chipFill: Color,
+    val hairline: Color
 )
 
 val PALETTES = listOf(
@@ -55,42 +56,42 @@ val PALETTES = listOf(
         text1 = Color(0xFFF2F5FA), text2 = Color(0xFF9AA6B8), text3 = Color(0xFF5F6B7E),
         pink = Color(0xFFEC4899), green = Color(0xFF10B981), cyan = Color(0xFF06B6D4),
         yellow = Color(0xFFF59E0B), danger = Color(0xFFF87171),
-        dangerContainer = Color(0xFF3A2410), chipFill = Color.White.copy(alpha = 0.06f)),
+        dangerContainer = Color(0xFF3A2410), chipFill = Color.White.copy(alpha = 0.06f), hairline = Color(0xFF1A2231)),
     Palette("mocha", "Catppuccin Mocha", true,
         bg = Color(0xFF1E1E2E), surface = Color(0xFF181825), surface2 = Color(0xFF313244),
         elevated = Color(0xFF45475A), line = Color(0xFF585B70),
         text1 = Color(0xFFCDD6F4), text2 = Color(0xFFA6ADC8), text3 = Color(0xFF9399B2),
         pink = Color(0xFFF5C2E7), green = Color(0xFFA6E3A1), cyan = Color(0xFF94E2D5),
         yellow = Color(0xFFF9E2AF), danger = Color(0xFFF38BA8),
-        dangerContainer = Color(0xFF3B2A3A), chipFill = Color.White.copy(alpha = 0.07f)),
+        dangerContainer = Color(0xFF3B2A3A), chipFill = Color.White.copy(alpha = 0.07f), hairline = Color(0xFF3A2C50)),
     Palette("tokyo", "Tokyo Night", true,
         bg = Color(0xFF1A1B26), surface = Color(0xFF16161E), surface2 = Color(0xFF292E42),
         elevated = Color(0xFF2F334D), line = Color(0xFF3B4261),
         text1 = Color(0xFFC0CAF5), text2 = Color(0xFFA9B1D6), text3 = Color(0xFF565F89),
         pink = Color(0xFFBB9AF7), green = Color(0xFF9ECE6A), cyan = Color(0xFF7DCFFF),
         yellow = Color(0xFFE0AF68), danger = Color(0xFFF7768E),
-        dangerContainer = Color(0xFF3A2A3C), chipFill = Color.White.copy(alpha = 0.07f)),
+        dangerContainer = Color(0xFF3A2A3C), chipFill = Color.White.copy(alpha = 0.07f), hairline = Color(0xFF1F2335)),
     Palette("github", "GitHub Dark", true,
         bg = Color(0xFF0D1117), surface = Color(0xFF161B22), surface2 = Color(0xFF21262D),
         elevated = Color(0xFF293039), line = Color(0xFF30363D),
         text1 = Color(0xFFE6EDF3), text2 = Color(0xFF8B949E), text3 = Color(0xFF6E7681),
         pink = Color(0xFFDB61A2), green = Color(0xFF3FB950), cyan = Color(0xFF58A6FF),
         yellow = Color(0xFFD29922), danger = Color(0xFFF85149),
-        dangerContainer = Color(0xFF2D1419), chipFill = Color.White.copy(alpha = 0.06f)),
+        dangerContainer = Color(0xFF2D1419), chipFill = Color.White.copy(alpha = 0.06f), hairline = Color(0xFF1E242C)),
     Palette("paper", "Paper", false,
         bg = Color(0xFFF3F5F9), surface = Color(0xFFFFFFFF), surface2 = Color(0xFFE7ECF3),
         elevated = Color(0xFFFFFFFF), line = Color(0xFFD5DCE6),
         text1 = Color(0xFF12161F), text2 = Color(0xFF59637A), text3 = Color(0xFF8C97AB),
         pink = Color(0xFFDB2777), green = Color(0xFF059669), cyan = Color(0xFF0E7490),
         yellow = Color(0xFFB45309), danger = Color(0xFFDC2626),
-        dangerContainer = Color(0xFFFEF3E2), chipFill = Color(0xFF12161F).copy(alpha = 0.06f)),
+        dangerContainer = Color(0xFFFEF3E2), chipFill = Color(0xFF12161F).copy(alpha = 0.06f), hairline = Color(0xFFE1E7EF)),
     Palette("latte", "Catppuccin Latte", false,
         bg = Color(0xFFEFF1F5), surface = Color(0xFFE6E9EF), surface2 = Color(0xFFCCD0DA),
         elevated = Color(0xFFFFFFFF), line = Color(0xFFBCC0CC),
-        text1 = Color(0xFF4C4F69), text2 = Color(0xFF6C6F85), text3 = Color(0xFF8C8FA1),
+        text1 = Color(0xFF4C4F69), text2 = Color(0xFF5C5F77), text3 = Color(0xFF8C8FA1),
         pink = Color(0xFFEA76CB), green = Color(0xFF40A02B), cyan = Color(0xFF179299),
         yellow = Color(0xFFDF8E1D), danger = Color(0xFFD20F39),
-        dangerContainer = Color(0xFFF9E6E6), chipFill = Color(0xFF4C4F69).copy(alpha = 0.07f))
+        dangerContainer = Color(0xFFF9E6E6), chipFill = Color(0xFF4C4F69).copy(alpha = 0.07f), hairline = Color(0xFFDCE0E8))
 )
 
 object PaletteHolder {
@@ -121,6 +122,16 @@ val Text3: Color get() = PaletteHolder.theme.text3
 
 /** Fill for interactive chips on flat pages — subtle on either theme. */
 val ChipFill: Color get() = PaletteHolder.theme.chipFill
+
+/**
+ * The respectful ink for any fill: black-ish ink on bright accents, white
+ * ink on deep ones — decided by luminance, never by taste. One helper so a
+ * chip on violet and a chip on amber can never disagree about which ink
+ * they carry.
+ */
+fun inkOn(fill: Color): Color =
+    if (1.05 - (0.299 * fill.red + 0.587 * fill.green + 0.114 * fill.blue) * fill.alpha
+        > 0.35) Color.White else Color(0xFF12161F)
 /**
  * The one accent everything reads. It is a getter over observable state, not
  * a constant, so picking a color in settings repaints the whole app without
@@ -138,9 +149,9 @@ val Cyan: Color get() = PaletteHolder.theme.cyan
 val Yellow: Color get() = PaletteHolder.theme.yellow
 val Danger: Color get() = PaletteHolder.theme.danger
 val DangerContainer: Color get() = PaletteHolder.theme.dangerContainer
-/** The hairline every divider in the app sits on — soft on either theme. */
-val Hairline: Color get() =
-    if (PaletteHolder.dark) Color(0xFF1A2231) else Color(0xFFE6EAF0)
+/** The hairline every divider in the app sits on — derived per palette, so
+ * Tokyo's dividers never vanish into Tokyo's background again. */
+val Hairline: Color get() = PaletteHolder.theme.hairline
 
 val CardShape = RoundedCornerShape(20.dp)
 val ChipShape = RoundedCornerShape(50.dp)

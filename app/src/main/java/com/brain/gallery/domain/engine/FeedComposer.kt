@@ -207,7 +207,8 @@ class FeedComposer @Inject constructor() {
         }
         // The cap stays; but raw sums are divided by the realistic ceiling
         // first (see [rescaled]) so a fully-loaded clip still sits apart.
-        return FeedItem(v, rescaled(s), why.take(2).joinToString(" · ").ifEmpty { "picked for balance" })
+        return FeedItem(v, rescaled(s), why.sortedBy { REASON_RANK[it] ?: 99 }
+            .take(2).joinToString(" · ").ifEmpty { "picked for balance" })
     }
 
     /**
@@ -224,6 +225,32 @@ class FeedComposer @Inject constructor() {
         val ENERGY_CATEGORIES = setOf("music", "sport", "gaming", "dance", "celebration")
         /** Realistic everyday ceiling of the raw sum; see [rescaled]. */
         const val SCORE_CEILING = 1.4f
+
+        /**
+         * Which reasons reach the card when there are more than two. The
+         * loudest human truths lead — a rewatch, the learned taste, a
+         * resurfaced memory — and the ambient fillers (time of day, energy,
+         * 'never seen') fall off first. A demotion note ('you saw this
+         * recently') is the last thing worth saying, never the second line
+         * of a card.
+         */
+        val REASON_RANK = mapOf(
+            "you came back to it" to 0,
+            "matches what you keep watching" to 1,
+            "from this day" to 2,
+            "buried" to 3,           // prefix-matched: 'buried N months'
+            "closed fast" to 4,
+            "a favorite" to 5,
+            "you usually finish these" to 6,
+            "all smiles" to 7,
+            "never seen" to 8,
+            "someone talking" to 9,
+            "high energy" to 10,
+            "fits the morning" to 11,
+            "fits the evening" to 11,
+            "with people" to 12,
+            "you saw this recently" to 13
+        )
     }
 
     private fun lerp(a: Float, b: Float, by: Float): Float = a + (b - a) * by.coerceIn(0f, 1f)

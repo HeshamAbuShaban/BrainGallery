@@ -37,6 +37,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlin.math.roundToInt
 import com.brain.gallery.ui.theme.Accent
+import com.brain.gallery.ui.theme.Text2
+import com.brain.gallery.ui.theme.Text1
 
 /** Floor for every tappable node in this file, per platform accessibility guidance. */
 private val MinTouchTarget = 48.dp
@@ -69,7 +71,7 @@ fun GlassSegmented(
     modifier: Modifier = Modifier,
     style: GlassStyle = GlassStyle(),
     selectedColor: Color = Accent,
-    labelColor: Color = Color(0xFFE8ECF4),
+    labelColor: Color = Text2,
     height: Dp = 40.dp,
     corner: Dp = style.corner
 ) {
@@ -160,8 +162,8 @@ fun GlassStatTile(
     modifier: Modifier = Modifier,
     accentColor: Color? = null,
     style: GlassStyle = GlassStyle(),
-    valueColor: Color = Color(0xFFF2F5FA),
-    labelColor: Color = Color(0xFF98A4B8),
+    valueColor: Color = Text1,
+    labelColor: Color = Text2,
     corner: Dp = 20.dp,
     /** Hero numerals read bigger than labels; callers decide how much. */
     valueSize: TextUnit = 19.sp,

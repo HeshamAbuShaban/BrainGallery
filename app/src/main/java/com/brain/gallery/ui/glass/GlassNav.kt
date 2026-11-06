@@ -44,6 +44,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brain.gallery.ui.theme.Accent
+import com.brain.gallery.ui.theme.Text1
+import com.brain.gallery.ui.theme.Text2
 
 data class GlassTab(val label: String, val icon: ImageVector)
 
@@ -75,8 +77,8 @@ fun GlassNav(
     modifier: Modifier = Modifier,
     style: GlassStyle = Glass.pane(Accent),
     selectedColor: Color = Accent,
-    idleColor: Color = Color(0xFF9AA6B8),
-    selectedLabelColor: Color = Color.White,
+    idleColor: Color = Text2,
+    selectedLabelColor: Color = Text1,
     height: Dp = GlassNavHeight
 ) {
     if (tabs.isEmpty()) return

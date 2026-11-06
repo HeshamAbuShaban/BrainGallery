@@ -35,8 +35,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -63,6 +61,7 @@ import com.brain.gallery.domain.organize.GroupKind
 import com.brain.gallery.engine.keeperReason
 import com.brain.gallery.domain.organize.SmartGroup
 import com.brain.gallery.domain.organize.fmtSize
+import com.brain.gallery.ui.components.FavButton
 import com.brain.gallery.ui.components.VideoActionsSheet
 import com.brain.gallery.ui.components.VideoDetailsDialog
 import com.brain.gallery.ui.components.VideoThumb
@@ -255,12 +254,16 @@ fun GroupDetail(
                         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.001f))
                             .clickable { onSplitOut(person.id, v.id) })
                     }
-                    IconButton(onClick = { onFav(v) },
-                        modifier = Modifier.align(Alignment.TopEnd).size(30.dp)) {
-                        Icon(if (v.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                            null, tint = if (v.isFavorite) Pink else Color.White.copy(alpha = 0.8f),
-                            modifier = Modifier.size(15.dp))
-                    }
+                    // One heart, everywhere: tap springs it, haptics answer.
+                    FavButton(
+                        favorite = v.isFavorite,
+                        onToggle = { onFav(v) },
+                        modifier = Modifier.align(Alignment.TopEnd),
+                        size = 15.dp,
+                        tapTarget = 30.dp,
+                        tint = Color.White.copy(alpha = 0.8f),
+                        contentDescription = if (v.isFavorite) "Unfavorite" else "Favorite"
+                    )
                 }
             }
             if (shown < group.videos.size) {

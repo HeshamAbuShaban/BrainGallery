@@ -1,5 +1,8 @@
 package com.brain.gallery.ui.feed
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.brain.gallery.data.local.BrainDatabase
@@ -23,6 +26,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.Calendar
 import javax.inject.Inject
 
@@ -51,6 +55,34 @@ class FeedViewModel @Inject constructor(
     // a reshuffle serves what is left, and wraps only when the unseen pool
     // runs thin. Session-scoped on purpose — a fresh app run may revisit.
     private val servedIds = LinkedHashSet<Long>()
+
+    /** Session-scoped playback speed: what you set on clip 1 is what clip 40 plays at. */
+    var playbackSpeed by mutableStateOf(1f)
+        private set
+    fun cycleSpeed() {
+        playbackSpeed = SPEEDS[(SPEEDS.indexOf(playbackSpeed) + 1) % SPEEDS.size]
+    }
+
+    /**
+     * The page the viewer deliberately paused, null while playing. Cleared
+     * the moment a different page becomes active — switching clips is an
+     * un-pause — but honored when you come back to the very clip you froze.
+     */
+    var pausedPage by mutableStateOf<Int?>(null)
+        private set
+    fun togglePause(page: Int) {
+        pausedPage = if (pausedPage == page) null else page
+    }
+    fun onActivePage(page: Int) {
+        val held = pausedPage
+        if (held != null && held != page) pausedPage = null
+    }
+
+    /** Set by a reshuffle at the end of the reel: the next batch lands async,
+     *  and the choosing gate covers the wait instead of flashing old page 0. */
+    private val _jumpToStart = MutableStateFlow(false)
+    val jumpToStart: StateFlow<Boolean> = _jumpToStart
+    fun consumeJump() { _jumpToStart.value = false }
 
     init {
         BrainScanService.start(ctx)
@@ -85,15 +117,21 @@ class FeedViewModel @Inject constructor(
                         return@collect
                     }
                     lastSig = sig
+                    _loading.value = true
 
-                    val events = db.watchDao().recent()
-                    // This composition reads the freshest profile; a watch
-                    // under it re-ranks the NEXT composition, never this one.
-                    _taste.value = runCatching { tasteStore.load() }.getOrDefault(TasteProfile())
-                    val composed = composer.compose(
-                        videos, events, suppressed,
-                        tuning = cfg.tuning, exclude = servedIds.toSet(),
-                        taste = _taste.value)
+                    // Scoring a whole library is real work — keep it off the
+                    // main thread so the seam between batches never janks.
+                    val composed = withContext(Dispatchers.Default) {
+                        val events = db.watchDao().recent()
+                        // This composition reads the freshest profile; a watch
+                        // under it re-ranks the NEXT composition, never this one.
+                        _taste.value = runCatching { tasteStore.load() }
+                            .getOrDefault(TasteProfile())
+                        composer.compose(
+                            videos, events, suppressed,
+                            tuning = cfg.tuning, exclude = servedIds.toSet(),
+                            taste = _taste.value)
+                    }
                     servedIds.addAll(composed.map { it.video.id })
                     _feed.value = composed
                     _loading.value = false
@@ -131,7 +169,13 @@ class FeedViewModel @Inject constructor(
         return out
     }
 
-    fun reshuffle() { _nonce.value += 1 }
+    fun reshuffle() {
+        // The end-of-reel seam: the choosing gate covers the async compose,
+        // and the next batch opens on its first clip, not a replay of page 0.
+        _loading.value = true
+        _jumpToStart.value = true
+        _nonce.value += 1
+    }
 
     fun refresh() { BrainScanService.start(ctx) }
 
@@ -158,6 +202,8 @@ class FeedViewModel @Inject constructor(
             }
         }
     }
+
+    private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 
     private var tasteLearnJob: kotlinx.coroutines.Job? = null
 

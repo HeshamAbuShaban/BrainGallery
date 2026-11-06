@@ -2,6 +2,8 @@ package com.brain.gallery.ui.organize
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -32,7 +34,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material.icons.filled.KeyboardArrowDown
@@ -50,6 +51,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -68,6 +70,7 @@ import android.os.Build
 import android.widget.ImageView
 import coil.compose.AsyncImage
 import com.brain.gallery.data.local.PhotoEntity
+import com.brain.gallery.ui.components.FavButton
 import com.brain.gallery.ui.components.ShimmerBar
 import com.brain.gallery.ui.glass.Glass
 import com.brain.gallery.ui.glass.glass
@@ -133,6 +136,13 @@ fun PhotoLibrary(
         }
     }
 
+    // Switching shelves or folders breathes in rather than pops.
+    val gridFade = remember { Animatable(1f) }
+    LaunchedEffect(folder, groupFilter) {
+        gridFade.snapTo(0.25f)
+        gridFade.animateTo(1f, tween(220))
+    }
+
     if (photos.isEmpty()) {
         Column(modifier.fillMaxSize().padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -152,7 +162,7 @@ fun PhotoLibrary(
             bottom = glassReserve() + 24.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
-        modifier = modifier.fillMaxSize()
+        modifier = modifier.fillMaxSize().graphicsLayer { alpha = gridFade.value }
     ) {
         item(span = { GridItemSpan(3) }, key = "count") {
             Text(
@@ -397,16 +407,17 @@ fun PhotoViewer(
                 horizontalArrangement = Arrangement.spacedBy(
                     28.dp, Alignment.CenterHorizontally),
                 verticalAlignment = Alignment.CenterVertically) {
-                IconButton(onClick = {
-                    haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                    onFav(!photo.isFavorite)
-                }, modifier = Modifier.glass(CircleShape, Glass.pane(Accent)).size(46.dp)) {
-                    Icon(
-                        if (photo.isFavorite) Icons.Default.Favorite
-                        else Icons.Default.FavoriteBorder,
-                        "Favorite", tint = if (photo.isFavorite) Pink else Text1,
-                        modifier = Modifier.size(22.dp))
-                }
+                // Same vocabulary as every other heart in the app: spring and haptic.
+                FavButton(
+                    favorite = photo.isFavorite,
+                    onToggle = { onFav(!photo.isFavorite) },
+                    modifier = Modifier.glass(CircleShape, Glass.pane(Accent)),
+                    size = 22.dp,
+                    tapTarget = 46.dp,
+                    activeColor = Pink,
+                    tint = Text1,
+                    contentDescription = "Favorite"
+                )
                 IconButton(onClick = {
                     haptics.performHapticFeedback(HapticFeedbackType.LongPress)
                     onDelete()

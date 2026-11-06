@@ -5,6 +5,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -30,7 +32,6 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -44,6 +45,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
@@ -53,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.data.local.PhotoEntity
+import com.brain.gallery.ui.components.FavIcon
 import com.brain.gallery.ui.components.SpotlightPlayer
 import com.brain.gallery.ui.components.VideoActionsSheet
 import com.brain.gallery.ui.components.VideoDetailsDialog
@@ -68,6 +71,7 @@ import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Bg
 import com.brain.gallery.ui.theme.Text1
 import com.brain.gallery.ui.theme.ChipFill
+import com.brain.gallery.ui.theme.inkOn
 import com.brain.gallery.ui.theme.Cyan
 import com.brain.gallery.ui.theme.Text2
 import com.brain.gallery.ui.theme.Pink
@@ -128,6 +132,12 @@ fun SearchScreen(
     val narrowingCategories by vm.narrowingCategories.collectAsState()
     val narrowingFolders by vm.narrowingFolders.collectAsState()
     val sections = remember(results, personNames) { resultSections(results, personNames) }
+    // One breath between answers: the grid lifts out, the next one in.
+    val gridFade = remember { Animatable(1f) }
+    LaunchedEffect(results) {
+        gridFade.snapTo(0.25f)
+        gridFade.animateTo(1f, tween(240))
+    }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().background(Bg).statusBarsPadding().padding(top = 4.dp)) {
@@ -249,10 +259,10 @@ fun SearchScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     suggestions.forEach { sg ->
-                        Text(sg, color = Accent, fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                        Text(sg, color = inkOn(Accent), fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
                             modifier = Modifier
                                 .clip(RoundedCornerShape(50))
-                                .background(ChipFill)
+                                .background(Accent.copy(alpha = 0.85f))
                                 .clickable { vm.query(sg); vm.rememberSearch(sg) }
                                 .padding(horizontal = 14.dp, vertical = 8.dp))
                     }
@@ -301,7 +311,7 @@ fun SearchScreen(
                     bottom = glassReserve() + 20.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.weight(1f)) {
+                modifier = Modifier.weight(1f).graphicsLayer { alpha = gridFade.value }) {
                 sections.forEachIndexed { i, section ->
                     section.title?.let { t ->
                         item(span = { GridItemSpan(3) }, key = "hdr_$i") {
@@ -330,10 +340,13 @@ fun SearchScreen(
                                         photoFor = hit.photo
                                     })
                             if (hit.photo.isFavorite) {
-                                Icon(Icons.Default.Favorite, "favorite",
-                                    tint = Pink, modifier = Modifier
+                                // Pops on newly-appearing state; steady when already known.
+                                FavIcon(hit.photo.isFavorite,
+                                    modifier = Modifier
                                         .align(Alignment.TopEnd)
-                                        .padding(6.dp))
+                                        .padding(6.dp),
+                                    size = 14.dp,
+                                    contentDescription = "favorite")
                             }
                         }
                     }

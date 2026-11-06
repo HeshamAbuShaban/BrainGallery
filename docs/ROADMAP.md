@@ -278,6 +278,18 @@ but no seek, so a representative later frame is not reachable without
 writing a decoder of our own. The first frame stays. 20 tests pin the new
 policy (`PhotoPolicyTest`); no migration, no column, no dependency.
 
+## The photo half gets its mind (Nov 5, evening)
+
+The user's five-point critique, shipped and device-verified: nav pill reads
+the live accent (no more stuck purple), both "More like this" rails fold
+behind their headers via a shared RailPrefs (content first, neighbours on
+request), search suggestions are drawn from the library with weight gates
+(3+/5+) under a "Drawn from your library" heading, PhotoGroupBuilder builds
+the still half of the smart groups (With people / All smiles / labeled
+subjects / Being read / Clutter) as filter cards above the month grid, and
+the single-photo viewer carries an info panel (date, dimensions, brain
+label, tags), the foldable neighbours rail, and share-out-of-device.
+
 ## Six curated themes, device-verified (Nov 5)
 
 The two-theme switch grew into six hand-tuned palettes — Midnight, Catppuccin

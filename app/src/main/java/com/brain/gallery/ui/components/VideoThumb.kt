@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.offset
-import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
@@ -39,12 +38,12 @@ import coil.imageLoader
 import coil.request.ImageRequest
 import coil.request.videoFrameMillis
 import com.brain.gallery.data.local.VideoEntity
+import com.brain.gallery.ui.components.FavIcon
 import com.brain.gallery.ui.glass.Glass
 import com.brain.gallery.ui.glass.glass
 import com.brain.gallery.ui.theme.Accent
 import com.brain.gallery.ui.theme.Hairline
 import com.brain.gallery.ui.theme.CardShape
-import com.brain.gallery.ui.theme.Pink
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -89,8 +88,9 @@ fun VideoThumb(
             listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f)),
             startY = 300f)))
         if (video.isFavorite) {
-            Icon(Icons.Default.Favorite, null, tint = Pink, modifier = Modifier
-                .align(Alignment.TopEnd).padding(6.dp).size(14.dp))
+            // A badge that pops in, not just appears.
+            FavIcon(video.isFavorite, modifier = Modifier
+                .align(Alignment.TopEnd).padding(6.dp), size = 14.dp)
         }
         Text(fmtDur(video.durationMs), color = Color.White, fontSize = 10.sp,
             fontWeight = FontWeight.SemiBold,

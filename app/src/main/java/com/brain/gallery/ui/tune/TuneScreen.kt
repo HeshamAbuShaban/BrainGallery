@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.shape.RoundedCornerShape
 import com.brain.gallery.ui.theme.PALETTES
+import com.brain.gallery.ui.theme.inkOn
 import com.brain.gallery.ui.theme.ChipFill
 import com.brain.gallery.ui.theme.AccentSoft
 import androidx.compose.foundation.shape.CircleShape
@@ -394,13 +395,14 @@ private fun AccentRow(current: Long, onPick: (Long) -> Unit) {
             verticalAlignment = Alignment.CenterVertically) {
             ACCENT_CHOICES.forEach { argb ->
                 val sel = argb == current
+                val fill = Color(argb)
                 Box(Modifier.size(36.dp)
                     .clip(CircleShape)
-                    .background(Color(argb))
-                    .then(if (sel) Modifier.border(2.dp, Color.White, CircleShape) else Modifier)
+                    .background(fill)
+                    .then(if (sel) Modifier.border(2.dp, inkOn(fill), CircleShape) else Modifier)
                     .clickable { onPick(argb) },
                     contentAlignment = Alignment.Center) {
-                    if (sel) Icon(Icons.Default.Check, null, tint = Color.White,
+                    if (sel) Icon(Icons.Default.Check, null, tint = inkOn(fill),
                         modifier = Modifier.size(16.dp))
                 }
             }

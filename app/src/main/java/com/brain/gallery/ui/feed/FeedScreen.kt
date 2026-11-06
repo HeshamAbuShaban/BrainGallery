@@ -39,7 +39,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Pause
@@ -93,6 +92,7 @@ import coil.request.ImageRequest
 import coil.request.videoFrameMillis
 import com.brain.gallery.data.local.VideoEntity
 import com.brain.gallery.domain.engine.FeedItem
+import com.brain.gallery.ui.components.FavIcon
 import com.brain.gallery.ui.components.VideoActionsSheet
 import com.brain.gallery.ui.components.VideoDetailsDialog
 import com.brain.gallery.ui.components.fmtDur
@@ -573,11 +573,16 @@ private fun ReelPage(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.spacedBy(13.dp)
                 ) {
+                    // The reel's heart: springs on a tap, haptic underneath.
                     RailButton(
-                        icon = if (v.isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                        tint = if (v.isFavorite) Pink else Color.White,
-                        count = null
-                    ) { onFav(); tick++ }
+                        icon = Icons.Default.Favorite,
+                        tint = Color.White,
+                        count = null,
+                        iconContent = {
+                            FavIcon(v.isFavorite, size = 27.dp,
+                                activeColor = Pink, tint = Color.White)
+                        }
+                    ) { onFav(); tick++; haptics.performHapticFeedback(HapticFeedbackType.LongPress) }
                     RailButton(Icons.Default.AutoAwesome, Cyan, null) { onSimilar() }
                     RailButton(Icons.Default.Speed,
                         if (speed != 1f) Yellow else Color.White,
@@ -681,11 +686,16 @@ private fun RailButton(
     tint: Color,
     count: String?,
     tick: Int = 0,
+    iconContent: (@Composable () -> Unit)? = null,
     onClick: () -> Unit
 ) {
     Column(horizontalAlignment = Alignment.CenterHorizontally) {
         IconButton(onClick = onClick, modifier = Modifier.size(42.dp)) {
-            Icon(icon, null, tint = tint, modifier = Modifier.size(27.dp))
+            if (iconContent != null) {
+                iconContent()
+            } else {
+                Icon(icon, null, tint = tint, modifier = Modifier.size(27.dp))
+            }
         }
         if (count != null) {
             Text(count, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
