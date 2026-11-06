@@ -42,6 +42,11 @@ class FeedComposer @Inject constructor() {
 
         val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
         val recentIds = events.take(40).map { it.videoId }.toSet()
+        // Rewatches: the same clip appearing twice or more in the recent
+        // window is the loudest yes the viewer can give.
+        val replayCounts = events.take(40)
+            .groupingBy { it.videoId }.eachCount()
+            .filterValues { it > 1 }
         val limit = tuning.feedLength.coerceIn(10, 300)
 
         // The session walk. Served-this-session clips stay out, so the reel
@@ -50,13 +55,13 @@ class FeedComposer @Inject constructor() {
         // what is left unseen leads, then the served clips return as a
         // second pass behind them.
         val unseen = base.filter { it.id !in exclude }
-        if (unseen.size >= limit / 2) return reel(unseen, recentIds, hour, tuning, taste, limit, random)
+        if (unseen.size >= limit / 2) return reel(unseen, recentIds, hour, tuning, taste, limit, random, replayCounts)
 
-        val head = reel(unseen, recentIds, hour, tuning, taste, limit, random)
+        val head = reel(unseen, recentIds, hour, tuning, taste, limit, random, replayCounts)
         val tailNeed = limit - head.size
         if (tailNeed <= 0) return head
         val served = base.filter { it.id in exclude }
-        return head + reel(served, recentIds, hour, tuning, taste, tailNeed, random)
+        return head + reel(served, recentIds, hour, tuning, taste, tailNeed, random, replayCounts)
     }
 
     /**
@@ -72,12 +77,13 @@ class FeedComposer @Inject constructor() {
         t: FeedTuning,
         taste: TasteProfile,
         limit: Int,
-        random: Random
+        random: Random,
+        replayCounts: Map<Long, Int> = emptyMap()
     ): List<FeedItem> {
         if (pool.isEmpty() || limit <= 0) return emptyList()
         val ranked = pool.asSequence()
             .filter { it.junkScore < t.junkCut }
-            .map { v -> score(v, recentIds, hour, t, taste) }
+            .map { v -> score(v, recentIds, hour, t, taste, replayCounts) }
             .sortedByDescending { it.score }
             .take(limit * 2)
             .toList()
@@ -111,7 +117,8 @@ class FeedComposer @Inject constructor() {
         recentIds: Set<Long>,
         hour: Int,
         t: FeedTuning,
-        taste: TasteProfile = TasteProfile()
+        taste: TasteProfile = TasteProfile(),
+        replayCounts: Map<Long, Int> = emptyMap()
     ): FeedItem {
         var s = 0.3f // base exploration
         val why = mutableListOf<String>()
@@ -123,6 +130,14 @@ class FeedComposer @Inject constructor() {
                 why += "you usually finish these"
             }
             if (v.skipCount > 2) s -= 0.2f * t.completionWeight
+            // Early abandon is a verdict, not a hiccup: every cross-source
+            // reading of short-video ranking agrees the first seconds carry
+            // the heaviest vote. A clip closed in its first moments sinks
+            // far harder than a late skip.
+            if (v.skipCount > 0 && v.avgCompletion in 0.01f..0.15f) {
+                s -= 0.3f * t.completionWeight
+                why += "closed fast"
+            }
         } else {
             s += 0.12f * t.noveltyWeight
             why += "never seen"
@@ -180,6 +195,15 @@ class FeedComposer @Inject constructor() {
         if (v.id in recentIds) {
             s *= 1f - t.replayPenalty * 0.65f
             why += "you saw this recently"
+        }
+        // Rewatch: the loudest yes — coming back to a clip after it ended
+        // outweighs a plain completion. Capped so one beloved clip cannot
+        // own the reel. Added AFTER the anti-repeat demotion on purpose:
+        // the return is the point, the demotion governs everything else.
+        val replays = replayCounts[v.id] ?: 0
+        if (replays > 0) {
+            s += 0.18f * replays.coerceAtMost(3) * t.completionWeight
+            why += "you came back to it"
         }
         // The cap stays; but raw sums are divided by the realistic ceiling
         // first (see [rescaled]) so a fully-loaded clip still sits apart.
