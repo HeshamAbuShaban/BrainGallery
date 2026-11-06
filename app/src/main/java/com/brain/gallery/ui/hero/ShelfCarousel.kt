@@ -270,12 +270,19 @@ private fun ShelfCard(
         } else {
             Box(Modifier.fillMaxSize().background(Surface2))
         }
+        // The cards read by what covers them: title needs the dark behind it,
+        // or the type vanishes into whatever the frame shows.
+        Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(56.dp)
+            .background(Brush.verticalGradient(
+                listOf(Color.Transparent, Color.Black.copy(alpha = 0.62f)))))
         // Raw type only: name and one metadata line. No pills, no chips.
         Column(Modifier.align(Alignment.BottomStart).padding(10.dp)) {
-            Text(group.title, color = Text1, fontSize = 13.sp, fontWeight = FontWeight.Bold,
+            Text(group.title, color = Color.White, fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(1.dp))
-            Text(group.subtitle, color = Text2, fontSize = 10.5.sp,
+            Text(group.subtitle, color = Color.White.copy(alpha = 0.72f),
+                fontSize = 10.5.sp,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }

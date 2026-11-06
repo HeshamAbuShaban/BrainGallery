@@ -112,7 +112,7 @@ fun GlassNav(
         Box(
             Modifier
                 .glassNavReveal { alpha.value }
-                .widthIn(min = 236.dp, max = 330.dp)
+                .widthIn(min = 248.dp, max = 372.dp)
                 .height(height)
                 .glass(RoundedCornerShape(style.corner), style)
                 .padding(horizontal = 5.dp)
