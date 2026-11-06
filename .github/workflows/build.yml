@@ -66,13 +66,13 @@ jobs:
           unzip -l "$APK" | awk 'NF>=4 && $1 ~ /^[0-9]+$/ {printf "%10.2f MB  %s\n", $1/1048576, $4}' | sort -rn | head -15
 
       - name: Upload debug APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: brain-gallery-debug
           path: app/build/outputs/apk/debug/app-debug.apk
 
       - name: Upload release APK
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: brain-gallery-release
           path: app/build/outputs/apk/release/app-release.apk
@@ -80,7 +80,7 @@ jobs:
       # The HTML test report survives only if you know to ask for it.
       - name: Keep the test report on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: unit-test-reports
           path: app/build/reports/tests/testDebugUnitTest/
