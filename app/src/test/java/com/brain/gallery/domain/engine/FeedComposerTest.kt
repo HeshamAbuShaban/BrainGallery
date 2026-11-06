@@ -238,7 +238,7 @@ class FeedComposerTest {
             WatchEventEntity(videoId = 1, atMs = 1, completion = 0.95f, skipped = false, hourOfDay = 13))
         val out = composer.compose(clips, events, random = Random(7))
         val one = out.first { it.video.id == 1L }
-        assertTrue(one.reason.contains("came back"), "reason was: ${one.reason}")
+        assertTrue("reason was: ${one.reason}", one.reason.contains("came back"))
     }
 
     @Test
@@ -246,7 +246,7 @@ class FeedComposerTest {
         val abandoned = video(1, watched = true, completion = 0.1f).copy(skipCount = 1)
         val out = composer.compose(listOf(abandoned), emptyList(), random = Random(7))
         val reason = out.first().reason
-        assertTrue(reason.contains("closed fast"), "reason was: $reason")
+        assertTrue("reason was: $reason", reason.contains("closed fast"))
         assertFalse(reason.contains("a favorite"))
     }
 
