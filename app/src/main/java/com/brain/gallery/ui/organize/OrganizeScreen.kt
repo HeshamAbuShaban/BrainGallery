@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -69,6 +70,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -277,7 +279,6 @@ fun OrganizeScreen(
                         // screen. Featured groups leaning on the inside of a
                         // cylinder; tap opens the group.
                         val shelf = buildList {
-                            groups.firstOrNull { it.kind == GroupKind.ON_THIS_DAY }?.let { add(it) }
                             groups.firstOrNull { it.kind == GroupKind.MEMORIES }?.let { add(it) }
                             groups.firstOrNull { it.kind == GroupKind.GEMS }?.let { add(it) }
                             groups.firstOrNull { it.kind == GroupKind.FAVORITES }?.let { add(it) }
@@ -316,6 +317,19 @@ fun OrganizeScreen(
                                         modifier = Modifier.padding(top = 2.dp)
                                     )
                                 }
+                            }
+                        }
+                        // "On this day": not a scoring signal, a door. It used
+                        // to share a tile with everything else; now it has the
+                        // hub's one wide card, and the shelf misses nothing it
+                        // cannot do better than this can.
+                        val otd = groups.firstOrNull {
+                            it.kind == GroupKind.ON_THIS_DAY && it.videos.isNotEmpty()
+                        }
+                        if (otd != null) {
+                            item(span = { GridItemSpan(2) }, key = "on-this-day") {
+                                OnThisDayCard(group = otd,
+                                    onOpen = { onOpenGroup(otd.id) })
                             }
                         }
                         itemsIndexed(groups, key = { _, g -> g.id }) { i, g ->
@@ -741,4 +755,43 @@ fun GroupDetailRoute(
         onSwipeNotInterested = { vid -> vm.markNotInterested(vid) },
         persons = persons,
         personCounts = personCounts)
+}
+
+/**
+ * The hub's one deliberate door: this date, other years. A strip of the day's
+ * own covers under one quiet line — a shelf tile was never enough of a reason
+ * to open a day the brain kept for you. It replaced its own slot on the
+ * shelf, which this card alone now carries.
+ */
+@Composable
+private fun OnThisDayCard(group: SmartGroup, onOpen: () -> Unit) {
+    val haptics = LocalHapticFeedback.current
+    val covers = group.videos.take(5)
+    Box(
+        Modifier.fillMaxWidth().height(128.dp)
+            .clip(RoundedCornerShape(20.dp))
+            .clickable {
+                haptics.performHapticFeedback(
+                    androidx.compose.ui.hapticfeedback.HapticFeedbackType.TextHandleMove)
+                onOpen()
+            }
+    ) {
+        Row(Modifier.fillMaxSize(),
+            horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+            covers.forEach { v -> VideoThumb(v, Modifier.weight(1f).fillMaxHeight()) }
+        }
+        Box(Modifier.fillMaxSize().background(Brush.verticalGradient(
+            listOf(Color.Black.copy(alpha = 0.15f), Color.Black.copy(alpha = 0.85f)),
+            startY = 0f)))
+        Column(Modifier.align(Alignment.BottomStart).padding(16.dp, 14.dp)) {
+            Text("ON THIS DAY", color = Yellow, fontSize = 10.sp,
+                fontWeight = FontWeight.ExtraBold, letterSpacing = 1.5.sp)
+            Spacer(Modifier.height(3.dp))
+            Text("${group.videos.size} clips from this date, across the years",
+                color = Color.White, fontSize = 15.5.sp, fontWeight = FontWeight.Bold,
+                maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text("from years past, today — tap to wander back",
+                color = Color.White.copy(alpha = 0.75f), fontSize = 11.sp, maxLines = 1)
+        }
+    }
 }
