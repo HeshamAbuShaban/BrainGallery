@@ -24,8 +24,8 @@ android {
         applicationId = "com.brain.gallery"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0"
         // Target only the phone's ABI. A universal APK shipped four copies of the
         // native libs (arm64-v8a, armeabi-v7a, x86, x86_64) — the x86 pair is
         // emulator-only dead weight that cost ~65 MB.
