@@ -1,7 +1,0 @@
-version: 2
-updates:
-  # Keep the CI's own actions fresh — they age quietly otherwise.
-  - package-ecosystem: github-actions
-    directory: /
-    schedule:
-      interval: weekly
