@@ -107,6 +107,7 @@ class TuneViewModel @Inject constructor(private val store: SettingsStore) : View
  * to the Brain control room. Every control here is read by the composer —
  * nothing on this screen is decorative.
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun TuneScreen(onOpenBrain: () -> Unit, vm: TuneViewModel = hiltViewModel()) {
     val cfg by vm.settings.collectAsState()
